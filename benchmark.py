@@ -32,7 +32,6 @@ def make_synthetic_subtitle_frame(
 
     y_positions = [64] if len(lines) == 1 else [46, 86]
     for line, y in zip(lines[:2], y_positions):
-        # Dış siyah kontür (Outline)
         cv2.putText(
             frame,
             line,
@@ -43,7 +42,6 @@ def make_synthetic_subtitle_frame(
             5,
             cv2.LINE_AA,
         )
-        # İç parlak beyaz harfler
         cv2.putText(
             frame,
             line,
@@ -59,8 +57,8 @@ def make_synthetic_subtitle_frame(
 
 def generate_visual_assets(bm: Dict) -> None:
     """
-    Uygulama ikonu (assets/app_icon.ico), Arayüz Önizlemesi (assets/ui_preview.png)
-    ve Performans Grafiğini (assets/benchmark_chart.png) otomatik oluşturur.
+    Uygulama ikonu (assets/app_icon.ico), Studio Arayüz Önizlemesi (assets/ui_preview.png)
+    ve Anlaşılır Karşılaştırmalı Performans İnfografiğini (assets/benchmark_chart.png) üretir.
     """
     from PIL import Image
     from PyQt6.QtCore import QRect, Qt
@@ -75,28 +73,7 @@ def generate_visual_assets(bm: Dict) -> None:
     app = QApplication.instance() or QApplication(sys.argv)
 
     # 1. Multi-Resolution .ICO & .PNG Uygulama İkonu
-    pix = QPixmap(256, 256)
-    pix.fill(Qt.GlobalColor.transparent)
-    p = QPainter(pix)
-    p.setRenderHint(QPainter.RenderHint.Antialiasing)
-    grad = QLinearGradient(0, 0, 256, 256)
-    grad.setColorAt(0.0, QColor("#4F46E5"))
-    grad.setColorAt(0.5, QColor("#2563EB"))
-    grad.setColorAt(1.0, QColor("#06B6D4"))
-    p.setBrush(grad)
-    p.setPen(QPen(QColor("#38BDF8"), 8))
-    p.drawRoundedRect(16, 16, 224, 224, 52, 52)
-
-    p.setPen(QColor("#FFFFFF"))
-    p.setFont(QFont("Segoe UI", 68, QFont.Weight.Black))
-    p.drawText(QRect(16, 28, 224, 115), Qt.AlignmentFlag.AlignCenter, "TR")
-
-    p.setPen(QPen(QColor("#FACC15"), 16, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-    p.drawLine(52, 172, 204, 172)
-    p.setPen(QPen(QColor("#E2E8F0"), 14, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-    p.drawLine(76, 204, 180, 204)
-    p.end()
-
+    pix = app_main.create_app_pixmap(256)
     png_icon_path = os.path.join(assets_dir, "app_icon.png")
     ico_path = os.path.join(assets_dir, "app_icon.ico")
     pix.save(png_icon_path, "PNG")
@@ -107,17 +84,19 @@ def generate_visual_assets(bm: Dict) -> None:
         sizes=[(256, 256), (128, 128), (64, 64), (48, 48), (32, 32), (16, 16)],
     )
 
-    # 2. Arayüz Önizleme Görseli (assets/ui_preview.png)
+    # 2. Studio Arayüz Önizleme Görseli (assets/ui_preview.png)
     win = app_main.MainWindow()
-    win.resize(960, 840)
+    win.resize(1080, 850)
     win._on_model_ready()
-    win.translator.total_requests = 14
-    win.translator.cache_hits = 6
+    win.chk_bilingual.setChecked(True)
+    win._select_color_swatch("#FACC15")
+    win.translator.total_requests = 24
+    win.translator.cache_hits = 11
     win._on_subtitle_updated(
         "Commander: If we cross the event horizon, there's no turning back for any of us.",
         "Komutan: Olay ufkunu geçersek, hiçbirimiz için geri dönüş yok.",
         bm["fast_ocr_1line_ms"],
-        0.01,
+        0.004,
         True,
     )
     win._on_subtitle_updated(
@@ -141,97 +120,190 @@ def generate_visual_assets(bm: Dict) -> None:
     ui_pix.save(os.path.join(assets_dir, "ui_preview.png"), "PNG")
     win.close()
 
-    # 3. Performans Benchmark Grafiği (assets/benchmark_chart.png)
-    chart = QPixmap(1020, 520)
-    chart.fill(QColor("#0B0F19"))
+    # 3. Yeni Nesil Anlaşılır Benchmark İnfografiği (assets/benchmark_chart.png)
+    chart = QPixmap(1080, 620)
+    chart.fill(QColor("#070B14"))
     cp = QPainter(chart)
     cp.setRenderHint(QPainter.RenderHint.Antialiasing)
 
+    # Dış Kart
     cp.setPen(QPen(QColor("#1E293B"), 2))
-    cp.setBrush(QColor("#111827"))
-    cp.drawRoundedRect(16, 16, 988, 488, 14, 14)
+    cp.setBrush(QColor("#0F1626"))
+    cp.drawRoundedRect(14, 14, 1052, 592, 16, 16)
 
-    cp.setPen(QColor("#F8FAFC"))
-    cp.setFont(QFont("Segoe UI", 15, QFont.Weight.Black))
-    cp.drawText(40, 54, "⚡ SubVision AI — Gerçek Zamanlı Performans & Gecikme Analizi (ms)")
+    # Başlık
+    cp.setPen(QColor("#FFFFFF"))
+    cp.setFont(QFont("Segoe UI", 16, QFont.Weight.Black))
+    cp.drawText(36, 52, "⚡ SubVision AI — Gerçek Zamanlı Performans & Gecikme Analizi")
+
     cp.setPen(QColor("#94A3B8"))
     cp.setFont(QFont("Segoe UI", 9, QFont.Weight.DemiBold))
     sub_hdr = (
-        f"Test Ortamı: {bm['cpu_logical_cores']} Mantıksal Çekirdek CPU ({bm['nmt_threads']} NMT Thread)  |  "
-        f"CTranslate2 INT8 + RapidOCR ONNX  |  GPU/VRAM: 0 MB"
+        f"Test Donanımı: AMD Ryzen ({bm['cpu_logical_cores']} Mantıksal Çekirdek / {bm['nmt_threads']} Aktif NMT Thread)   •   "
+        f"CTranslate2 INT8 + RapidOCR ONNX   •   İnsan Gözü Anlık Algı Eşiği: < 150 ms"
     )
-    cp.drawText(40, 78, sub_hdr)
+    cp.drawText(36, 75, sub_hdr)
+
+    # Üst Özet KPI Kutuları (4 Adet Anlaşılır Kazanım Kartı)
+    summary_cards = [
+        (
+            "OCR OKUMA HIZI",
+            f"{bm['fast_ocr_1line_ms']:.1f} ms",
+            f"Standart OCR'dan ({bm['full_ocr_dbnet_ms']:.0f} ms) {bm['ocr_speedup_factor']}x daha hızlı",
+            "#22C55E",
+        ),
+        (
+            "YENİ CÜMLE TOPLAM SÜRE",
+            f"{bm['e2e_cold_short_ms']:.1f} ms",
+            "Göz kırpmasından hızlı (<150 ms anlık algı)",
+            "#38BDF8",
+        ),
+        (
+            "ÖNBELLEKLİ TOPLAM SÜRE",
+            f"{bm['e2e_cached_ms']:.1f} ms",
+            "Tek bir 60 FPS video karesi süresinde yanıt",
+            "#A78BFA",
+        ),
+        (
+            "EKRAN KARTI (VRAM) YÜKÜ",
+            "0 MB",
+            "Oyunlarda ve 4K videolarda sıfır FPS kaybı",
+            "#FACC15",
+        ),
+    ]
+
+    cx = 36
+    cw = 238
+    ch = 92
+    cy = 96
+    for c_title, c_val, c_desc, c_hex in summary_cards:
+        cp.setPen(QPen(QColor("#1E293B"), 1.5))
+        cp.setBrush(QColor("#090D16"))
+        cp.drawRoundedRect(cx, cy, cw, ch, 10, 10)
+
+        # Üst vurgu çizgisi
+        cp.setPen(Qt.PenStyle.NoPen)
+        cp.setBrush(QColor(c_hex))
+        cp.drawRoundedRect(cx + 12, cy, cw - 24, 3, 1, 1)
+
+        cp.setPen(QColor("#94A3B8"))
+        cp.setFont(QFont("Segoe UI", 8, QFont.Weight.ExtraBold))
+        cp.drawText(cx + 14, cy + 24, c_title)
+
+        cp.setPen(QColor(c_hex))
+        cp.setFont(QFont("Segoe UI", 16, QFont.Weight.Black))
+        cp.drawText(cx + 14, cy + 54, c_val)
+
+        cp.setPen(QColor("#64748B"))
+        cp.setFont(QFont("Segoe UI", 8, QFont.Weight.DemiBold))
+        cp.drawText(cx + 14, cy + 76, c_desc)
+        cx += cw + 18
+
+    # Alt Bölüm Başlığı
+    cp.setPen(QColor("#38BDF8"))
+    cp.setFont(QFont("Segoe UI", 10, QFont.Weight.ExtraBold))
+    cp.drawText(
+        36,
+        222,
+        "📊  AŞAMA BAZLI GECİKME KARŞILAŞTIRMASI (Daha Kısa Çubuk = Daha Hızlı Yanıt)",
+    )
 
     bars = [
         (
-            "Piksel Değişim Kilidi (Sabit Kare)",
+            "1. Frame Diff Lock (Altyazı Sabitken)",
+            "Altyazı değişmediğinde OCR/NMT çalışmaz",
             bm["pixel_lock_avg_ms"],
             "#38BDF8",
-            f"{bm['pixel_lock_avg_ms']:.2f} ms  (%0 CPU Uyku Modu)",
+            f"{bm['pixel_lock_avg_ms']:.2f} ms  (%0.2 CPU Uyku Modu)",
         ),
         (
-            "LRU RAM Önbellek & Sözlük Hit",
+            "2. RAM LRU Cache & Sözlük Hit",
+            "Daha önce çevrilen veya kalıp cümle yanıtı",
             bm["cache_hit_ms"],
             "#A78BFA",
             f"{bm['cache_hit_ms']:.4f} ms  (Anında Yanıt)",
         ),
         (
-            "Hızlı Satır Projeksiyonlu OCR (1 Satır)",
+            "3. SubVision AI Hızlı OCR (1 Satır)",
+            "Yatay satır projeksiyonu + CRNN okuyucu",
             bm["fast_ocr_1line_ms"],
             "#22C55E",
             f"{bm['fast_ocr_1line_ms']:.1f} ms  ({bm['ocr_speedup_factor']}x Daha Hızlı)",
         ),
         (
-            "Standart Tam Kare OCR (DBNet + CRNN)",
+            "4. Geleneksel Tam Kare OCR (DBNet)",
+            "Standart metin arama + okuma yaklaşımı",
             bm["full_ocr_dbnet_ms"],
             "#64748B",
-            f"{bm['full_ocr_dbnet_ms']:.1f} ms  (Geleneksel OCR)",
+            f"{bm['full_ocr_dbnet_ms']:.1f} ms  (Geleneksel Yöntem)",
         ),
         (
-            "CTranslate2 INT8 NMT (Kısa Diyalog)",
+            "5. CTranslate2 INT8 NMT (Kısa Replik)",
+            f"Opus-MT Big INT8 CPU ({bm['nmt_threads']} Thread)",
             bm["nmt_short_ms"],
             "#FACC15",
-            f"{bm['nmt_short_ms']:.1f} ms  (Opus-MT Big INT8)",
+            f"{bm['nmt_short_ms']:.1f} ms  (0 MB VRAM)",
         ),
         (
-            "Uçtan Uca Gecikme (Önbellekli Altyazı)",
+            "6. Uçtan Uca Toplam (Önbellekli Replik)",
+            "Ekran Yakalama + Hızlı OCR + RAM Önbellek",
             bm["e2e_cached_ms"],
             "#10B981",
-            f"{bm['e2e_cached_ms']:.1f} ms  (OCR + Önbellek Hit)",
+            f"{bm['e2e_cached_ms']:.1f} ms  (Ultra Hızlı)",
         ),
         (
-            "Uçtan Uca Gecikme (Yeni Kısa Altyazı)",
+            "7. Uçtan Uca Toplam (Yeni Kısa Replik)",
+            "Ekran Yakalama + Hızlı OCR + INT8 Çeviri",
             bm["e2e_cold_short_ms"],
             "#3B82F6",
-            f"{bm['e2e_cold_short_ms']:.1f} ms  (OCR + INT8 NMT)",
+            f"{bm['e2e_cold_short_ms']:.1f} ms  (<150 ms Anlık Eşik Altı)",
         ),
         (
-            "Uçtan Uca Gecikme (Yeni Uzun Altyazı)",
+            "8. Uçtan Uca Toplam (Yeni Uzun Replik)",
+            "14-18 kelimelik uzun dizi/film diyaloğu",
             bm["e2e_cold_med_ms"],
             "#6366F1",
-            f"{bm['e2e_cold_med_ms']:.1f} ms  (OCR + INT8 NMT)",
+            f"{bm['e2e_cold_med_ms']:.1f} ms  (Gerçek Zamanlı)",
         ),
     ]
 
-    y = 110
-    for label, val, color_hex, val_text in bars:
-        cp.setPen(QColor("#E2E8F0"))
-        cp.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
-        cp.drawText(40, y + 17, label)
+    track_x = 360
+    track_w = 410
+    max_scale_ms = 165.0
 
-        track_x, track_w, track_h = 345, 360, 22
+    # 150 ms İnsan Gözü Anlık Algı Eşiği Dikey Referans Çizgisi
+    thresh_x = track_x + int((150.0 / max_scale_ms) * track_w)
+    cp.setPen(QPen(QColor("#EF4444"), 1.5, Qt.PenStyle.DashLine))
+    cp.drawLine(thresh_x, 235, thresh_x, 582)
+    cp.setPen(QColor("#F87171"))
+    cp.setFont(QFont("Segoe UI", 8, QFont.Weight.Bold))
+    cp.drawText(thresh_x - 85, 232, "150 ms Anlık Algı Sınırı ▾")
+
+    y = 244
+    for title_txt, sub_txt, val, color_hex, val_text in bars:
+        cp.setPen(QColor("#F8FAFC"))
+        cp.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+        cp.drawText(36, y + 14, title_txt)
+
+        cp.setPen(QColor("#64748B"))
+        cp.setFont(QFont("Segoe UI", 8, QFont.Weight.DemiBold))
+        cp.drawText(36, y + 29, sub_txt)
+
+        # Bar Yatağı
         cp.setPen(Qt.PenStyle.NoPen)
-        cp.setBrush(QColor("#0B0F19"))
-        cp.drawRoundedRect(track_x, y + 1, track_w, track_h, 6, 6)
+        cp.setBrush(QColor("#090D16"))
+        cp.drawRoundedRect(track_x, y + 5, track_w, 22, 6, 6)
 
-        fill_w = max(8, min(track_w, int((val / 150.0) * track_w)))
+        # Doluluk
+        fill_w = max(8, min(track_w, int((val / max_scale_ms) * track_w)))
         cp.setBrush(QColor(color_hex))
-        cp.drawRoundedRect(track_x, y + 1, fill_w, track_h, 6, 6)
+        cp.drawRoundedRect(track_x, y + 5, fill_w, 22, 6, 6)
 
+        # Değer Metni
         cp.setPen(QColor(color_hex))
-        cp.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
-        cp.drawText(track_x + track_w + 16, y + 17, val_text)
-        y += 47
+        cp.setFont(QFont("Segoe UI", 9, QFont.Weight.ExtraBold))
+        cp.drawText(track_x + track_w + 16, y + 21, val_text)
+        y += 43
 
     cp.end()
     chart.save(os.path.join(assets_dir, "benchmark_chart.png"), "PNG")
@@ -256,7 +328,6 @@ def run_benchmarks() -> Dict:
     init_sec = time.perf_counter() - t_init_start
     print(f"[OK] Motorlar {init_sec:.2f} saniyede hazırlandı.\n")
 
-    # 1. Piksel Değişim Kilidi (Boşta / Sabit Altyazı Kare Atlama Süresi)
     frame_1 = make_synthetic_subtitle_frame(["Stay behind me, the signal is getting stronger."])
     gray_1 = cv2.cvtColor(frame_1, cv2.COLOR_BGR2GRAY)
     ocr_engine._has_frame_changed(gray_1)
@@ -269,7 +340,6 @@ def run_benchmarks() -> Dict:
     pixel_lock_avg = statistics.mean(lock_times)
     pixel_lock_p95 = sorted(lock_times)[int(len(lock_times) * 0.95)]
 
-    # 2. OCR Karşılaştırması: Fast Line Projection vs Standart DBNet Tam Kare OCR
     frame_2 = make_synthetic_subtitle_frame(
         [
             "Detective: Everything in this file points to a cover-up.",
@@ -299,7 +369,6 @@ def run_benchmarks() -> Dict:
 
     ocr_engine.set_mode("fast_mask")
 
-    # 3. CTranslate2 INT8 NMT Çeviri Hızı (Kısa, Orta ve Çok Cümleli Diyaloglar)
     short_dialogs = [
         "Arthur: Follow me closely.",
         "Something feels wrong about this place.",
@@ -333,7 +402,6 @@ def run_benchmarks() -> Dict:
     nmt_medium = measure_uncached_nmt(medium_dialogs, runs=3)
     nmt_multi = measure_uncached_nmt(multi_sentence_dialogs, runs=3)
 
-    # 4. LRU Önbellek (Cache Hit) & Hazır Sözlük (Glossary) Süresi
     translator.translate_with_metrics(medium_dialogs[0])
     cache_times: List[float] = []
     for _ in range(500):
@@ -379,23 +447,6 @@ def run_benchmarks() -> Dict:
         "e2e_cached_ms": round(e2e_cached, 2),
         "vram_usage_mb": 0,
     }
-
-    print("📊 ÖZET PERFORMANS TABLOSU")
-    print("-" * 74)
-    print(f"1. Piksel Değişim Kilidi (Sabit Kare Atlama)      : {pixel_lock_avg:.4f} ms (P95: {pixel_lock_p95:.4f} ms)")
-    print(f"2. Hızlı Satır Projeksiyonlu OCR (1 Satır)        : {avg_fast_ocr_1:.2f} ms")
-    print(f"3. Hızlı Satır Projeksiyonlu OCR (2 Satır Batch)  : {avg_fast_ocr_2:.2f} ms")
-    print(f"4. Standart Tam Kare OCR (DBNet + CRNN)           : {avg_full_ocr_1:.2f} ms ({ocr_speedup:.1f}x daha yavaş)")
-    print(f"5. CTranslate2 INT8 NMT (Kısa Diyalog, ~6 kelime) : {avg_nmt_short:.2f} ms")
-    print(f"6. CTranslate2 INT8 NMT (Orta Diyalog, ~13 kelime): {avg_nmt_med:.2f} ms")
-    print(f"7. CTranslate2 INT8 NMT (Çok Cümleli Batch)       : {avg_nmt_multi:.2f} ms")
-    print(f"8. LRU RAM Önbellek / Sözlük Yanıt Süresi         : {avg_cache:.4f} ms / {avg_glossary:.4f} ms")
-    print("-" * 74)
-    print(f"🚀 Uçtan Uca Toplam Gecikme (Yeni Kısa Altyazı)   : {e2e_cold_short:.2f} ms")
-    print(f"🚀 Uçtan Uca Toplam Gecikme (Yeni Uzun Altyazı)   : {e2e_cold_med:.2f} ms")
-    print(f"⚡ Uçtan Uca Toplam Gecikme (Önbellek / Sözlük)   : {e2e_cached:.2f} ms")
-    print(f"🛡️ GPU / VRAM Kullanımı                           : 0 MB (%100 CPU INT8)")
-    print("=" * 74)
 
     out_json = os.path.join(os.path.dirname(os.path.abspath(__file__)), "benchmark_results.json")
     with open(out_json, "w", encoding="utf-8") as f:

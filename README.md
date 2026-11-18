@@ -1,14 +1,14 @@
 <div align="center">
 
-<img src="assets/app_icon.png" alt="SubVision AI Logo" width="96" height="96" />
+<img src="assets/app_icon.png" alt="SubVision AI Logo" width="92" height="92" />
 
-# ⚡ SubVision AI — Real-Time On-Screen Subtitle Translator (EN ➔ TR)
+# ⚡ SubVision AI — Real-Time On-Screen Subtitle Studio (EN ➔ TR)
 
 **Oyunlar, Diziler, Filmler ve Canlı Yayınlar İçin Ultra Düşük Gecikmeli Lokal AI Altyazı Çeviri Motoru**
 
-[![Release](https://img.shields.io/badge/Release-v1.0.0_(Windows_x64)-2563EB?style=for-the-badge&logo=github)](https://github.com/Andacbasaran/subvision-ai-subtitle-translator/releases/latest)
+[![Release](https://img.shields.io/badge/Download_Release-v1.0.0_(.EXE)-2563EB?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/Andacbasaran/subvision-ai-subtitle-translator/releases/latest)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
-[![PyQt6](https://img.shields.io/badge/GUI-PyQt6-41CD52?style=for-the-badge&logo=qt&logoColor=white)](https://pypi.org/project/PyQt6/)
+[![PyQt6](https://img.shields.io/badge/UI-PyQt6_Studio-41CD52?style=for-the-badge&logo=qt&logoColor=white)](https://pypi.org/project/PyQt6/)
 [![CTranslate2](https://img.shields.io/badge/NMT-CTranslate2_INT8-FACC15?style=for-the-badge)](https://github.com/OpenNMT/CTranslate2)
 [![RapidOCR](https://img.shields.io/badge/OCR-RapidOCR_ONNX-38BDF8?style=for-the-badge)](https://github.com/RapidAI/RapidOCR)
 [![VRAM](https://img.shields.io/badge/GPU_/_VRAM-0_MB_(%25100_CPU)-10B981?style=for-the-badge)](#)
@@ -18,76 +18,100 @@
 
 ---
 
-## 🎯 Genel Bakış (Overview)
+## ✨ Neden SubVision AI? (Kısa Özet)
 
-**SubVision AI**, ekranda çalışan herhangi bir **PC Oyunu** *(RPG, Action, Story, Visual Novel)*, **Dizi & Film** *(Netflix, Prime Video, Disney+, VLC, MPC-HC, Blu-ray)* veya **Canlı Yayın / Video** *(YouTube, Twitch, Udemy)* üzerindeki İngilizce altyazıları gerçek zamanlı (*Real-Time*) olarak yakalayan, tamamen **lokal CPU üzerinde (`INT8 Quantization` destekli NMT modeli ile)** Türkçeye çeviren ve şeffaf bir **`Click-Through Overlay`** olarak ekrana yansıtan yüksek performanslı bir masaüstü uygulamasıdır.
+**SubVision AI**, ekranda açık olan herhangi bir **PC Oyunu**, **Dizi / Film Platformu** *(Netflix, Prime Video, Disney+, VLC, Blu-ray)* veya **Canlı Yayın / Video** *(YouTube, Twitch, Udemy)* üzerindeki İngilizce altyazıları anlık olarak okuyan, **tamamen kendi bilgisayarınızda (`Offline CPU Inference`)** Türkçeye çeviren ve orijinal altyazının tam üzerine şeffaf bir **`Click-Through Overlay`** olarak yansıtan masaüstü stüdyosudur.
 
-* 🛡️ **Zero GPU / VRAM Footprint (`0 MB VRAM`):** Oyunlarda FPS düşüşüne veya frame-time dalgalanmasına yol açmamak için GPU kaynağını kullanmaz; tüm OCR ve NMT `inference` işlemlerini `CTranslate2 INT8` ve `ONNX Runtime` üzerinden CPU üzerinde çalıştırır.
-* 🔒 **Anti-Cheat & DRM Safe:** Hiçbir oyun dosyasına, process belleğine veya media player sürecine inject olmaz; yalnızca OS seviyesinde belirlenen **`ROI (Region of Interest)`** alanından ekran yakalama yapar.
-* 🌐 **%100 Offline & Self-Hosted Inference:** Harici bir Cloud API anahtarı, rate-limit veya ücretli abonelik gerektirmez.
+<table>
+  <tr>
+    <td width="50%">
+      <b>⚡ Göz Kırpmasından Hızlı (~88 ms)</b><br/>
+      Standart OCR motorlarındaki ağır metin arama katmanını (<code>DBNet</code>) bypass ederek altyazıyı <b>19.8 ms</b>'de okur ve toplam <b>~87.9 ms</b> içinde Türkçeye çevirir.
+    </td>
+    <td width="50%">
+      <b>🛡️ Sıfır FPS Kaybı (0 MB VRAM)</b><br/>
+      Ekran kartını (GPU) hiç kullanmaz. Tüm OCR ve NMT işlemleri <code>INT8 Quantization</code> ile işlemci (CPU) üzerinde çalışır; oyunlarda tek bir FPS düşüşüne bile yol açmaz.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <b>👻 Kendi Yazısını Okumayan Akıllı Overlay</b><br/>
+      Win32 <code>WDA_EXCLUDEFROMCAPTURE</code> teknolojisi sayesinde Türkçe altyazı kutusu, orijinal İngilizce altyazının tam üstünü kapatsa bile OCR kendi yazdığı Türkçe metni görmez.
+    </td>
+    <td width="50%">
+      <b>🎬 Oyun, Dizi ve Sinema İçin 3 Özel Profil</b><br/>
+      Kontürlü oyun/film altyazıları, yarı saydam bantlı dizi altyazıları ve açık zeminli videolar için 3 farklı algılama modu + <b>Çift Dilli (EN + TR) Sinema Modu</b> içerir.
+    </td>
+  </tr>
+</table>
 
 ---
 
-## 🖥️ Uygulama Arayüzü (UI Preview)
+## 🖥️ Uygulama Arayüzü (SubVision AI Studio v1.1)
 
 <div align="center">
-  <img src="assets/ui_preview.png" alt="SubVision AI UI Preview" width="900" />
+  <img src="assets/ui_preview.png" alt="SubVision AI Studio UI Preview" width="960" />
 </div>
+
+* **Sol Panel (Canlı Yakalama Stüdyosu):** Yakalanan İngilizce kaynak cümleyi, anlık Türkçe çeviriyi ve geçmiş diyalog akışını milisaniye bazlı gecikme etiketleriyle canlı gösterir.
+* **Sağ Panel (Sahne Profili & Overlay Tasarımcısı):** Algılama modunu, altyazı konumunu, renk paletini, yazı boyutunu ve çift dilli sinema modunu **Canlı Önizleme Kutusu** üzerinden anında test ederek özelleştirmenizi sağlar.
+* **Üst Telemetri Kartları:** `OCR Yakalama`, `NMT Çeviri`, `Uçtan Uca Gecikme` ve `LRU Cache Hit` oranlarını görsel barlarla gerçek zamanlı raporlar.
 
 ---
 
-## 📊 Performans Testleri ve Latency Analizi (Benchmarks)
-
-Repo içerisindeki **[`benchmark.py`](benchmark.py)** script'i veya arayüzdeki **`📊 Benchmark Testi`** butonu ile kendi donanımınız üzerindeki gerçek **`End-to-End Latency`** metriklerini ölçebilirsiniz.
+## 📊 Performans Testleri ve Benchmark Analizi
 
 <div align="center">
-  <img src="assets/benchmark_chart.png" alt="SubVision AI Performance Benchmark Chart" width="900" />
+  <img src="assets/benchmark_chart.png" alt="SubVision AI Performance Benchmark Chart" width="960" />
 </div>
 
-### 🧪 Test Ortamı (Hardware Specs)
-* **CPU:** AMD Ryzen (`AMD64 Family 25 Model 97`, 12 Logical Cores / `intra_threads=6`)
-* **OS:** Windows 10 / 11 x64 (`Build 26300`)
-* **NMT Model:** `Helsinki-NLP/opus-mt-tc-big-en-tr` (`CTranslate2 INT8 Quantized` — `227 MB`)
-* **OCR Engine:** `RapidOCR (ONNX Runtime CPU)` + Custom `Horizontal Line Projection`
-* **GPU / VRAM Usage:** **`0 MB`**
+### 💡 Bu Benchmark Rakamları Pratikte Ne Anlama Geliyor?
 
-### 1. Pipeline Aşamaları ve End-to-End Latency Tablosu
+Bir altyazı çeviricinin dizi izlerken veya oyun oynarken **"anlık (gecikmesiz)"** hissettirmesi için insan gözünün algı eşiği **`150 ms`** altıdır:
 
-| Pipeline Stage | Mean Latency | P95 / Detay | Teknik Açıklama |
+1. **Yeni Bir Cümle Çıktığında (`87.9 ms`):** Ekrana ilk kez düşen bir İngilizce replik, **`19.8 ms`** içinde okunur ve **`68.0 ms`** içinde Türkçeye çevrilir. Toplam **`87.9 ms`** süre, insanın göz kırpma süresinin (~150-200 ms) yarısıdır; altyazı değiştiği anda Türkçe karşılığını görürsünüz.
+2. **Tekrar Eden veya Kalıp Diyaloglarda (`19.8 ms`):** 4096 cümlelik `Thread-Safe LRU Cache` ve hazır diyalog sözlüğü sayesinde çeviri süresi **`0.004 ms`**'ye iner. Toplam yanıt süresi **`19.8 ms`** olur *(60 FPS bir videonun tek bir karesi kadar süre)*.
+3. **Altyazı Ekranda Sabit Dururken (`0.18 ms` — `%0.2 CPU`):** `Frame Diff Lock` algoritması her kareyi `0.18 ms`'de kontrol eder. Ekrandaki altyazı değişmediği sürece OCR ve çeviri motorunu uyku modunda tutarak işlemciyi hiç yormaz.
+
+---
+
+### ⚖️ Geleneksel Yaklaşım vs. SubVision AI Karşılaştırması
+
+| Karşılaştırma Kriteri | Geleneksel Yöntem (DBNet OCR + PyTorch FP32) | ⚡ SubVision AI (Fast Line Projection + CT2 INT8) | Pratik Kazanım |
 | :--- | :---: | :---: | :--- |
-| **1. Frame Diff Lock (Idle Frame Skip)** | **`0.18 ms`** | `0.19 ms` | `64×16` downsampled L1-norm frame diff; altyazı değişmediğinde OCR ve NMT pipeline'ını tetiklemez. |
-| **2. Fast Line Projection OCR (Single-Line)** | **`19.83 ms`** | `~21 ms` | Ağır `DBNet Text Detection` katmanını bypass edip satırı `0.2 ms`'de crop'layarak doğrudan `CRNN Recognizer`'a verir. |
-| **3. Fast Line Projection OCR (Multi-Line Batch)** | **`65.13 ms`** | Single Batch | Çok satırlı altyazıları tek bir `ONNX Runtime` batch çağrısında paralel okur. |
-| **4. CTranslate2 INT8 NMT (Short Dialogue)** | **`68.03 ms`** | ~6–8 tokens | `INT8 Quantized` Transformer Decoder (`beam_size=1`, `intra_threads=6`). |
-| **5. CTranslate2 INT8 NMT (Long Dialogue)** | **`124.42 ms`** | ~14–18 tokens | Çok cümleli dizi/film repliklerinde paralel `translate_batch` inference süresi. |
-| **6. Thread-Safe LRU Cache & Glossary Lookup** | **`0.0045 ms`** | `0.0032 ms` | 4096-entry RAM `LRU Cache` ve hazır idiom/phrase tablosu ile sub-millisecond yanıt. |
-| **🚀 End-to-End Latency (Warm Cache Hit)** | **`19.83 ms`** | **Instant** | `OCR (19.83 ms) + RAM LRU Cache (0.0045 ms)` |
-| **🚀 End-to-End Latency (Cold Short Subtitle)** | **`87.86 ms`** | **Real-Time** | `OCR (19.83 ms) + CTranslate2 INT8 NMT (68.03 ms)` |
-| **🚀 End-to-End Latency (Cold Long Subtitle)** | **`144.25 ms`** | **Real-Time** | `OCR (19.83 ms) + CTranslate2 INT8 NMT (124.42 ms)` |
+| **Tek Satır OCR Okuma Süresi** | `97.8 ms` – `350+ ms` | **`19.8 ms`** | **4.9x – 6.2x Daha Hızlı Okuma** |
+| **Yeni Cümle Uçtan Uca Gecikme** | `300 ms` – `650 ms` *(Hissedilir gecikme)* | **`87.9 ms`** *(Kısa)* / **`144.2 ms`** *(Uzun)* | **< 150 ms Anlık Algı Eşiği Altı** |
+| **Önbellekli Uçtan Uca Gecikme** | `100+ ms` | **`19.8 ms`** | **Anında Tepki (`0.004 ms` Cache)** |
+| **Harcanan Ekran Kartı Belleği** | `1.2 GB – 2.4 GB VRAM` | **`0 MB VRAM`** | **Oyunlarda Sıfır FPS Kaybı** |
+| **Altyazı Sabitken CPU Kullanımı** | Sürekli OCR Taraması (`%25 – %45 CPU`) | **`%0.2 CPU`** (`0.18 ms` Frame Lock) | **Sessiz ve Serin Çalışma** |
+| **Model Disk Boyutu** | `~890 MB` (FP32) | **`227 MB`** (INT8 Quantized) | **%74 Daha Az Bellek Ayak İzi** |
 
-### 2. Geleneksel Mimari ile Karşılaştırma (Baseline vs SubVision AI)
+### 🔬 Detaylı Pipeline Ölçüm Tablosu *(AMD Ryzen 12-Thread CPU / 6 Active NMT Threads)*
 
-| Metrik / Özellik | Geleneksel Pipeline (DBNet OCR + PyTorch FP32) | ⚡ SubVision AI (Fast Line Projection + CT2 INT8) | Kazanım / Fark |
-| :--- | :---: | :---: | :---: |
-| **Single-Line OCR Latency (CPU)** | `97.82 ms` – `350+ ms` | **`19.83 ms`** | **4.9x – 6.2x Speedup** |
-| **NMT Model Footprint (Disk)** | `~890 MB` (FP32 PyTorch) | **`227 MB`** (INT8 CTranslate2) | **%74 Daha Küçük Model** |
-| **GPU VRAM Consumption** | `1.2 GB – 2.4 GB VRAM` | **`0 MB VRAM`** | **Sıfır Oyun FPS Kaybı** |
-| **Idle CPU Utilization (Static Frame)** | Sürekli OCR Polling (`%25-%45 CPU`) | **`%0.2 CPU`** (`0.18 ms` Frame Diff Lock) | **Zero Idle Overhead** |
-| **Self-Capture Feedback Loop** | Overlay üzerindeki çeviriyi tekrar OCR'a sokar | **`WDA_EXCLUDEFROMCAPTURE` ile %100 İzole** | **In-Place Overlay Coverage** |
+| Pipeline Aşaması | Ortalama Süre | Detay / P95 | Nasıl Çalışır? |
+| :--- | :---: | :---: | :--- |
+| **1. Frame Diff Lock (Idle Skip)** | **`0.18 ms`** | `P95: 0.19 ms` | `64×16` küçültülmüş matris farkı `< %0.45` ise kareyi anında atlar. |
+| **2. Fast Line Projection OCR (1 Satır)** | **`19.83 ms`** | `~21 ms` | `DBNet` dedektörünü atlayıp satırı `0.2 ms`'de keserek doğrudan `CRNN`'e verir. |
+| **3. Fast Line Projection OCR (2 Satır)** | **`65.13 ms`** | Tek Batch | İki satırlı altyazıları tek bir `ONNX Runtime` batch çağrısında paralel okur. |
+| **4. CTranslate2 INT8 NMT (Kısa Replik)** | **`68.03 ms`** | ~6–8 kelime | `Helsinki-NLP/opus-mt-tc-big-en-tr` (`INT8`, `beam_size=1`, `6 Thread`). |
+| **5. CTranslate2 INT8 NMT (Uzun Replik)** | **`124.42 ms`** | ~14–18 kelime | Çok cümleli uzun dizi/film repliklerinde paralel `translate_batch` çıkarımı. |
+| **6. LRU Cache & Glossary Lookup** | **`0.0045 ms`** | `0.0032 ms` | RAM önbelleği ve kalıp sözlüğünden model çalıştırmadan anında dönüş. |
+
+> 💡 **Kendi Sisteminizde Test Edin:** Uygulama içindeki **`⚡ Donanım Benchmark`** butonuna tıklayarak veya terminalden `python benchmark.py` komutunu çalıştırarak kendi işlemcinizin milisaniye bazlı performans karnesini görebilirsiniz.
 
 ---
 
-## 🧠 Sistem Mimarisi (Architecture & Data Flow)
+## 🧠 Sistem Mimarisi (Pipeline Architecture)
 
 ```mermaid
 flowchart TD
-    A["🖥️ 30 FPS (33 ms) Regional Screen Capture (MSS)"] --> B{"🔒 Frame Diff Lock\n(64x16 L1 Matrix Diff < 0.45%?)"}
-    B -- "True (0.18 ms)" --> Z["💤 0% CPU Idle State\n(Skip OCR & NMT Pipeline)"]
-    B -- "False (New Frame)" --> C["🎨 Outline & Box-Verified Color Mask\n(White / Yellow / Cyan + Morphological Dark Neighbor Check)"]
-    C --> D["✂️ Horizontal Line Projection (0.2 ms)\n(Bypass DBNet Text Detector -> Direct Tight Line Crops)"]
+    A["🖥️ 30 FPS (33 ms) Regional Screen Capture (MSS)"] --> B{"🔒 Frame Diff Lock\n(64x16 Matris Farkı < %0.45 mi?)"}
+    B -- "Evet (0.18 ms)" --> Z["💤 %0.2 CPU Uyku Modu\n(OCR ve NMT Çalıştırılmaz)"]
+    B -- "Hayır (Yeni Altyazı)" --> C["🎨 Outline & Box-Verified Color Mask\n(Beyaz / Sarı / Turkuaz + Koyu Kontür Doğrulaması)"]
+    C --> D["✂️ Horizontal Line Projection (0.2 ms)\n(DBNet Dedektörünü Bypass Et -> Doğrudan Satır Kes)"]
     D --> E["⚡ RapidOCR ONNX CRNN Batch Recognition (~19.8 ms)"]
-    E --> F["🧹 Noise Regex Cleanup + Speaker Extraction + Slang Normalization"]
-    F --> G{"⚡ 4096-Entry Thread-Safe LRU Cache\nor Exact Phrase Glossary Hit?"}
+    E --> F["🧹 Noise Regex Cleanup + Speaker Parser + Slang Normalizer"]
+    F --> G{"⚡ 4096-Entry Thread-Safe LRU Cache\nveya Sözlükte Var mı?"}
     G -- "Hit (0.004 ms)" --> I["🪟 Click-Through Overlay Window\n(Win32 WDA_EXCLUDEFROMCAPTURE = 0x11)"]
     G -- "Miss" --> H["🧠 CTranslate2 INT8 Parallel Batch Inference\n(Opus-MT Big EN->TR | beam_size=1 | ~68 ms)"]
     H --> I
@@ -95,28 +119,14 @@ flowchart TD
 
 ---
 
-## 🔬 Mühendislik ve Optimizasyon Detayları
+## 🚀 İndirme ve Kurulum (30 Saniyede Başlayın)
 
-1. **Win32 `WDA_EXCLUDEFROMCAPTURE (0x11)` Self-Capture Immunity:**
-   Standart ekran çeviricilerde Türkçe overlay penceresi orijinal İngilizce altyazının üzerine yerleştirildiğinde, ekran yakalayıcı bir sonraki frame'de kendi render ettiği Türkçe metni yakalayarak feedback loop'a girer. **SubVision AI**, Windows 10/11 `SetWindowDisplayAffinity` API'sini kullanarak overlay penceresini DWM (Desktop Window Manager) capture pipeline'ından hariç tutar. Böylece Türkçe altyazı kutusu orijinal İngilizce altyazının tam üstünü kapatsa bile `MSS` alttaki orijinal görüntüyü yakalamaya devam eder.
-2. **DBNet Bypass & `Horizontal Line Projection`:**
-   Standart OCR pipeline'larında toplam sürenin `%80`'i metin bounding-box'larını arayan `DBNet Text Detection` modelinde harcanır. SubVision AI, altyazı piksellerinin etrafındaki koyu kontür/gölge komşuluğunu (`Morphological Dilation`) doğrulayarak parlak sahne arka planlarını filtreler; ardından yatay piksel projeksiyon profilinden satır koordinatlarını **`0.2 ms`** içinde çıkarıp doğrudan `CRNN Text Recognizer` katmanına batch olarak besler.
-3. **3 Farklı OCR & Scene Detection Profili:**
-   * 🎬 **Oyun, Dizi & Film (Hybrid Mode - Önerilen):** Önce `19.8 ms`'lik `Fast Line Projection` filtresini çalıştırır; sahnede kontürsüz özel bir font varsa otomatik olarak `Full-Frame OCR` fallback'ine geçer.
-   * ⚡ **Kontürlü Altyazı Modu (Fast Mask Mode):** Yalnızca koyu kontürlü veya koyu arka plan bantlı beyaz/sarı/turkuaz altyazıları okur; oyun içi patlama ve ışık parlamalarında (`bright_ratio > 0.55`) anti-flicker koruması sağlar.
-   * 🖥️ **Genel Ekran & Video (Full-Frame OCR Mode):** Açık renk zemin üzerindeki koyu metinler, Visual Novel diyalog kutuları ve masaüstü uygulamaları için `DBNet + CRNN` tam kare okuma modudur.
-4. **Speaker-Aware Parsing & Bilingual (EN + TR) Sinema Modu:**
-   `Detective: Wait here!` veya `[Arthur] Follow me!` formatındaki repliklerde konuşmacı adını (`Speaker Prefix`) regex ile NMT öncesinde ayırır; karakter isimlerinin yanlış çevrilmesini engeller. Ayrıca dizi/film izleyicileri için Türkçe çevirinin üstünde orijinal İngilizce satırı da gösteren **Bilingual Subtitle** seçeneği sunar.
+### Seçenek 1: Hazır `.exe` İle Tek Tıkla Çalıştırma *(Önerilen)*
+1. [**📦 GitHub Releases (v1.0.0)**](https://github.com/Andacbasaran/subvision-ai-subtitle-translator/releases/latest) sayfasından **`SubVisionAI.exe`** (veya `SubVisionAI-v1.0.0-Windows-x64.zip`) dosyasını indirin.
+2. **`SubVisionAI.exe`** dosyasına çift tıklayın.
+   *(Bilgisayarınızda Python kurulu olmasa bile gömülü `Bootstrapper`, taşınabilir çalışma ortamını ve `227 MB` boyutundaki `INT8` çeviri modelini ilk açılışta otomatik olarak indirip kurar).*
 
----
-
-## 🚀 İndirme, Kurulum ve Çalıştırma
-
-### Seçenek 1: GitHub Releases Üzerinden `.exe` İle Çalıştırma (Önerilen)
-[**📦 GitHub Releases (v1.0.0)**](https://github.com/Andacbasaran/subvision-ai-subtitle-translator/releases/latest) sayfasından **`SubVisionAI.exe`** veya **`SubVisionAI-v1.0.0-Windows-x64.zip`** paketini indirip doğrudan **`SubVisionAI.exe`** dosyasına çift tıklamanız yeterlidir.
-* Sistemde Python kurulu olmasa bile gömülü **`Bootstrapper`** (`setup_bootstrap.ps1`), taşınabilir çalışma ortamını ve `227 MB` boyutundaki `CTranslate2 INT8` modelini ilk açılışta otomatik olarak indirip yapılandırır.
-
-### Seçenek 2: Kaynak Koddan Çalıştırma (Developer Setup)
+### Seçenek 2: Kaynak Koddan Çalıştırma *(Developer Setup)*
 
 ```powershell
 # 1. Repository'yi klonlayın
@@ -127,70 +137,47 @@ cd subvision-ai-subtitle-translator
 python -m venv .venv
 .\.venv\Scripts\activate
 
-# 3. Bağımlılıkları yükleyin
+# 3. Bağımlılıkları yükleyin ve başlatın
 pip install -r requirements.txt
-
-# 4. Uygulamayı başlatın
 python main.py
 ```
 
-### Seçenek 3: `.exe` Build Alma (`build_exe.py`)
-
-```powershell
-# Kök dizinde özel ikonlu ve gömülü kaynak kodlu Windows executable (SubVisionAI.exe) derlemek için:
-python build_exe.py
-
-# PyInstaller ile standalone dist/SubVisionAI paketi oluşturmak için:
-pip install pyinstaller
-python build_exe.py --pyinstaller
-```
-
-### CLI Benchmark Suite Çalıştırma
-
-```powershell
-python benchmark.py
-```
-
 ---
 
-## 🎮 Kullanım ve Global Hotkeys
+## 🎮 3 Adımda Kullanım & Kısayollar
 
-1. **Hedef Uygulamayı Açın:**
-   * **Oyunlarda:** Görüntü ayarlarından **`Borderless Windowed`** (Çerçevesiz Pencere) modunu seçin.
-   * **Dizi / Film / Yayınlarda:** Netflix, Prime Video, YouTube, Twitch veya VLC/MPC-HC oynatıcınızı açın.
-2. **`F7` ile ROI (Altyazı Bölgesi) Seçin:**
-   İngilizce altyazıların belirdiği alt bölgeyi fare ile sürükleyerek seçin.
-3. **`F8` ile Gerçek Zamanlı Çeviriyi Başlatın:**
-   30 FPS (`33 ms`) worker thread seçili alanı izlemeye başlar ve yeni altyazı yakalandığı anda Türkçe overlay ekrana yansıtılır.
+1. **Oyun veya Videoyu Açın:** Oyunlarda görüntü ayarlarından **`Borderless Windowed (Çerçevesiz Pencere)`** modunu seçin; Netflix, YouTube, Prime Video, Twitch veya VLC'de doğrudan videoyu açın.
+2. **`F7` Tuşuna Basıp Altyazı Alanını Seçin:** İngilizce altyazıların çıktığı bölgeyi fare ile kutu içine alın.
+3. **`F8` Tuşuna Basıp Çeviriyi Başlatın:** Ekrana İngilizce altyazı düştüğü anda Türkçe çevirisi otomatik olarak gösterilir.
 
-| Global Hotkey | İşlev | Açıklama |
+| Global Kısayol | Buton | Açıklama |
 | :---: | :--- | :--- |
-| **`F7`** | 🎯 **Select ROI** | Oyun veya video içindeyken fare ile altyazı yakalama bölgesini (`ROI`) seçme ekranını açar. |
-| **`F8`** | ▶️ **Start / Stop Worker** | 30 FPS gerçek zamanlı capture & translation worker thread'ini başlatır veya durdurur. |
-| **`F9`** | 🧪 **Sample Dialogue Test** | Dizi, film ve oyunlardan örnek repliklerle latency ve overlay görünüm testi yapar. |
-| **`ESC`** | ❌ **Cancel Selection** | ROI seçici açıkken mevcut seçimi iptal eder. |
+| **`F7`** | 🎯 **Altyazı Alanını Seç** | Oyun veya video içindeyken fare ile altyazı yakalama bölgesini (`ROI`) seçme ekranını açar. |
+| **`F8`** | ▶️ **Başlat / Durdur** | 30 FPS gerçek zamanlı yakalama ve çeviri motorunu başlatır veya durdurur. |
+| **`F9`** | 🧪 **Örnek Sahne Simülasyonu** | Dizi, film ve oyunlardan örnek repliklerle hız ve overlay görünüm testi yapar. |
+| **`ESC`** | ❌ **Seçimi İptal Et** | Alan seçici (`ROI`) açıkken mevcut seçimi iptal eder. |
 
 ---
 
-## 📂 Proje Dizin Yapısı (Directory Structure)
+## 📂 Proje Dizin Yapısı
 
 ```text
 ├── SubVisionAI.exe          # Özel ikonlu, kendi kendini kurabilen (self-bootstrapping) Windows executable
-├── main.py                  # PyQt6 ana arayüz, KPI telemetri kartları, global hotkey ve QThread yönetimi
+├── main.py                  # PyQt6 Studio arayüzü, KPI telemetri kartları, canlı önizleme ve QThread yönetimi
 ├── ocr_engine.py            # MSS regional capture, frame diff lock, outline color mask ve RapidOCR ONNX
 ├── translator.py            # CTranslate2 INT8 (Opus-MT EN->TR) NMT motoru, model downloader ve Thread-Safe LRU Cache
 ├── overlay_ui.py            # WDA_EXCLUDEFROMCAPTURE destekli click-through overlay ve multi-monitor 4K DPI ROI selector
 ├── glossary.py              # OCR noise cleanup, speaker prefix parser, slang normalizer ve exact phrase dictionary
-├── benchmark.py             # End-to-end latency benchmark suite ve görsel grafik üretim aracı
+├── benchmark.py             # End-to-end latency benchmark suite ve infografik üretim aracı
 ├── build_exe.py             # SubVisionAI.exe (C# Win32) ve PyInstaller standalone paket build script'i
 ├── setup_bootstrap.ps1      # Zero-dependency otomatik Portable Python & paket kurulum script'i
 ├── baslat.bat               # Hızlı başlatma script'i
 ├── requirements.txt         # Python bağımlılıkları
-└── assets/                  # Uygulama ikonu (.ico/.png), UI preview ve benchmark grafikleri
+└── assets/                  # Uygulama ikonu (.ico/.png), Studio UI preview ve benchmark infografiği
 ```
 
 ---
 
-## 📄 Lisans (License)
+## 📄 Lisans
 
 Bu proje **[MIT License](LICENSE)** kapsamında lisanslanmıştır.
