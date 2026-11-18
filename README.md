@@ -97,7 +97,7 @@ Bir altyazı çeviricinin dizi izlerken veya oyun oynarken **"anlık (gecikmesiz
 | **5. CTranslate2 INT8 NMT (Uzun Replik)** | **`124.42 ms`** | ~14–18 kelime | Çok cümleli uzun dizi/film repliklerinde paralel `translate_batch` çıkarımı. |
 | **6. LRU Cache & Glossary Lookup** | **`0.0045 ms`** | `0.0032 ms` | RAM önbelleği ve kalıp sözlüğünden model çalıştırmadan anında dönüş. |
 
-> 💡 **Kendi Sisteminizde Test Edin:** Uygulama içindeki **`⚡ Donanım Benchmark`** butonuna tıklayarak veya terminalden `python benchmark.py` komutunu çalıştırarak kendi işlemcinizin milisaniye bazlı performans karnesini görebilirsiniz.
+> 💡 **Kendi Sisteminizde Test Edin:** Uygulama içindeki **`⚡ Donanım Benchmark`** butonuna tıklayarak, terminalden `python benchmark.py` komutunu çalıştırarak veya `python -m unittest test_pipeline.py -v` ile birim/entegrasyon testlerini koşarak tüm pipeline'ı doğrulayabilirsiniz.
 
 ---
 
@@ -167,8 +167,9 @@ python main.py
 ├── ocr_engine.py            # MSS regional capture, frame diff lock, outline color mask ve RapidOCR ONNX
 ├── translator.py            # CTranslate2 INT8 (Opus-MT EN->TR) NMT motoru, model downloader ve Thread-Safe LRU Cache
 ├── overlay_ui.py            # WDA_EXCLUDEFROMCAPTURE destekli click-through overlay ve multi-monitor 4K DPI ROI selector
-├── glossary.py              # OCR noise cleanup, speaker prefix parser, slang normalizer ve exact phrase dictionary
+├── glossary.py              # OCR noise cleanup, SDH sound filter, ALL-CAPS normalizer, speaker parser ve sözlük
 ├── benchmark.py             # End-to-end latency benchmark suite ve infografik üretim aracı
+├── test_pipeline.py         # Otomatik birim ve entegrasyon test paketi (unittest)
 ├── build_exe.py             # SubVisionAI.exe (C# Win32) ve PyInstaller standalone paket build script'i
 ├── setup_bootstrap.ps1      # Zero-dependency otomatik Portable Python & paket kurulum script'i
 ├── baslat.bat               # Hızlı başlatma script'i

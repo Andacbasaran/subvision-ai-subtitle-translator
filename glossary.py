@@ -1,13 +1,14 @@
 """
 SubVision AI — Oyun, Dizi, Film ve Yayın Altyazıları İçin Gelişmiş Metin İşleme Modülü.
-OCR gürültü temizleme, konuşmacı ayrıştırma, günlük konuşma/argo (slang) normalizasyonu
-ve sıfır gecikmeli (0.01 ms) sık kullanılan kalıp sözlüğünü içerir.
+OCR gürültü temizleme, SDH/CC ses efekti filtreleme, ALL-CAPS cümle normalizasyonu,
+konuşmacı ayrıştırma, günlük konuşma/argo (slang) normalizasyonu ve sıfır gecikmeli (0.003 ms)
+sık kullanılan kalıp sözlüğünü içerir.
 """
 
 import re
 from typing import Optional, Tuple
 
-# 1. Tam Eşleşme Sözlüğü (0.01 ms'de model çalıştırmadan anında çevrilen popüler dizi, film ve oyun ifadeleri)
+# 1. Tam Eşleşme Sözlüğü (0.003 ms'de model çalıştırmadan anında çevrilen popüler dizi, film ve oyun ifadeleri)
 EXACT_PHRASES = {
     # Sinema / Dizi & Genel Diyalog Kalıpları
     "previously on": "Önceki bölümlerde",
@@ -70,7 +71,6 @@ EXACT_PHRASES = {
     "be careful": "Dikkatli ol",
     "be careful!": "Dikkatli ol!",
     "take care": "Kendine iyi bak",
-    "Good luck": "İyi şanslar",
     "good luck": "İyi şanslar",
     "good luck!": "İyi şanslar!",
     "of course": "Tabii ki",
@@ -222,9 +222,9 @@ SLANG_PATTERNS = [
     (re.compile(r"\bgotcha\b", re.IGNORECASE), "got you"),
     (re.compile(r"\bain't\b", re.IGNORECASE), "is not"),
     (re.compile(r"\baint\b", re.IGNORECASE), "is not"),
-    (re.compile(r"\b'cause\b", re.IGNORECASE), "because"),
+    (re.compile(r"(?<!\w)'cause\b", re.IGNORECASE), "because"),
     (re.compile(r"\bcuz\b", re.IGNORECASE), "because"),
-    (re.compile(r"\b'em\b", re.IGNORECASE), "them"),
+    (re.compile(r"(?<!\w)'em\b", re.IGNORECASE), "them"),
     (re.compile(r"\bhomie\b", re.IGNORECASE), "my friend"),
     (re.compile(r"\bhomies\b", re.IGNORECASE), "my friends"),
     (re.compile(r"\bdawg\b", re.IGNORECASE), "buddy"),
@@ -243,22 +243,64 @@ SLANG_PATTERNS = [
     (re.compile(r"\bdammit\b", re.IGNORECASE), "damn it"),
 ]
 
-# OCR hatalarını temizlemek için Regex kuralları
+# OCR hatalarını ve Dizi/Film SDH (İşitme Engelli Ses Betimlemeleri) etiketlerini temizlemek için Regex kuralları
 RE_MULTISPACE = re.compile(r"\s+")
 RE_OCR_NOISE = re.compile(r"[^a-zA-Z0-9\s.,!?'\":;\-\(\)\[\]]")
-# Konuşmacı ismi yakalama: örn. "Detective: Wait here!" veya "[Narrator] Once upon a time..."
+
+# Netflix / Prime Video / Blu-ray SDH ses efekti parantezleri: [sighs], (dramatic music), [laughs], (gunshot) vb.
+RE_SDH_SOUND_TAGS = re.compile(
+    r"[\[\(][^\]\)]*(?:music|sigh|laugh|groan|grunt|gasp|pant|cough|chuckle|sob|cry|scream|shout|whisper|applause|cheer|thunder|explosion|gunshot|siren|ringing|knock|slam|footstep|wind|rain|audio|sound|speaking|indistinct)[^\]\)]*[\]\)]",
+    re.IGNORECASE,
+)
+
+# Konuşmacı ismi yakalama: örn. "Detective: Wait here!" veya "[Arthur] Once upon a time..."
 RE_SPEAKER_COLON = re.compile(r"^([A-Z][a-zA-Z0-9\s]{1,20}):\s+(.+)$")
-RE_SPEAKER_BRACKET = re.compile(r"^\[([A-Za-z0-9\s]{1,20})\]\s*(.+)$")
+# Köşeli parantezde konuşmacı: yalnızca Baş Harfi Büyük özel isim (örn. [Arthur] veya [Narrator])
+RE_SPEAKER_BRACKET = re.compile(r"^\[([A-Z][a-zA-Z0-9]{1,18})\]\s*(.+)$")
+
 # Yaygın OCR harf karışıklıkları (örn. "l'm" -> "I'm", "0" -> "O" harf içinde)
 RE_OCR_L_TO_I = re.compile(r"\bl'([mMdDsS]|ll|ve|re)\b")
 RE_OCR_STANDALONE_L = re.compile(r"\bl\b")
 RE_ZERO_IN_WORD = re.compile(r"(?<=[A-Za-z])0(?=[A-Za-z])|(?<=[A-Z])0\b|\b0(?=[A-Za-z])")
+RE_STANDALONE_I_CONTRACT = re.compile(r"\bi('m|'ve|'ll|'d)?\b")
+
+
+def normalize_all_caps_text(text: str) -> str:
+    """
+    Bazı oyun ve filmler altyazıları tamamen BÜYÜK HARFLE (ALL CAPS) yazar.
+    SentencePiece tokenizer tamamen büyük harfli kelimeleri alt-hecelere böldüğü için
+    çeviri kalitesini düşürür (örn. 'CONSPIRACY' -> 'dengeye', 'conspiracy' -> 'komploya').
+    Bu fonksiyon ALL-CAPS metinleri doğal cümle düzenine (Sentence Case) dönüştürür.
+    """
+    letters = [c for c in text if c.isalpha()]
+    if len(letters) < 5:
+        return text
+    upper_ratio = sum(1 for c in letters if c.isupper()) / len(letters)
+    if upper_ratio < 0.75:
+        return text
+
+    lowered = text.lower()
+    # Cümle başlarını büyük harfe çevir
+    sentences = re.split(r"([.!?]\s+)", lowered)
+    rebuilt = []
+    for part in sentences:
+        if part and part[0].isalpha():
+            rebuilt.append(part[0].upper() + part[1:])
+        else:
+            rebuilt.append(part)
+    res = "".join(rebuilt)
+    if res and res[0].isalpha():
+        res = res[0].upper() + res[1:]
+
+    # İngilizce 'I', 'I'm', 'I'll', 'I've', 'I'd' zamirlerini büyük 'I' yap
+    res = RE_STANDALONE_I_CONTRACT.sub(lambda m: "I" + (m.group(1) or ""), res)
+    return res
 
 
 def clean_ocr_text(raw_text: str) -> str:
     """
-    OCR'dan gelen ham İngilizce altyazıyı temizler, harf/rakam karışıklıklarını düzeltir.
-    Dizi, film ve oyun altyazılarındaki satır sonlarını ve OCR parazitlerini normalize eder.
+    OCR'dan gelen ham İngilizce altyazıyı temizler, SDH ses efektlerini çıkarır,
+    harf/rakam karışıklıklarını düzeltir ve ALL-CAPS altyazıları normalize eder.
     """
     if not raw_text:
         return ""
@@ -269,6 +311,9 @@ def clean_ocr_text(raw_text: str) -> str:
 
     # İzin verilen İngilizce karakterler dışındaki parazitleri sil
     text = RE_OCR_NOISE.sub("", text)
+
+    # Dizi/Filmlerdeki [dramatic music], [sighs], (laughs) gibi işitme engelli ses etiketlerini temizle
+    text = RE_SDH_SOUND_TAGS.sub(" ", text)
 
     # Kelime içindeki '0' (sıfır) rakamını 'O' harfine düzelt (örn. "H0LD 0N" -> "HOLD ON")
     text = RE_ZERO_IN_WORD.sub("O", text)
@@ -291,23 +336,29 @@ def clean_ocr_text(raw_text: str) -> str:
 
 def extract_speaker_and_body(text: str) -> Tuple[Optional[str], str]:
     """
-    Altyazıda konuşmacı adı varsa ('Arthur: Hold on!' veya '[Narrator] Wait!') ayırır.
-    Böylece karakterin özel ismi yanlışlıkla Türkçeye çevrilmez.
+    Altyazıda konuşmacı adı varsa ('Arthur: Hold on!' veya '[Narrator] Wait!') ayırır
+    ve gövde metninde ALL-CAPS normalizasyonu uygular.
     """
     m1 = RE_SPEAKER_COLON.match(text)
     if m1:
-        return m1.group(1).strip(), m1.group(2).strip()
+        speaker = m1.group(1).strip()
+        if speaker.isupper() and len(speaker) > 2:
+            speaker = speaker.title()
+        return speaker, normalize_all_caps_text(m1.group(2).strip())
 
     m2 = RE_SPEAKER_BRACKET.match(text)
     if m2:
-        return m2.group(1).strip(), m2.group(2).strip()
+        speaker = m2.group(1).strip()
+        if speaker.isupper() and len(speaker) > 2:
+            speaker = speaker.title()
+        return speaker, normalize_all_caps_text(m2.group(2).strip())
 
-    return None, text
+    return None, normalize_all_caps_text(text)
 
 
 def lookup_exact_phrase(text: str) -> Optional[str]:
     """
-    Sık kullanılan kalıp ifadeleri 0.01 ms'de sözlükten döndürür.
+    Sık kullanılan kalıp ifadeleri 0.003 ms'de sözlükten döndürür.
     """
     stripped = text.strip()
     if not stripped:

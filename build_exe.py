@@ -22,6 +22,7 @@ EMBEDDED_FILES = [
     ("overlay_ui.py", "overlay_ui.py"),
     ("glossary.py", "glossary.py"),
     ("benchmark.py", "benchmark.py"),
+    ("test_pipeline.py", "test_pipeline.py"),
     ("requirements.txt", "requirements.txt"),
     ("setup_bootstrap.ps1", "setup_bootstrap.ps1"),
     ("baslat.bat", "baslat.bat"),

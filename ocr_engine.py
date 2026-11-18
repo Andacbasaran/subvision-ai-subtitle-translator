@@ -36,6 +36,9 @@ except Exception:
 _KERNEL_DARK_NEIGHBOR = cv2.getStructuringElement(cv2.MORPH_RECT, (9, 9))
 _KERNEL_HORIZ_CONNECT = cv2.getStructuringElement(cv2.MORPH_RECT, (14, 2))
 
+# ONNX Runtime Dynamic Shape Re-Planning'i (~80 ms) tamamen sıfırlamak için sabit en/boy oranı kovaları
+_BUCKET_RATIOS = (10, 16, 22)
+
 
 class SubtitleOCREngine:
     def __init__(
@@ -56,6 +59,16 @@ class SubtitleOCREngine:
         self._prev_thumb: Optional[np.ndarray] = None
         self._last_clean_text: str = ""
         self._empty_frames_count: int = 0
+
+        # ONNX Runtime CRNN motorunu sabit en/boy oranı kovaları (Shape Buckets) için ısıt (Warm-up)
+        # Böylece farklı uzunluktaki yeni altyazılarda ~80 ms'lik ONNX kernel re-planning gecikmesi sıfırlanır!
+        try:
+            for r in _BUCKET_RATIOS:
+                dummy = np.full((32, 32 * r, 3), 255, dtype=np.uint8)
+                self.ocr.text_rec([dummy])
+                self.ocr.text_rec([dummy, dummy])
+        except Exception:
+            pass
 
     def set_mode(self, mode: str) -> None:
         """
@@ -169,7 +182,24 @@ class SubtitleOCREngine:
             cy2 = min(h, y2 + 5)
             cx1 = max(0, x1 - 8)
             cx2 = min(w, x2 + 8)
-            crops.append(ocr_ready_bgr[cy1:cy2, cx1:cx2])
+            raw_crop = ocr_ready_bgr[cy1:cy2, cx1:cx2]
+
+            # Sabit En/Boy Oranı Kovasına (10x, 16x, 22x) Sağdan Beyaz Dolgu (White Padding)
+            ch, cw = raw_crop.shape[:2]
+            if ch > 0:
+                target_ratio = 10 if cw <= ch * 10 else (16 if cw <= ch * 16 else 22)
+                target_w = ch * target_ratio
+                if cw < target_w:
+                    raw_crop = cv2.copyMakeBorder(
+                        raw_crop,
+                        0,
+                        0,
+                        0,
+                        target_w - cw,
+                        cv2.BORDER_CONSTANT,
+                        value=(255, 255, 255),
+                    )
+            crops.append(raw_crop)
 
         return crops
 
@@ -196,12 +226,19 @@ class SubtitleOCREngine:
         ratio = SequenceMatcher(None, a, b).ratio()
         return ratio >= self.similarity_threshold
 
-    def read_image_fast(self, frame_bgr: np.ndarray) -> Tuple[str, float]:
+    def read_image_fast(
+        self,
+        frame_bgr: np.ndarray,
+        precomputed_mask: Optional[Tuple[np.ndarray, np.ndarray]] = None,
+    ) -> Tuple[str, float]:
         t0 = time.perf_counter()
         valid_lines: List[str] = []
 
         if self.use_color_mask:
-            ocr_ready_bgr, mask_u8, _ = self.apply_subtitle_color_mask(frame_bgr)
+            if precomputed_mask is not None:
+                ocr_ready_bgr, mask_u8 = precomputed_mask
+            else:
+                ocr_ready_bgr, mask_u8, _ = self.apply_subtitle_color_mask(frame_bgr)
             line_crops = self.extract_fast_line_crops(ocr_ready_bgr, mask_u8)
 
             if line_crops:
@@ -271,15 +308,17 @@ class SubtitleOCREngine:
                 frame_bgr, (960, max(24, int(h * scale))), interpolation=cv2.INTER_LINEAR
             )
 
-        if self.use_color_mask and self.ocr_mode == "fast_mask":
-            _, mask_u8, bright_ratio = self.apply_subtitle_color_mask(frame_bgr)
+        precomputed: Optional[Tuple[np.ndarray, np.ndarray]] = None
+        if self.use_color_mask:
+            ocr_ready_bgr, mask_u8, bright_ratio = self.apply_subtitle_color_mask(frame_bgr)
+            precomputed = (ocr_ready_bgr, mask_u8)
             # Ekran parlaması / flaş durumunda mevcut altyazıyı koru
             if bright_ratio > 0.55:
                 elapsed = (time.perf_counter() - t0) * 1000.0
                 return "UNCHANGED", self._last_clean_text, elapsed
 
             # Ekranda hiç parlak altyazı harfi kalmadıysa (5 kare / ~165ms sonra temizle)
-            if bright_ratio < 0.0012:
+            if bright_ratio < 0.0012 and self.ocr_mode == "fast_mask":
                 self._empty_frames_count += 1
                 if self._empty_frames_count >= 5:
                     self._last_clean_text = ""
@@ -288,7 +327,7 @@ class SubtitleOCREngine:
                     return "EMPTY", "", elapsed
                 elapsed = (time.perf_counter() - t0) * 1000.0
                 return "UNCHANGED", self._last_clean_text, elapsed
-            check_plane = mask_u8
+            check_plane = mask_u8 if (self.ocr_mode == "fast_mask" or bright_ratio >= 0.0012) else cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
         else:
             check_plane = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
 
@@ -296,7 +335,7 @@ class SubtitleOCREngine:
             elapsed = (time.perf_counter() - t0) * 1000.0
             return "UNCHANGED", self._last_clean_text, elapsed
 
-        cleaned, _ = self.read_image_fast(frame_bgr)
+        cleaned, _ = self.read_image_fast(frame_bgr, precomputed_mask=precomputed)
         elapsed = (time.perf_counter() - t0) * 1000.0
 
         if not cleaned:
