@@ -1,0 +1,23 @@
+# Python & Sanal Ortamlar
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+runtime/
+
+# Lokal Yapay Zeka Modeli (Uygulama ilk açılışta HuggingFace üzerinden otomatik indirir)
+models/
+
+# PyInstaller Derleme Çıktıları
+build/
+dist/
+*.spec
+
+# Kullanıcı Yerel Ayarları
+user_settings.json
+
+# İşletim Sistemi Geçici Dosyaları
+.DS_Store
+Thumbs.db
