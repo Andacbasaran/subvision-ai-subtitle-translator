@@ -248,17 +248,22 @@ namespace SubVisionAI
                 }
             }
 
-            // Kaldırma yardımcısını (SubVisionAI-Uninstaller.exe) aynı imzalı ikili dosyadan oluştur
+            // Ana başlatıcıyı (SubVisionAI.exe) ve Kaldırma yardımcısını (SubVisionAI-Uninstaller.exe) kurulum klasörüne doğrudan oluştur
             try
             {
                 string currentExe = Application.ExecutablePath;
+                string targetMainExe = Path.Combine(appDir, "SubVisionAI.exe");
+                if (!string.Equals(Path.GetFullPath(currentExe), Path.GetFullPath(targetMainExe), StringComparison.OrdinalIgnoreCase))
+                {
+                    File.Copy(currentExe, targetMainExe, true);
+                }
                 string uninstallerExe = Path.Combine(appDir, "SubVisionAI-Uninstaller.exe");
                 if (!string.Equals(Path.GetFullPath(currentExe), Path.GetFullPath(uninstallerExe), StringComparison.OrdinalIgnoreCase))
                 {
                     File.Copy(currentExe, uninstallerExe, true);
                     if (logCallback != null)
                     {
-                        logCallback("[OK] Kaldırma yardımcısı hazırlandı: SubVisionAI-Uninstaller.exe");
+                        logCallback("[OK] Kaldırma yardımcısı doğrudan kuruldu: SubVisionAI-Uninstaller.exe");
                     }
                 }
             }
@@ -1546,9 +1551,18 @@ namespace SubVisionAI
             string mainPy = Path.Combine(appDir, "main.py");
             string readyPyw = FindReadyPythonw(appDir);
 
-            // Eğer zaten kuruluysa doğrudan uygulamayı başlat (arka planda hiçbir dosya yazma!)
+            // Eğer zaten kuruluysa doğrudan uygulamayı başlat (kaldırma yardımcısı eksikse tamamla)
             if (!isSetupMode && readyPyw != null && File.Exists(mainPy))
             {
+                try
+                {
+                    string uninstExe = Path.Combine(appDir, "SubVisionAI-Uninstaller.exe");
+                    if (!File.Exists(uninstExe))
+                    {
+                        File.Copy(Application.ExecutablePath, uninstExe, true);
+                    }
+                }
+                catch { }
                 LaunchMainApp(readyPyw, appDir, mainPy);
                 return;
             }
@@ -1729,21 +1743,15 @@ def build_native_exe(base_dir: str) -> bool:
             check=False,
         )
         if res.returncode == 0 and os.path.exists(exe_file):
-            # Kaldırma yardımcısını (SubVisionAI-Uninstaller.exe) da kök dizine üret
-            try:
-                import shutil
-
-                shutil.copy2(exe_file, uninstaller_file)
-            except Exception:
-                pass
-
-            # Her iki .exe dosyasını Authenticode SHA-256 + DigiCert Timestamp ile imzala
-            ensure_publisher_certificate_and_sign(base_dir, [exe_file, uninstaller_file])
+            # Kurulum yardımcısını (SubVisionAI.exe) Authenticode SHA-256 + DigiCert Timestamp ile imzala.
+            # (Not: Kaldırma yardımcısı SubVisionAI-Uninstaller.exe ayrı dağıtılmaz; kullanıcı
+            #  SubVisionAI.exe ile kurulum yaptığında bilgisayarına otomatik olarak kurulur.)
+            ensure_publisher_certificate_and_sign(base_dir, [exe_file])
 
             size_kb = os.path.getsize(exe_file) / 1024.0
             print(
-                f"[OK] Dijital İmzalı Kurulum Yardımcısı & Uninstaller üretildi: "
-                f"SubVisionAI.exe & SubVisionAI-Uninstaller.exe ({size_kb:.1f} KB)"
+                f"[OK] Dijital İmzalı Kurulum Yardımcısı üretildi: "
+                f"SubVisionAI.exe ({size_kb:.1f} KB)"
             )
             return True
         print(f"[HATA] Derleme başarısız:\n{res.stdout}\n{res.stderr}")
@@ -1758,10 +1766,10 @@ def build_pyinstaller_bundle(base_dir: str) -> None:
     print("[*] PyInstaller bağımsız (standalone --onedir) paket derlemesi başlatılıyor...")
     ico_file = os.path.join(base_dir, "assets", "app_icon.ico")
     png_file = os.path.join(base_dir, "assets", "app_icon.png")
-    uninstaller_file = os.path.join(base_dir, "SubVisionAI-Uninstaller.exe")
+    launcher_exe = os.path.join(base_dir, "SubVisionAI.exe")
     data_sep = ";" if os.name == "nt" else ":"
 
-    if not os.path.exists(uninstaller_file):
+    if not os.path.exists(launcher_exe):
         build_native_exe(base_dir)
 
     cmd = [
@@ -1794,10 +1802,10 @@ def build_pyinstaller_bundle(base_dir: str) -> None:
     dist_app_dir = os.path.join(base_dir, "dist", "SubVisionAI")
     dist_exe = os.path.join(dist_app_dir, "SubVisionAI.exe")
     dist_uninst = os.path.join(dist_app_dir, "SubVisionAI-Uninstaller.exe")
-    if os.path.exists(uninstaller_file) and os.path.exists(dist_app_dir):
+    if os.path.exists(launcher_exe) and os.path.exists(dist_app_dir):
         import shutil
 
-        shutil.copy2(uninstaller_file, dist_uninst)
+        shutil.copy2(launcher_exe, dist_uninst)
 
     ensure_publisher_certificate_and_sign(base_dir, [dist_exe, dist_uninst])
     print("[OK] PyInstaller standalone paketi 'dist/SubVisionAI' klasörüne çıkartıldı ve imzalandı.")

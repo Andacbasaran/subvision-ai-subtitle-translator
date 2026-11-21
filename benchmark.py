@@ -77,17 +77,19 @@ def generate_visual_assets(bm: Dict) -> None:
 
     app = QApplication.instance() or QApplication(sys.argv)
 
-    # 1. Multi-Resolution .ICO & .PNG Uygulama İkonu
-    pix = app_main.create_app_pixmap(256)
+    # 1. Multi-Resolution .ICO & .PNG Uygulama İkonu (Mevcut özel tasarım logo varsa koru)
     png_icon_path = os.path.join(assets_dir, "app_icon.png")
     ico_path = os.path.join(assets_dir, "app_icon.ico")
-    pix.save(png_icon_path, "PNG")
-    img = Image.open(png_icon_path)
-    img.save(
-        ico_path,
-        format="ICO",
-        sizes=[(256, 256), (128, 128), (64, 64), (48, 48), (32, 32), (16, 16)],
-    )
+    if not os.path.exists(png_icon_path) or not os.path.exists(ico_path):
+        pix = app_main.create_app_pixmap(256)
+        if not os.path.exists(png_icon_path):
+            pix.save(png_icon_path, "PNG")
+        img = Image.open(png_icon_path)
+        img.save(
+            ico_path,
+            format="ICO",
+            sizes=[(256, 256), (128, 128), (64, 64), (48, 48), (32, 32), (16, 16)],
+        )
 
     # 2. Studio Arayüz Önizleme Görseli (assets/ui_preview.png)
     win = app_main.MainWindow()

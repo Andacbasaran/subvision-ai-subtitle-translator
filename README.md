@@ -139,8 +139,8 @@ flowchart TD
 ### Seçenek 2: Dijital İmzalı İnteraktif GUI Kurulum Yardımcısı (`SubVisionAI.exe`)
 - **`SubVisionAI-OnlineSetup`** / **`SubVisionAI.exe`** dosyası, **SHA-256 Authenticode dijital imzalı ve DigiCert zaman damgalıdır**. Kullanıcı onayı olmadan arka planda hiçbir dosya çıkartmaz (*Zero Silent-Dropper*); ilk açılışta Masaüstü kısayolu, Başlat Menüsü / Windows *Yüklü Uygulamalar* kaydı ve Yayıncı Sertifikası seçeneklerini sunan koyu temalı grafik kurulum yardımcısını açar.
 
-### 🗑️ Opsiyonel Bileşen Seçimli Kaldırma Yardımcısı (`SubVisionAI-Uninstaller.exe`)
-Hem **`SubVisionAI-Uninstaller.exe`** *(Windows Ayarlar ➔ Uygulamalar ➔ Yüklü Uygulamalar üzerinden veya doğrudan çalıştırılabilir)*, hem Inno Setup kaldırıcısı, hem de uygulama içi **`Bileşenler / Kaldır`** butonu üzerinden programla birlikte indirilen bileşenleri **opsiyonel olarak** seçip silebilirsiniz:
+### 🗑️ Otomatik Kurulan Opsiyonel Bileşen Seçimli Kaldırma Yardımcısı (`SubVisionAI-Uninstaller.exe`)
+`SubVisionAI.exe` ile programı kurduğunuzda **`SubVisionAI-Uninstaller.exe`** bilgisayarınızdaki kurulum klasörüne, Başlat Menüsüne ve *Windows Ayarlar ➔ Uygulamalar ➔ Yüklü Uygulamalar* listesine **otomatik olarak** eklenir. Ayrıca uygulama içi **`Bileşenler / Kaldır`** butonu üzerinden de programla birlikte indirilen bileşenleri **opsiyonel olarak** seçip silebilirsiniz:
 1. ☑️ **Ana Uygulama Dosyaları, Masaüstü / Başlat Menüsü Kısayolları ve Sistem Kaydı**
 2. ☑️ **Taşınabilir Python 3.11 Çalışma Ortamı ve Yapay Zeka Kütüphaneleri (`runtime/` — ~340 MB)**
 3. ☑️ **İndirilen Yapay Zeka Çeviri Modeli (`models/opus-en-tr-ct2` — ~227 MB)** *(İleride tekrar kurduğunuzda 227 MB modeli yeniden indirmemek için bu kutunun işaretini kaldırarak modeli koruyabilirsiniz)*
@@ -197,8 +197,7 @@ python main.py
 ## 📂 Proje Dizin Yapısı
 
 ```text
-├── SubVisionAI.exe                      # SHA-256 Authenticode imzalı interaktif Kurulum Yardımcısı & Başlatıcı
-├── SubVisionAI-Uninstaller.exe          # SHA-256 Authenticode imzalı opsiyonel bileşen seçimli Kaldırma Yardımcısı
+├── SubVisionAI.exe                      # SHA-256 Authenticode imzalı Kurulum Yardımcısı & Başlatıcı (kurulumda SubVisionAI-Uninstaller.exe'yi otomatik oluşturur)
 ├── main.py                              # PyQt6 Studio v1.3, asenkron Latest-Frame-Wins worker, Bileşen Yöneticisi
 ├── hardware.py                          # Evrensel CPU/ISA algılama, uyarlanabilir thread/FPS profili ve platform yardımcıları
 ├── ocr_engine.py                        # MSS regional capture, yerel kontrast/renkli konuşmacı maskesi, anti-phantom OCR

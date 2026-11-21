@@ -164,6 +164,25 @@ def make_flat_icon(kind: str, color_hex: str = "#FAFAFA", size: int = 14) -> QIc
 
 
 def create_app_pixmap(size: int = 64) -> QPixmap:
+    search_roots = [get_app_base_dir()]
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass and meipass not in search_roots:
+        search_roots.append(meipass)
+    for root in search_roots:
+        for fname in ("app_icon.png", "app_icon.ico"):
+            icon_path = os.path.join(root, "assets", fname)
+            if os.path.exists(icon_path):
+                src_pix = QPixmap(icon_path)
+                if not src_pix.isNull():
+                    scaled = src_pix.scaled(
+                        size * 2,
+                        size * 2,
+                        Qt.AspectRatioMode.KeepAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation,
+                    )
+                    scaled.setDevicePixelRatio(2.0)
+                    return scaled
+
     pix = QPixmap(size, size)
     pix.fill(Qt.GlobalColor.transparent)
     painter = QPainter(pix)
@@ -210,9 +229,10 @@ def create_app_icon() -> QIcon:
     if meipass and meipass not in search_roots:
         search_roots.append(meipass)
     for root in search_roots:
-        ico_path = os.path.join(root, "assets", "app_icon.ico")
-        if os.path.exists(ico_path):
-            return QIcon(ico_path)
+        for fname in ("app_icon.ico", "app_icon.png"):
+            ico_path = os.path.join(root, "assets", fname)
+            if os.path.exists(ico_path):
+                return QIcon(ico_path)
     return QIcon(create_app_pixmap(64))
 
 
