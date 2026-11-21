@@ -1,6 +1,6 @@
 import INDEX_HTML from "./index.html";
 
-const GITHUB_RAW_BASE = "https://raw.githubusercontent.com/Andacbasaran/subvision-ai-subtitle-translator/2208b7eff0f805421a199378fd3e8703e9d2e45c";
+const GITHUB_RAW_BASE = "https://raw.githubusercontent.com/Andacbasaran/subvision-ai-subtitle-translator/0e3045e1e18d3ce226f14df50619c4b5fea80f5d";
 
 const STATIC_ROUTES = {
   "/downloads/SubVisionAI.exe": {
