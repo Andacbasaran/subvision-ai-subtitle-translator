@@ -88,26 +88,26 @@ class ROISelectorOverlay(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        # Yarı saydam sinematik karartma
-        painter.fillRect(self.rect(), QColor(6, 10, 20, 150))
+        # Yarı saydam koyu ekran karartma
+        painter.fillRect(self.rect(), QColor(9, 9, 11, 155))
 
-        # Modern Üst HUD Bilgi Kartı
-        bw = min(820, self.width() - 40)
+        # Sade Flat Üst HUD Bilgi Çubuğu
+        bw = min(680, self.width() - 40)
         bx = (self.width() - bw) // 2
-        banner_rect = QRect(bx, 32, bw, 62)
+        banner_rect = QRect(bx, 32, bw, 52)
 
-        painter.setBrush(QColor(15, 23, 42, 240))
-        painter.setPen(QPen(QColor(56, 189, 248, 180), 1.5))
-        painter.drawRoundedRect(banner_rect, 14, 14)
+        painter.setBrush(QColor(17, 17, 20, 245))
+        painter.setPen(QPen(QColor(63, 63, 70, 220), 1))
+        painter.drawRoundedRect(banner_rect, 10, 10)
 
-        painter.setPen(QColor(248, 250, 252))
+        painter.setPen(QColor(250, 250, 250))
         ui_font = get_ui_font_family()
-        font = QFont(ui_font, 12, QFont.Weight.Bold)
+        font = QFont(ui_font, 11, QFont.Weight.DemiBold)
         painter.setFont(font)
         painter.drawText(
             banner_rect,
             Qt.AlignmentFlag.AlignCenter,
-            "🎯 Oyun, Dizi veya Filmdeki Altyazı Bölgesini Fare İle Seçin   •   İptal: ESC",
+            "Altyazı bölgesini fare ile sürükleyip seçin   ·   İptal: ESC",
         )
 
         if self.start_pos and self.end_pos:
@@ -116,45 +116,41 @@ class ROISelectorOverlay(QWidget):
             painter.fillRect(sel_rect, Qt.GlobalColor.transparent)
             painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceOver)
 
-            # Ana Çerçeve
-            pen = QPen(QColor(56, 189, 248, 220), 1.5, Qt.PenStyle.SolidLine)
+            # Ana İnce Çerçeve
+            pen = QPen(QColor(59, 130, 246, 220), 1.5, Qt.PenStyle.SolidLine)
             painter.setPen(pen)
             painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.drawRect(sel_rect)
 
-            # Köşe Vurguları (Viewfinder Corner Brackets)
-            corner_pen = QPen(QColor(34, 197, 94), 3.0, Qt.PenStyle.SolidLine)
+            # Köşe Vurguları (Minimal Viewfinder Brackets)
+            corner_pen = QPen(QColor(250, 250, 250), 2.5, Qt.PenStyle.SolidLine)
             painter.setPen(corner_pen)
-            cl = min(18, sel_rect.width() // 4, sel_rect.height() // 3)
+            cl = min(16, sel_rect.width() // 4, sel_rect.height() // 3)
             x1, y1, x2, y2 = sel_rect.left(), sel_rect.top(), sel_rect.right(), sel_rect.bottom()
 
-            # Sol-Üst
             painter.drawLine(x1, y1, x1 + cl, y1)
             painter.drawLine(x1, y1, x1, y1 + cl)
-            # Sağ-Üst
             painter.drawLine(x2, y1, x2 - cl, y1)
             painter.drawLine(x2, y1, x2, y1 + cl)
-            # Sol-Alt
             painter.drawLine(x1, y2, x1 + cl, y2)
             painter.drawLine(x1, y2, x1, y2 - cl)
-            # Sağ-Alt
             painter.drawLine(x2, y2, x2 - cl, y2)
             painter.drawLine(x2, y2, x2, y2 - cl)
 
-            # Boyut Rozeti (Dimensions Pill)
-            dim_text = f"📏 {sel_rect.width()} × {sel_rect.height()} px"
-            badge_w = 148
-            badge_h = 26
+            # Boyut Rozeti
+            dim_text = f"{sel_rect.width()} × {sel_rect.height()} px"
+            badge_w = 124
+            badge_h = 24
             badge_x = sel_rect.left()
             badge_y = max(12, sel_rect.top() - badge_h - 6)
             badge_rect = QRect(badge_x, badge_y, badge_w, badge_h)
 
-            painter.setBrush(QColor(15, 23, 42, 230))
-            painter.setPen(QPen(QColor(34, 197, 94, 200), 1))
+            painter.setBrush(QColor(17, 17, 20, 238))
+            painter.setPen(QPen(QColor(63, 63, 70, 220), 1))
             painter.drawRoundedRect(badge_rect, 6, 6)
 
-            painter.setFont(QFont(ui_font, 9, QFont.Weight.Bold))
-            painter.setPen(QColor(74, 222, 128))
+            painter.setFont(QFont(ui_font, 8, QFont.Weight.DemiBold))
+            painter.setPen(QColor(228, 228, 231))
             painter.drawText(badge_rect, Qt.AlignmentFlag.AlignCenter, dim_text)
 
     def mousePressEvent(self, event) -> None:
@@ -383,10 +379,10 @@ class SubtitleOverlayWindow(QWidget):
 
         has_text = bool(self._current_tr.strip())
         if has_text or self.show_guide_border:
-            bg_color = QColor(8, 12, 22, self.bg_alpha if has_text else 120)
+            bg_color = QColor(9, 9, 11, self.bg_alpha if has_text else 115)
             painter.setBrush(bg_color)
             if self.show_guide_border:
-                painter.setPen(QPen(QColor(56, 189, 248, 230), 2, Qt.PenStyle.DashLine))
+                painter.setPen(QPen(QColor(59, 130, 246, 220), 1.5, Qt.PenStyle.DashLine))
             else:
-                painter.setPen(QPen(QColor(255, 255, 255, 26), 1, Qt.PenStyle.SolidLine))
-            painter.drawRoundedRect(self.rect().adjusted(2, 2, -2, -2), 12, 12)
+                painter.setPen(QPen(QColor(255, 255, 255, 22), 1, Qt.PenStyle.SolidLine))
+            painter.drawRoundedRect(self.rect().adjusted(2, 2, -2, -2), 10, 10)
