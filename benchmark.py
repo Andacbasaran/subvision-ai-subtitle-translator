@@ -94,6 +94,7 @@ def generate_visual_assets(bm: Dict) -> None:
     # 2. Studio Arayüz Önizleme Görseli (assets/ui_preview.png)
     win = app_main.MainWindow()
     win.resize(880, 665)
+    win.combo_ocr_mode.setCurrentIndex(0)
     win.chk_bilingual.setChecked(True)
     win._select_color_swatch("#FACC15")
     win.translator.total_requests = 24
@@ -122,10 +123,23 @@ def generate_visual_assets(bm: Dict) -> None:
     app.processEvents()
     win._on_model_ready()
     win.lbl_scene_tag.setText("Canlı Yakalama · 30 FPS")
+    win._switch_tab(0)
     win.repaint()
     app.processEvents()
     ui_pix = win.grab()
     ui_pix.save(os.path.join(assets_dir, "ui_preview.png"), "PNG")
+
+    win._switch_tab(1)
+    win.repaint()
+    app.processEvents()
+    hist_pix = win.grab()
+    hist_pix.save(os.path.join(assets_dir, "ui_preview_history.png"), "PNG")
+
+    win._switch_tab(2)
+    win.repaint()
+    app.processEvents()
+    set_pix = win.grab()
+    set_pix.save(os.path.join(assets_dir, "ui_preview_settings.png"), "PNG")
     win.close()
 
     # 3. Yeni Nesil Anlaşılır Benchmark İnfografiği (assets/benchmark_chart.png)

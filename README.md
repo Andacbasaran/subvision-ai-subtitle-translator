@@ -68,8 +68,20 @@
 ## 🖥️ Uygulama Arayüzü (SubVision AI Studio v1.3)
 
 <div align="center">
-  <img src="assets/ui_preview.png" alt="SubVision AI Studio v1.3 UI Preview" width="880" />
+  <img src="assets/ui_preview.png" alt="SubVision AI Studio v1.3 — Ana Ekran" width="880" />
 </div>
+
+<details>
+<summary><b>📸 Diğer Sekmelerin Ekran Görüntülerini Gör (2. Diyalog Geçmişi & 3. Ayarlar / Canlı Hız Ölçümü)</b></summary>
+<br/>
+<div align="center">
+  <p><b>2. Sekme — Çevrilen Diyalog Geçmişi (Tıkla & Kopyala)</b></p>
+  <img src="assets/ui_preview_history.png" alt="SubVision AI Studio v1.3 — Diyalog Geçmişi" width="840" />
+  <br/><br/>
+  <p><b>3. Sekme — Algılama, Performans Profili, Canlı Hız Ölçümü & Bileşen Yöneticisi</b></p>
+  <img src="assets/ui_preview_settings.png" alt="SubVision AI Studio v1.3 — Ayarlar ve Hız Ölçümü" width="840" />
+</div>
+</details>
 
 <br/>
 
