@@ -24,6 +24,7 @@ from PyQt6.QtGui import (
     QIcon,
     QKeySequence,
     QPainter,
+    QPainterPath,
     QPen,
     QPixmap,
     QPolygonF,
@@ -46,6 +47,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSlider,
+    QStackedWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -164,6 +166,9 @@ def make_flat_icon(kind: str, color_hex: str = "#FAFAFA", size: int = 14) -> QIc
 
 
 def create_app_pixmap(size: int = 64) -> QPixmap:
+    """
+    Yeni SubVision AI logosunu (assets/app_icon.png) HiDPI (2x) yumuşak köşeli olarak yükler.
+    """
     search_roots = [get_app_base_dir()]
     meipass = getattr(sys, "_MEIPASS", None)
     if meipass and meipass not in search_roots:
@@ -174,14 +179,26 @@ def create_app_pixmap(size: int = 64) -> QPixmap:
             if os.path.exists(icon_path):
                 src_pix = QPixmap(icon_path)
                 if not src_pix.isNull():
+                    target_px = size * 2
                     scaled = src_pix.scaled(
-                        size * 2,
-                        size * 2,
+                        target_px,
+                        target_px,
                         Qt.AspectRatioMode.KeepAspectRatio,
                         Qt.TransformationMode.SmoothTransformation,
                     )
-                    scaled.setDevicePixelRatio(2.0)
-                    return scaled
+                    rounded = QPixmap(target_px, target_px)
+                    rounded.fill(Qt.GlobalColor.transparent)
+                    p = QPainter(rounded)
+                    p.setRenderHint(QPainter.RenderHint.Antialiasing)
+                    p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+                    path = QPainterPath()
+                    rad = target_px * 0.22
+                    path.addRoundedRect(0.0, 0.0, float(target_px), float(target_px), rad, rad)
+                    p.setClipPath(path)
+                    p.drawPixmap(0, 0, scaled)
+                    p.end()
+                    rounded.setDevicePixelRatio(2.0)
+                    return rounded
 
     pix = QPixmap(size, size)
     pix.fill(Qt.GlobalColor.transparent)
@@ -206,12 +223,12 @@ def create_app_pixmap(size: int = 64) -> QPixmap:
     y1 = int(size * 0.67)
     y2 = int(size * 0.80)
     painter.setPen(
-        QPen(QColor("#FFFFFF"), max(2, size // 16), Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
+        QPen(QColor("#38BDF8"), max(2, size // 16), Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
     )
     painter.drawLine(int(size * 0.23), y1, int(size * 0.77), y1)
     painter.setPen(
         QPen(
-            QColor(255, 255, 255, 165),
+            QColor("#FACC15"),
             max(2, size // 20),
             Qt.PenStyle.SolidLine,
             Qt.PenCapStyle.RoundCap,
@@ -253,14 +270,12 @@ class ModelLoaderThread(QThread):
 
     def run(self) -> None:
         try:
-            self.progress.emit(
-                f"OCR motoru hazırlanıyor ({self.ocr_engine.ocr_intra_threads} Thread)...", 8
-            )
+            self.progress.emit("Yapay zeka görüntü okuma motoru hazırlanıyor...", 10)
             self.ocr_engine.ensure_initialized()
-            self.progress.emit("OCR motoru hazır! Çeviri modeli kontrol ediliyor...", 18)
+            self.progress.emit("Çeviri motoru hazırlanıyor...", 22)
             self.translator.load(
                 progress_callback=lambda msg, pct: self.progress.emit(
-                    msg, max(18, int(18 + pct * 0.82))
+                    msg, max(22, int(22 + pct * 0.78))
                 )
             )
             self.finished_ok.emit()
@@ -495,7 +510,6 @@ class CaptureTranslateWorker(QThread):
                     elif status == "NEW_TEXT" and en_text:
                         idle_streak_sec = 0.0
                         orig_line_h = self.ocr_engine.last_line_height_px
-                        # Hızlı Yol (0.01 ms): Önbellek / Sözlükte varsa NMT kuyruğunu hiç beklemeden anında göster!
                         fast_hit = self.translator.try_fast_lookup(en_text)
                         if fast_hit is not None:
                             self._slot.invalidate()
@@ -511,7 +525,6 @@ class CaptureTranslateWorker(QThread):
                     self.status_tick.emit(f"Yakalama hatası: {exc}")
 
                 elapsed = time.perf_counter() - loop_start
-                # 2 saniye boyunca altyazı değişmediyse işlemciyi dinlendirmek için akıllı bekleme moduna geç
                 target_interval = (
                     self.idle_scan_interval_sec
                     if idle_streak_sec >= 2.0
@@ -539,7 +552,15 @@ class FlatSwitch(QCheckBox):
     def __init__(self, text: str = "", parent: Optional[QWidget] = None):
         super().__init__(text, parent)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setMinimumHeight(24)
+        self.setMinimumHeight(26)
+
+    def sizeHint(self) -> QSize:
+        fm = self.fontMetrics()
+        text_w = fm.horizontalAdvance(self.text()) if self.text() else 0
+        return QSize(36 + 12 + text_w + 10, max(26, fm.height() + 6))
+
+    def minimumSizeHint(self) -> QSize:
+        return self.sizeHint()
 
     def hitButton(self, pos) -> bool:
         return self.rect().contains(pos)
@@ -548,26 +569,26 @@ class FlatSwitch(QCheckBox):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        track_w, track_h = 34, 18
+        track_w, track_h = 36, 19
         y = (self.height() - track_h) // 2
         checked = self.isChecked()
 
-        track_col = QColor("#2563EB") if checked else QColor("#27272A")
-        border_col = QColor("#3B82F6") if checked else QColor("#3F3F46")
+        track_col = QColor("#0284C7") if checked else QColor("#162033")
+        border_col = QColor("#38BDF8") if checked else QColor("#293852")
         p.setBrush(track_col)
         p.setPen(QPen(border_col, 1))
         p.drawRoundedRect(1, y, track_w, track_h, track_h / 2.0, track_h / 2.0)
 
-        knob_d = 12
+        knob_d = 13
         knob_x = (track_w - knob_d - 2) if checked else 4
         knob_y = y + (track_h - knob_d) // 2
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QColor("#FAFAFA") if checked else QColor("#A1A1AA"))
+        p.setBrush(QColor("#FFFFFF") if checked else QColor("#94A3B8"))
         p.drawEllipse(knob_x, knob_y, knob_d, knob_d)
 
-        p.setPen(QColor("#D4D4D8") if self.isEnabled() else QColor("#52525B"))
+        p.setPen(QColor("#E2E8F0") if self.isEnabled() else QColor("#475569"))
         p.setFont(self.font())
-        text_rect = QRect(track_w + 11, 0, self.width() - track_w - 11, self.height())
+        text_rect = QRect(track_w + 10, 0, self.width() - track_w - 10, self.height())
         p.drawText(
             text_rect,
             Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
@@ -585,9 +606,15 @@ class FlatComboBox(QComboBox):
         super().paintEvent(event)
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        pen = QPen(QColor("#71717A"), 1.6, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin)
+        pen = QPen(
+            QColor("#38BDF8"),
+            1.7,
+            Qt.PenStyle.SolidLine,
+            Qt.PenCapStyle.RoundCap,
+            Qt.PenJoinStyle.RoundJoin,
+        )
         p.setPen(pen)
-        cx = self.width() - 15
+        cx = self.width() - 16
         cy = self.height() // 2
         p.drawLine(QPointF(cx - 4.0, cy - 2.0), QPointF(cx, cy + 2.2))
         p.drawLine(QPointF(cx, cy + 2.2), QPointF(cx + 4.0, cy - 2.0))
@@ -596,8 +623,7 @@ class FlatComboBox(QComboBox):
 
 class TelemetryCard(QFrame):
     """
-    Sade Flat KPI Telemetri Kartı:
-    Yumuşak koyu zemin, tek satır üst etiket + minimal rozet, net metrik değeri ve ince 3px bar.
+    Sade Performans Özeti Kartı (Gelişmiş Ayarlar sekmesinde yer alır).
     """
 
     def __init__(
@@ -615,38 +641,34 @@ class TelemetryCard(QFrame):
         self.setStyleSheet(
             """
             QFrame#telemetryCard {
-                background-color: #111114;
-                border: 1px solid #232329;
+                background-color: #090E1A;
+                border: 1px solid #1C283E;
                 border-radius: 10px;
-            }
-            QFrame#telemetryCard:hover {
-                border: 1px solid #32323C;
-                background-color: #141418;
             }
             """
         )
 
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(14, 12, 14, 12)
-        lay.setSpacing(6)
+        lay.setContentsMargins(12, 10, 12, 10)
+        lay.setSpacing(4)
 
         top_row = QHBoxLayout()
         top_row.setSpacing(6)
         self.lbl_title = QLabel(title)
         self.lbl_title.setStyleSheet(
-            "color: #71717A; font-size: 7.8pt; font-weight: 700; letter-spacing: 0.6px;"
+            "color: #94A3B8; font-size: 7.6pt; font-weight: 700; letter-spacing: 0.5px;"
         )
         top_row.addWidget(self.lbl_title)
 
         self.lbl_badge = QLabel(badge_text)
         self.lbl_badge.setStyleSheet(
             """
-            color: #A1A1AA;
-            background-color: #18181B;
-            border: 1px solid #27272A;
+            color: #38BDF8;
+            background-color: #0F1D33;
+            border: 1px solid #1E3A5F;
             border-radius: 4px;
             padding: 1px 6px;
-            font-size: 7.2pt;
+            font-size: 7pt;
             font-weight: 700;
             """
         )
@@ -654,12 +676,9 @@ class TelemetryCard(QFrame):
         lay.addLayout(top_row)
 
         self.lbl_val = QLabel(initial_val)
-        self.lbl_val.setStyleSheet(
-            "color: #FAFAFA; font-size: 16.5pt; font-weight: 700; padding-top: 1px;"
-        )
+        self.lbl_val.setStyleSheet("color: #F8FAFC; font-size: 14pt; font-weight: 700;")
         lay.addWidget(self.lbl_val)
 
-        # İnce Flat Gecikme / Doluluk Çubuğu
         self.bar = QProgressBar()
         self.bar.setRange(0, 100)
         self.bar.setValue(initial_pct)
@@ -668,7 +687,7 @@ class TelemetryCard(QFrame):
         self.bar.setStyleSheet(
             f"""
             QProgressBar {{
-                background-color: #1F1F24;
+                background-color: #162033;
                 border: none;
                 border-radius: 1px;
             }}
@@ -681,7 +700,7 @@ class TelemetryCard(QFrame):
         lay.addWidget(self.bar)
 
         self.lbl_sub = QLabel(sub_text)
-        self.lbl_sub.setStyleSheet("color: #71717A; font-size: 8pt; font-weight: 500;")
+        self.lbl_sub.setStyleSheet("color: #64748B; font-size: 7.8pt; font-weight: 500;")
         lay.addWidget(self.lbl_sub)
 
     def set_metric(
@@ -706,19 +725,20 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(APP_TITLE)
         self.setWindowIcon(create_app_icon())
 
-        # Küçük ekranlar (1366x768 veya 1080p @ %150 DPI) dahil her ekrana sığan pencere boyutlandırması
+        # Kompakt, ferah ve her ekrana kaydırmasız sığan modern pencere boyutu
         screen = QGuiApplication.primaryScreen()
         avail = screen.availableGeometry() if screen else QRect(0, 0, 1920, 1080)
-        min_w = min(920, max(760, avail.width() - 40))
-        min_h = min(640, max(540, avail.height() - 40))
-        init_w = min(1080, max(min_w, avail.width() - 40))
-        init_h = min(840, max(min_h, avail.height() - 40))
+        min_w = min(740, max(660, avail.width() - 40))
+        min_h = min(560, max(500, avail.height() - 40))
+        init_w = min(860, max(min_w, avail.width() - 60))
+        init_h = min(650, max(min_h, avail.height() - 60))
         self.setMinimumSize(min_w, min_h)
         self.resize(init_w, init_h)
 
         self.settings = self._load_settings()
         self.roi: Dict[str, int] = self.settings.get("roi", self._default_roi())
         self._resume_after_roi = False
+        self._restore_window_after_roi = False
 
         # Evrensel Donanım & İşlemci (CPU / ISA) Algılama + Uyarlanabilir Çalışma Profili
         self.hw_profile: HardwareProfile = detect_hardware_profile(query_ct2=True)
@@ -736,15 +756,17 @@ class MainWindow(QMainWindow):
             use_color_mask=(saved_ocr_mode != "full_ocr"),
             ocr_mode=saved_ocr_mode,
             tuning=self.tuning,
-            lazy_init=True,  # Arayüzün eski/düşük CPU'larda anında açılması için arka planda ısıt
+            lazy_init=True,
         )
         self.worker: Optional[CaptureTranslateWorker] = None
         self.bench_worker: Optional[BenchmarkWorker] = None
 
         self.overlay = SubtitleOverlayWindow()
-        self.roi_selector = ROISelectorOverlay(on_selected=self._on_roi_selected)
+        self.roi_selector = ROISelectorOverlay(
+            on_selected=self._on_roi_selected,
+            on_cancelled=self._on_roi_cancelled,
+        )
 
-        # Seçili görünüm durumları (WDA_EXCLUDEFROMCAPTURE desteklenmeyen OS'lerde 'above' güvenli varsayılan)
         default_overlay_mode = "cover" if self.hw_profile.capture_exclude_supported else "above"
         self._selected_color = self.settings.get("text_color", "#FACC15")
         self._selected_overlay_mode = self.settings.get("overlay_mode", default_overlay_mode)
@@ -849,66 +871,76 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(
             f"""
             QMainWindow, QWidget#centralWidget, QScrollArea {{
-                background-color: #09090B;
-                color: #FAFAFA;
+                background-color: #060A13;
+                color: #F8FAFC;
                 font-family: '{ui_font}', 'Segoe UI', 'Inter', 'DejaVu Sans', -apple-system, sans-serif;
             }}
             QLabel {{
                 background-color: transparent;
-                color: #E4E4E7;
+                color: #E2E8F0;
                 font-family: '{ui_font}', 'Segoe UI', 'Inter', 'DejaVu Sans', -apple-system, sans-serif;
             }}
+            QFrame#brandHeader {{
+                background-color: #0B1220;
+                border: 1px solid #1E2D45;
+                border-radius: 14px;
+            }}
             QFrame#studioPanel {{
-                background-color: #111114;
-                border: 1px solid #232329;
-                border-radius: 10px;
+                background-color: #0C1322;
+                border: 1px solid #1A263B;
+                border-radius: 14px;
+            }}
+            QFrame#stepCard {{
+                background-color: #090F1C;
+                border: 1px solid #1C2940;
+                border-radius: 12px;
             }}
             QPushButton {{
-                background-color: #18181B;
-                color: #E4E4E7;
-                border: 1px solid #27272A;
-                border-radius: 8px;
+                background-color: #131D31;
+                color: #F1F5F9;
+                border: 1px solid #24344F;
+                border-radius: 9px;
                 padding: 8px 14px;
                 font-size: 9.2pt;
                 font-weight: 600;
             }}
             QPushButton:hover {{
-                background-color: #222228;
-                border-color: #3F3F46;
-                color: #FAFAFA;
+                background-color: #1A2742;
+                border-color: #38BDF8;
+                color: #FFFFFF;
             }}
             QPushButton:pressed {{
-                background-color: #141417;
+                background-color: #0F172A;
             }}
             QPushButton:disabled {{
-                background-color: #111114;
-                color: #52525B;
-                border-color: #1E1E24;
+                background-color: #0B101C;
+                color: #475569;
+                border-color: #162033;
             }}
             QComboBox {{
-                background-color: #18181B;
-                border: 1px solid #27272A;
-                border-radius: 7px;
-                padding: 6px 11px;
+                background-color: #0F172A;
+                border: 1px solid #24344F;
+                border-radius: 8px;
+                padding: 7px 12px;
                 min-height: 22px;
-                color: #F4F4F5;
-                font-size: 9pt;
+                color: #F8FAFC;
+                font-size: 9.2pt;
                 font-weight: 500;
             }}
             QComboBox:hover {{
-                border-color: #3F3F46;
-                background-color: #1C1C21;
+                border-color: #38BDF8;
+                background-color: #131E36;
             }}
             QComboBox::drop-down {{
                 border: none;
-                width: 24px;
+                width: 26px;
             }}
             QComboBox QAbstractItemView {{
-                background-color: #18181B;
-                color: #F4F4F5;
-                selection-background-color: #27272A;
-                selection-color: #FAFAFA;
-                border: 1px solid #3F3F46;
+                background-color: #0F172A;
+                color: #F8FAFC;
+                selection-background-color: #1E3A5F;
+                selection-color: #FFFFFF;
+                border: 1px solid #38BDF8;
                 outline: none;
                 padding: 4px;
             }}
@@ -917,68 +949,47 @@ class MainWindow(QMainWindow):
             }}
             QSlider::groove:horizontal {{
                 border: none;
-                height: 4px;
-                background: #27272A;
+                height: 5px;
+                background: #1A263B;
                 border-radius: 2px;
             }}
             QSlider::sub-page:horizontal {{
-                background: #3B82F6;
+                background: #38BDF8;
                 border-radius: 2px;
             }}
             QSlider::handle:horizontal {{
-                background: #FAFAFA;
-                border: 2px solid #2563EB;
-                width: 14px;
-                height: 14px;
+                background: #FFFFFF;
+                border: 2px solid #0284C7;
+                width: 15px;
+                height: 15px;
                 margin: -6px 0;
                 border-radius: 8px;
             }}
             QSlider::handle:horizontal:hover {{
-                background: #FFFFFF;
-                border-color: #60A5FA;
-            }}
-            QCheckBox {{
-                background-color: transparent;
-                color: #D4D4D8;
-                font-size: 8.9pt;
-                font-weight: 500;
-                spacing: 8px;
-            }}
-            QCheckBox::indicator {{
-                width: 16px;
-                height: 16px;
-                border-radius: 4px;
-                border: 1px solid #3F3F46;
-                background-color: #18181B;
-            }}
-            QCheckBox::indicator:hover {{
-                border-color: #52525B;
-            }}
-            QCheckBox::indicator:checked {{
-                background-color: #2563EB;
-                border-color: #3B82F6;
+                background: #FACC15;
+                border-color: #38BDF8;
             }}
             QListWidget {{
-                background-color: #0D0D10;
-                border: 1px solid #232329;
-                border-radius: 8px;
-                color: #D4D4D8;
-                font-size: 8.8pt;
-                padding: 4px;
+                background-color: #080D18;
+                border: 1px solid #1A263B;
+                border-radius: 10px;
+                color: #E2E8F0;
+                font-size: 9pt;
+                padding: 6px;
                 outline: none;
             }}
             QListWidget::item {{
                 padding: 0px;
-                border-bottom: 1px solid #1A1A20;
-                border-radius: 6px;
-                margin-bottom: 2px;
+                border-bottom: 1px solid #131D30;
+                border-radius: 8px;
+                margin-bottom: 4px;
             }}
             QListWidget::item:hover {{
-                background-color: #141419;
+                background-color: #0E1729;
             }}
             QListWidget::item:selected {{
-                background-color: #18181E;
-                color: #FAFAFA;
+                background-color: #132038;
+                color: #FFFFFF;
             }}
             QScrollBar:vertical {{
                 background: transparent;
@@ -986,12 +997,12 @@ class MainWindow(QMainWindow):
                 margin: 2px 0;
             }}
             QScrollBar::handle:vertical {{
-                background: #27272A;
+                background: #1E2D45;
                 border-radius: 3px;
                 min-height: 24px;
             }}
             QScrollBar::handle:vertical:hover {{
-                background: #3F3F46;
+                background: #38BDF8;
             }}
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
                 height: 0px;
@@ -1009,69 +1020,99 @@ class MainWindow(QMainWindow):
 
         main_layout = QVBoxLayout(central)
         main_layout.setSpacing(12)
-        main_layout.setContentsMargins(16, 14, 16, 12)
+        main_layout.setContentsMargins(18, 16, 18, 14)
 
         # ═════════════════════════════════════════════════════════════════════
-        # 1. MINIMAL FLAT HEADER BAR
+        # 1. YENİ LOGOLU MODERN BAŞLIK & SEKMELİ GEZİNTİ ÇUBUĞU
         # ═════════════════════════════════════════════════════════════════════
         header_frame = QFrame()
-        header_frame.setObjectName("studioPanel")
+        header_frame.setObjectName("brandHeader")
         header_v = QVBoxLayout(header_frame)
-        header_v.setContentsMargins(16, 12, 16, 12)
-        header_v.setSpacing(8)
+        header_v.setContentsMargins(16, 13, 16, 13)
+        header_v.setSpacing(10)
 
         top_bar = QHBoxLayout()
-        top_bar.setSpacing(12)
+        top_bar.setSpacing(14)
 
+        # Yeni Logo (52x52 HiDPI)
         logo_lbl = QLabel()
-        logo_lbl.setPixmap(create_app_pixmap(38))
-        logo_lbl.setFixedSize(38, 38)
+        logo_lbl.setPixmap(create_app_pixmap(52))
+        logo_lbl.setFixedSize(52, 52)
         logo_lbl.setStyleSheet("border: none; background: transparent;")
         top_bar.addWidget(logo_lbl)
 
+        # Marka Başlığı ve Durum Satırı
         title_col = QVBoxLayout()
-        title_col.setSpacing(1)
+        title_col.setSpacing(3)
 
         title_row = QHBoxLayout()
         title_row.setSpacing(8)
         title_lbl = QLabel("SubVision AI")
-        title_lbl.setFont(QFont(ui_font, 13, QFont.Weight.Bold))
-        title_lbl.setStyleSheet("color: #FAFAFA; border: none; background: transparent;")
+        title_lbl.setFont(QFont(ui_font, 15, QFont.Weight.Bold))
+        title_lbl.setStyleSheet("color: #FFFFFF; border: none; background: transparent;")
         title_row.addWidget(title_lbl)
 
         ver_pill = QLabel("v1.3")
         ver_pill.setStyleSheet(
-            "color: #A1A1AA; background-color: #18181B; border: 1px solid #27272A; border-radius: 4px; padding: 1px 6px; font-size: 7.5pt; font-weight: 700;"
+            """
+            color: #38BDF8;
+            background-color: #0F223D;
+            border: 1px solid #1E3A5F;
+            border-radius: 5px;
+            padding: 1px 7px;
+            font-size: 7.8pt;
+            font-weight: 700;
+            """
         )
         title_row.addWidget(ver_pill)
+
+        self.lbl_model_status = QLabel("●  Hazırlanıyor...")
+        self.lbl_model_status.setStyleSheet(
+            """
+            color: #FACC15;
+            background-color: #231F0D;
+            border: 1px solid #4D4113;
+            border-radius: 9px;
+            padding: 2px 10px;
+            font-size: 8.2pt;
+            font-weight: 600;
+            """
+        )
+        title_row.addWidget(self.lbl_model_status)
         title_row.addStretch(1)
         title_col.addLayout(title_row)
 
-        sub_lbl = QLabel("Lokal Yapay Zeka Altyazı Stüdyosu  ·  EN → TR")
+        sub_lbl = QLabel("Oyun, Dizi ve Videolar İçin Anlık Ekran Üstü Türkçe Altyazı")
         sub_lbl.setStyleSheet(
-            "color: #71717A; font-size: 8.6pt; font-weight: 500; border: none; background: transparent;"
+            "color: #94A3B8; font-size: 9pt; font-weight: 500; border: none; background: transparent;"
         )
         title_col.addWidget(sub_lbl)
         top_bar.addLayout(title_col, stretch=1)
 
-        badge_col = QVBoxLayout()
-        badge_col.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        badge_col.setSpacing(4)
-
-        self.hw_badge = QLabel(self._format_hw_badge_text())
-        self.hw_badge.setToolTip(format_hardware_summary(self.hw_profile, self.tuning))
-        self.hw_badge.setStyleSheet(
-            "color: #A1A1AA; background-color: #18181B; border: 1px solid #232329; border-radius: 6px; padding: 3px 10px; font-size: 7.9pt; font-weight: 600;"
+        # Sağ: Sade 3 Sekmeli Kapsül Gezinti Menüsü
+        nav_capsule = QFrame()
+        nav_capsule.setStyleSheet(
+            """
+            QFrame {
+                background-color: #060A13;
+                border: 1px solid #1A263B;
+                border-radius: 10px;
+            }
+            """
         )
-        badge_col.addWidget(self.hw_badge, alignment=Qt.AlignmentFlag.AlignRight)
+        nav_row = QHBoxLayout(nav_capsule)
+        nav_row.setContentsMargins(4, 4, 4, 4)
+        nav_row.setSpacing(4)
 
-        self.lbl_model_status = QLabel("●  Donanım algılandı, motorlar hazırlanıyor...")
-        self.lbl_model_status.setStyleSheet(
-            "color: #EAB308; font-size: 8.5pt; font-weight: 600; border: none; background: transparent;"
-        )
-        badge_col.addWidget(self.lbl_model_status, alignment=Qt.AlignmentFlag.AlignRight)
-        top_bar.addLayout(badge_col)
+        self.btn_tab_main = QPushButton("Ana Ekran")
+        self.btn_tab_history = QPushButton("Geçmiş")
+        self.btn_tab_settings = QPushButton("Ayarlar")
+        for idx, b in enumerate((self.btn_tab_main, self.btn_tab_history, self.btn_tab_settings)):
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.clicked.connect(lambda checked=False, i=idx: self._switch_tab(i))
+            nav_row.addWidget(b)
 
+        top_bar.addWidget(nav_capsule, alignment=Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         header_v.addLayout(top_bar)
 
         self.progress_bar = QProgressBar()
@@ -1084,10 +1125,10 @@ class MainWindow(QMainWindow):
             QProgressBar {
                 border: none;
                 border-radius: 2px;
-                background-color: #1F1F24;
+                background-color: #131D31;
             }
             QProgressBar::chunk {
-                background-color: #3B82F6;
+                background-color: #38BDF8;
                 border-radius: 2px;
             }
             """
@@ -1096,41 +1137,512 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(header_frame)
 
         # ═════════════════════════════════════════════════════════════════════
-        # 2. FLAT TELEMETRİ ŞERİDİ (4 KPI Cards)
+        # 2. SEKMELİ İÇERİK ALANI (QStackedWidget)
         # ═════════════════════════════════════════════════════════════════════
+        self.stack = QStackedWidget()
+        main_layout.addWidget(self.stack, stretch=1)
+
+        # ─────────────────────────────────────────────────────────────────────
+        # SEKME 0: ANA EKRAN (ÇEVİRİ & GÖRÜNÜM) — %100 Sadeleştirilmiş Deneyim
+        # ─────────────────────────────────────────────────────────────────────
+        page_main = QWidget()
+        page_main_lay = QVBoxLayout(page_main)
+        page_main_lay.setContentsMargins(0, 0, 0, 0)
+        page_main_lay.setSpacing(12)
+
+        # A) 2 ADIMDA KULLANIM KARTI (Alan Seç -> Çeviriyi Başlat)
+        steps_row = QHBoxLayout()
+        steps_row.setSpacing(12)
+
+        # ADIM 1 KARTI
+        step1_card = QFrame()
+        step1_card.setObjectName("stepCard")
+        s1_lay = QVBoxLayout(step1_card)
+        s1_lay.setContentsMargins(14, 12, 14, 12)
+        s1_lay.setSpacing(7)
+
+        s1_hdr = QHBoxLayout()
+        lbl_s1_badge = QLabel("1. ADIM  ·  ALTYAZI YERİ")
+        lbl_s1_badge.setStyleSheet(
+            "color: #38BDF8; font-size: 7.8pt; font-weight: 700; letter-spacing: 0.7px;"
+        )
+        s1_hdr.addWidget(lbl_s1_badge)
+
+        self.lbl_roi_badge = QLabel(f"Seçili: {self.roi['width']}×{self.roi['height']} px")
+        self.lbl_roi_badge.setStyleSheet(
+            "color: #94A3B8; font-size: 7.8pt; font-weight: 600;"
+        )
+        s1_hdr.addWidget(self.lbl_roi_badge, alignment=Qt.AlignmentFlag.AlignRight)
+        s1_lay.addLayout(s1_hdr)
+
+        self.btn_select_roi = QPushButton("  Altyazı Alanını Seç   (F7)")
+        self.btn_select_roi.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_select_roi.setIcon(make_flat_icon("target", "#38BDF8", 15))
+        self.btn_select_roi.setIconSize(QSize(15, 15))
+        self.btn_select_roi.setMinimumHeight(44)
+        self.btn_select_roi.setStyleSheet(
+            """
+            QPushButton {
+                background-color: #132038;
+                border: 1px solid #25406B;
+                border-radius: 10px;
+                color: #F8FAFC;
+                font-size: 10pt;
+                font-weight: 700;
+            }
+            QPushButton:hover {
+                background-color: #192B4B;
+                border-color: #38BDF8;
+                color: #FFFFFF;
+            }
+            """
+        )
+        self.btn_select_roi.clicked.connect(self.open_roi_selector)
+        s1_lay.addWidget(self.btn_select_roi)
+
+        lbl_s1_desc = QLabel("Ekranda İngilizce altyazının çıktığı bölgeyi fareyle kutu içine alın.")
+        lbl_s1_desc.setStyleSheet("color: #64748B; font-size: 8.1pt; font-weight: 500;")
+        s1_lay.addWidget(lbl_s1_desc)
+        steps_row.addWidget(step1_card, stretch=1)
+
+        # ADIM 2 KARTI
+        step2_card = QFrame()
+        step2_card.setObjectName("stepCard")
+        s2_lay = QVBoxLayout(step2_card)
+        s2_lay.setContentsMargins(14, 12, 14, 12)
+        s2_lay.setSpacing(7)
+
+        s2_hdr = QHBoxLayout()
+        lbl_s2_badge = QLabel("2. ADIM  ·  CANLI ÇEVİRİ")
+        lbl_s2_badge.setStyleSheet(
+            "color: #FACC15; font-size: 7.8pt; font-weight: 700; letter-spacing: 0.7px;"
+        )
+        s2_hdr.addWidget(lbl_s2_badge)
+
+        self.lbl_scene_tag = QLabel(f"Otomatik · {self.tuning.scan_fps} FPS")
+        self.lbl_scene_tag.setStyleSheet(
+            "color: #94A3B8; font-size: 7.8pt; font-weight: 600;"
+        )
+        s2_hdr.addWidget(self.lbl_scene_tag, alignment=Qt.AlignmentFlag.AlignRight)
+        s2_lay.addLayout(s2_hdr)
+
+        self.btn_toggle = QPushButton("  Anlık Çeviriyi Başlat   (F8)")
+        self.btn_toggle.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_toggle.setIcon(make_flat_icon("play", "#FFFFFF", 14))
+        self.btn_toggle.setIconSize(QSize(14, 14))
+        self.btn_toggle.setMinimumHeight(44)
+        self.btn_toggle.setEnabled(False)
+        self._set_toggle_button_style(active=False)
+        self.btn_toggle.clicked.connect(self.toggle_translation)
+        s2_lay.addWidget(self.btn_toggle)
+
+        self.lbl_toggle_desc = QLabel("Seçili alandaki altyazıları gerçek zamanlı okuyup Türkçeye çevirir.")
+        self.lbl_toggle_desc.setStyleSheet("color: #64748B; font-size: 8.1pt; font-weight: 500;")
+        s2_lay.addWidget(self.lbl_toggle_desc)
+        steps_row.addWidget(step2_card, stretch=1)
+
+        page_main_lay.addLayout(steps_row)
+
+        # B) TEK BİRLEŞİK CANLI ALTYAZI & ÖNİZLEME EKRANI
+        live_card = QFrame()
+        live_card.setObjectName("studioPanel")
+        live_lay = QVBoxLayout(live_card)
+        live_lay.setContentsMargins(16, 13, 16, 14)
+        live_lay.setSpacing(9)
+
+        live_hdr = QHBoxLayout()
+        live_hdr.setSpacing(8)
+        lbl_live_title = QLabel("CANLI ALTYAZI & ÖNİZLEME")
+        lbl_live_title.setStyleSheet(
+            "color: #94A3B8; font-size: 8pt; font-weight: 700; letter-spacing: 0.8px;"
+        )
+        live_hdr.addWidget(lbl_live_title)
+        live_hdr.addStretch(1)
+
+        self.btn_test = QPushButton(" Örnek Sahne Dene (F9)")
+        self.btn_test.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_test.setIcon(make_flat_icon("preview", "#38BDF8", 13))
+        self.btn_test.setIconSize(QSize(13, 13))
+        self.btn_test.setEnabled(False)
+        self.btn_test.setStyleSheet(
+            """
+            QPushButton {
+                background-color: #101A2E;
+                color: #38BDF8;
+                border: 1px solid #1E3A5F;
+                padding: 4px 11px;
+                font-size: 8.2pt;
+                font-weight: 600;
+                border-radius: 7px;
+            }
+            QPushButton:hover {
+                background-color: #162642;
+                border-color: #38BDF8;
+                color: #FFFFFF;
+            }
+            QPushButton:disabled {
+                color: #475569;
+                border-color: #162033;
+                background-color: #0B101C;
+            }
+            """
+        )
+        self.btn_test.clicked.connect(self.run_sample_test)
+        live_hdr.addWidget(self.btn_test)
+
+        btn_copy = QPushButton(" Kopyala")
+        btn_copy.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_copy.setIcon(make_flat_icon("copy", "#94A3B8", 12))
+        btn_copy.setIconSize(QSize(12, 12))
+        btn_copy.setStyleSheet(
+            """
+            QPushButton {
+                background-color: #101A2E;
+                color: #CBD5E1;
+                border: 1px solid #1E2D45;
+                padding: 4px 10px;
+                font-size: 8.2pt;
+                font-weight: 600;
+                border-radius: 7px;
+            }
+            QPushButton:hover {
+                background-color: #1A2742;
+                color: #FFFFFF;
+                border-color: #38BDF8;
+            }
+            """
+        )
+        btn_copy.clicked.connect(self._copy_current_translation)
+        live_hdr.addWidget(btn_copy)
+        live_lay.addLayout(live_hdr)
+
+        # Birleşik Sinematik Önizleme Kutusu
+        self.preview_box = QFrame()
+        self.preview_box.setMinimumHeight(106)
+        prev_v = QVBoxLayout(self.preview_box)
+        prev_v.setContentsMargins(18, 14, 18, 14)
+        prev_v.setSpacing(6)
+
+        self.lbl_en_preview = QLabel(
+            "Altyazı bekleniyor... Test etmek için 'Örnek Sahne Dene (F9)' butonuna tıklayabilirsiniz."
+        )
+        self.lbl_en_preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl_en_preview.setWordWrap(True)
+        prev_v.addWidget(self.lbl_en_preview)
+
+        self.lbl_tr_preview = QLabel("Türkçe çeviri burada ve seçtiğiniz ekran bölgesinde anında görünür.")
+        self.lbl_tr_preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl_tr_preview.setWordWrap(True)
+        prev_v.addWidget(self.lbl_tr_preview)
+
+        # Geriye dönük uyumluluk referansları
+        self.lbl_mini_en = self.lbl_en_preview
+        self.lbl_mini_tr = self.lbl_tr_preview
+
+        live_lay.addWidget(self.preview_box, stretch=1)
+        page_main_lay.addWidget(live_card, stretch=1)
+
+        # C) SADELEŞTİRİLMİŞ ALTYAZI GÖRÜNÜMÜ KARTI
+        style_card = QFrame()
+        style_card.setObjectName("studioPanel")
+        style_lay = QVBoxLayout(style_card)
+        style_lay.setContentsMargins(16, 13, 16, 13)
+        style_lay.setSpacing(10)
+
+        lbl_style_hdr = QLabel("ALTYAZI GÖRÜNÜMÜ")
+        lbl_style_hdr.setStyleSheet(
+            "color: #94A3B8; font-size: 8pt; font-weight: 700; letter-spacing: 0.8px;"
+        )
+        style_lay.addWidget(lbl_style_hdr)
+
+        # Üst Satır: Altyazı Rengi (Sol) & Ekrandaki Konumu (Sağ)
+        style_top_grid = QGridLayout()
+        style_top_grid.setHorizontalSpacing(18)
+        style_top_grid.setVerticalSpacing(6)
+
+        lbl_col_title = QLabel("Altyazı Rengi")
+        lbl_col_title.setStyleSheet("color: #CBD5E1; font-size: 8.6pt; font-weight: 600;")
+        style_top_grid.addWidget(lbl_col_title, 0, 0)
+
+        lbl_pos_title = QLabel("Ekrandaki Konumu")
+        lbl_pos_title.setStyleSheet("color: #CBD5E1; font-size: 8.6pt; font-weight: 600;")
+        style_top_grid.addWidget(lbl_pos_title, 0, 1)
+
+        swatch_row = QHBoxLayout()
+        swatch_row.setSpacing(6)
+        self._color_buttons: Dict[str, QPushButton] = {}
+        color_presets = [
+            ("#FACC15", "Sarı"),
+            ("#FFFFFF", "Beyaz"),
+            ("#38BDF8", "Turkuaz"),
+            ("#4ADE80", "Yeşil"),
+        ]
+        for hex_code, label_txt in color_presets:
+            b = QPushButton(f" {label_txt}")
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.setIcon(make_flat_icon("dot", hex_code, 10))
+            b.setIconSize(QSize(10, 10))
+            b.clicked.connect(lambda checked=False, c=hex_code: self._select_color_swatch(c))
+            self._color_buttons[hex_code] = b
+            swatch_row.addWidget(b)
+        style_top_grid.addLayout(swatch_row, 1, 0)
+
+        seg_frame = QFrame()
+        seg_frame.setStyleSheet(
+            "QFrame { background-color: #070B14; border: 1px solid #1C2940; border-radius: 9px; }"
+        )
+        pos_row = QHBoxLayout(seg_frame)
+        pos_row.setContentsMargins(3, 3, 3, 3)
+        pos_row.setSpacing(4)
+        self.btn_mode_cover = QPushButton("Orijinalin Üstünü Kapat")
+        self.btn_mode_cover.setCursor(Qt.CursorShape.PointingHandCursor)
+        if not self.hw_profile.capture_exclude_supported:
+            self.btn_mode_cover.setToolTip(
+                "Bu işletim sistemi sürümünde WDA_EXCLUDEFROMCAPTURE desteklenmediği için "
+                "OCR döngüsünü önlemek adına 'Hemen Üstünde' konumu otomatik uygulanır."
+            )
+        self.btn_mode_above = QPushButton("Hemen Üstünde Göster")
+        self.btn_mode_above.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_mode_cover.clicked.connect(lambda: self._select_overlay_mode("cover"))
+        self.btn_mode_above.clicked.connect(lambda: self._select_overlay_mode("above"))
+        pos_row.addWidget(self.btn_mode_cover)
+        pos_row.addWidget(self.btn_mode_above)
+        style_top_grid.addWidget(seg_frame, 1, 1)
+
+        style_top_grid.setColumnStretch(0, 1)
+        style_top_grid.setColumnStretch(1, 1)
+        style_lay.addLayout(style_top_grid)
+
+        # Orta Satır: Yazı Boyutu & Arka Plan Koyuluğu (Yan Yana 2 Sütun)
+        sliders_row = QHBoxLayout()
+        sliders_row.setSpacing(18)
+
+        # Sol Slider: Yazı Boyutu
+        font_col = QHBoxLayout()
+        font_col.setSpacing(8)
+        self.lbl_font_cap = QLabel("Yazı Boyutu")
+        self.lbl_font_cap.setStyleSheet("color: #CBD5E1; font-size: 8.6pt; font-weight: 600;")
+        font_col.addWidget(self.lbl_font_cap)
+
+        self.slider_font = QSlider(Qt.Orientation.Horizontal)
+        self.slider_font.setRange(14, 36)
+        self.slider_font.setValue(self.settings.get("font_size", 22))
+        self.slider_font.valueChanged.connect(self._on_appearance_changed)
+        font_col.addWidget(self.slider_font, stretch=1)
+
+        self.lbl_font_val = QLabel("22 pt")
+        self.lbl_font_val.setMinimumWidth(42)
+        self.lbl_font_val.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self.lbl_font_val.setStyleSheet("color: #38BDF8; font-size: 8.6pt; font-weight: 700;")
+        font_col.addWidget(self.lbl_font_val)
+        sliders_row.addLayout(font_col, stretch=1)
+
+        # Sağ Slider: Arka Plan Koyuluğu
+        alpha_col = QHBoxLayout()
+        alpha_col.setSpacing(8)
+        lbl_alpha_cap = QLabel("Arka Plan Koyuluğu")
+        lbl_alpha_cap.setStyleSheet("color: #CBD5E1; font-size: 8.6pt; font-weight: 600;")
+        alpha_col.addWidget(lbl_alpha_cap)
+
+        init_alpha = self.settings.get("bg_alpha", 225)
+        self.slider_alpha = QSlider(Qt.Orientation.Horizontal)
+        self.slider_alpha.setRange(90, 250)
+        self.slider_alpha.setValue(init_alpha)
+        self.slider_alpha.valueChanged.connect(self._on_appearance_changed)
+        alpha_col.addWidget(self.slider_alpha, stretch=1)
+
+        self.lbl_alpha_val = QLabel(f"%{int(init_alpha / 255 * 100)}")
+        self.lbl_alpha_val.setMinimumWidth(42)
+        self.lbl_alpha_val.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self.lbl_alpha_val.setStyleSheet("color: #38BDF8; font-size: 8.6pt; font-weight: 700;")
+        alpha_col.addWidget(self.lbl_alpha_val)
+        sliders_row.addLayout(alpha_col, stretch=1)
+
+        style_lay.addLayout(sliders_row)
+
+        # Alt Satır: 3 Pratik Görünüm Anahtarı
+        toggles_row = QHBoxLayout()
+        toggles_row.setSpacing(20)
+
+        self.chk_guide = FlatSwitch("Hizalama çerçevesini göster")
+        self.chk_guide.setChecked(False)
+        self.chk_guide.toggled.connect(self.overlay.set_guide_border)
+        toggles_row.addWidget(self.chk_guide)
+
+        self.chk_bilingual = FlatSwitch("Çift dilli görünüm (EN + TR)")
+        self.chk_bilingual.setChecked(self.settings.get("show_bilingual", False))
+        self.chk_bilingual.toggled.connect(self._on_appearance_changed)
+        toggles_row.addWidget(self.chk_bilingual)
+
+        self.chk_autofit = FlatSwitch("Yazıyı kutuya otomatik sığdır")
+        self.chk_autofit.setChecked(self.settings.get("auto_fit_font", True))
+        self.chk_autofit.toggled.connect(self._on_appearance_changed)
+        toggles_row.addWidget(self.chk_autofit)
+
+        toggles_row.addStretch(1)
+        style_lay.addLayout(toggles_row)
+
+        page_main_lay.addWidget(style_card)
+        self.stack.addWidget(page_main)
+
+        # ─────────────────────────────────────────────────────────────────────
+        # SEKME 1: DİYALOG GEÇMİŞİ
+        # ─────────────────────────────────────────────────────────────────────
+        page_hist = QFrame()
+        page_hist.setObjectName("studioPanel")
+        hist_lay = QVBoxLayout(page_hist)
+        hist_lay.setContentsMargins(16, 14, 16, 14)
+        hist_lay.setSpacing(10)
+
+        hist_hdr = QHBoxLayout()
+        lbl_hist = QLabel("ÇEVRİLEN DİYALOG GEÇMİŞİ")
+        lbl_hist.setStyleSheet(
+            "color: #94A3B8; font-size: 8.2pt; font-weight: 700; letter-spacing: 0.8px;"
+        )
+        hist_hdr.addWidget(lbl_hist)
+
+        btn_clear_hist = QPushButton("Geçmişi Temizle")
+        btn_clear_hist.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_clear_hist.setStyleSheet(
+            """
+            QPushButton {
+                background-color: #131D31;
+                color: #94A3B8;
+                border: 1px solid #1E2D45;
+                padding: 4px 12px;
+                font-size: 8.2pt;
+                font-weight: 600;
+                border-radius: 7px;
+            }
+            QPushButton:hover {
+                color: #F87171;
+                border-color: #EF4444;
+                background-color: #1F1218;
+            }
+            """
+        )
+        btn_clear_hist.clicked.connect(self._clear_history)
+        hist_hdr.addWidget(btn_clear_hist, alignment=Qt.AlignmentFlag.AlignRight)
+        hist_lay.addLayout(hist_hdr)
+
+        self.list_history = QListWidget()
+        self.list_history.setWordWrap(True)
+        self.list_history.setTextElideMode(Qt.TextElideMode.ElideNone)
+        self.list_history.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.list_history.itemClicked.connect(self._on_history_item_clicked)
+        hist_lay.addWidget(self.list_history, stretch=1)
+
+        self.stack.addWidget(page_hist)
+
+        # ─────────────────────────────────────────────────────────────────────
+        # SEKME 2: GELİŞMİŞ AYARLAR & SİSTEM
+        # ─────────────────────────────────────────────────────────────────────
+        page_settings = QWidget()
+        settings_lay = QVBoxLayout(page_settings)
+        settings_lay.setContentsMargins(0, 0, 0, 0)
+        settings_lay.setSpacing(12)
+
+        # Motor & Algılama Ayarları Kartı
+        engine_card = QFrame()
+        engine_card.setObjectName("studioPanel")
+        eng_lay = QVBoxLayout(engine_card)
+        eng_lay.setContentsMargins(16, 14, 16, 14)
+        eng_lay.setSpacing(10)
+
+        lbl_eng_title = QLabel("ALGILAMA VE PERFORMANS AYARLARI")
+        lbl_eng_title.setStyleSheet(
+            "color: #94A3B8; font-size: 8.2pt; font-weight: 700; letter-spacing: 0.8px;"
+        )
+        eng_lay.addWidget(lbl_eng_title)
+
+        eng_grid = QGridLayout()
+        eng_grid.setHorizontalSpacing(16)
+        eng_grid.setVerticalSpacing(6)
+
+        lbl_ocr_prof = QLabel("Altyazı Okuma (OCR) Modu")
+        lbl_ocr_prof.setStyleSheet("color: #CBD5E1; font-size: 8.8pt; font-weight: 600;")
+        eng_grid.addWidget(lbl_ocr_prof, 0, 0)
+
+        lbl_perf_prof = QLabel("İşlemci Hız Profili")
+        lbl_perf_prof.setStyleSheet("color: #CBD5E1; font-size: 8.8pt; font-weight: 600;")
+        eng_grid.addWidget(lbl_perf_prof, 0, 1)
+
+        self.combo_ocr_mode = FlatComboBox()
+        self.combo_ocr_mode.addItem("Kontürlü / Adaptif Maske — Oyun & Dizi (Önerilen)", "fast_mask")
+        self.combo_ocr_mode.addItem("Akıllı Hibrit — Oyun, Dizi & Açık Zemin", "hybrid")
+        self.combo_ocr_mode.addItem("Tam Kare Okuma — Genel Video & Yayın", "full_ocr")
+        self.combo_ocr_mode.currentIndexChanged.connect(self._on_ocr_mode_changed)
+        eng_grid.addWidget(self.combo_ocr_mode, 1, 0)
+
+        self.combo_perf_profile = FlatComboBox()
+        self.combo_perf_profile.addItem("Otomatik — Bilgisayara Göre En İyi (Önerilen)", PROFILE_AUTO)
+        self.combo_perf_profile.addItem("Eko — Düşük İşlemci Kullanımı (15 FPS)", PROFILE_ECO)
+        self.combo_perf_profile.addItem("Dengeli — Standart Akıcılık (24 FPS)", PROFILE_BALANCED)
+        self.combo_perf_profile.addItem("Performans — Maksimum Akıcılık (30 FPS)", PROFILE_PERFORMANCE)
+        self.combo_perf_profile.currentIndexChanged.connect(self._on_perf_profile_changed)
+        eng_grid.addWidget(self.combo_perf_profile, 1, 1)
+
+        eng_grid.setColumnStretch(0, 1)
+        eng_grid.setColumnStretch(1, 1)
+        eng_lay.addLayout(eng_grid)
+
+        settings_lay.addWidget(engine_card)
+
+        # Sistem & Performans Telemetrisi Kartı
+        sys_card = QFrame()
+        sys_card.setObjectName("studioPanel")
+        sys_lay = QVBoxLayout(sys_card)
+        sys_lay.setContentsMargins(16, 14, 16, 14)
+        sys_lay.setSpacing(10)
+
+        sys_hdr = QHBoxLayout()
+        lbl_sys_title = QLabel("DONANIM VE CANLI HIZ ÖLÇÜMÜ")
+        lbl_sys_title.setStyleSheet(
+            "color: #94A3B8; font-size: 8.2pt; font-weight: 700; letter-spacing: 0.8px;"
+        )
+        sys_hdr.addWidget(lbl_sys_title)
+
+        self.hw_badge = QLabel(self._format_hw_badge_text())
+        self.hw_badge.setToolTip(format_hardware_summary(self.hw_profile, self.tuning))
+        self.hw_badge.setStyleSheet(
+            "color: #38BDF8; background-color: #091526; border: 1px solid #1E3A5F; border-radius: 6px; padding: 3px 10px; font-size: 7.8pt; font-weight: 600;"
+        )
+        sys_hdr.addWidget(self.hw_badge, alignment=Qt.AlignmentFlag.AlignRight)
+        sys_lay.addLayout(sys_hdr)
+
         kpi_row = QHBoxLayout()
         kpi_row.setSpacing(10)
 
         self.card_ocr = TelemetryCard(
-            "OCR YAKALAMA",
+            "OCR OKUMA",
             "FAST MASK",
             "— ms",
-            f"2 Aşamalı Kare Kilidi · {self.tuning.ocr_intra_threads} Thread",
-            "#3B82F6",
+            f"Kare Kilidi · {self.tuning.ocr_intra_threads} Thread",
+            "#38BDF8",
             18,
         )
         self.card_nmt = TelemetryCard(
-            f"NMT ÇEVİRİ ({self.translator.active_compute_type.upper()})",
+            f"ÇEVİRİ ({self.translator.active_compute_type.upper()})",
             f"{self.translator.cpu_threads} THREAD",
             "— ms",
-            "Opus-MT Big EN → TR",
-            "#EAB308",
+            "Opus-MT EN → TR",
+            "#FACC15",
             40,
         )
         self.card_total = TelemetryCard(
-            "TOPLAM GECİKME",
+            "TOPLAM SÜRE",
             "REAL-TIME",
             "— ms",
-            "Hedef < 150 ms anlık algı",
-            "#22C55E",
+            "Hedef < 150 ms anlık yanıt",
+            "#10B981",
             50,
         )
         self.card_stats = TelemetryCard(
-            "OTURUM & ÖNBELLEK",
+            "OTURUM",
             f"{self.tuning.scan_fps} FPS",
             "0 Çeviri",
             f"ROI {self.roi['width']}×{self.roi['height']} px · Hit %0",
-            "#A1A1AA",
+            "#A78BFA",
             10,
         )
 
@@ -1138,391 +1650,66 @@ class MainWindow(QMainWindow):
         kpi_row.addWidget(self.card_nmt)
         kpi_row.addWidget(self.card_total)
         kpi_row.addWidget(self.card_stats)
-        main_layout.addLayout(kpi_row)
+        sys_lay.addLayout(kpi_row)
 
-        # ═════════════════════════════════════════════════════════════════════
-        # 3. HİYERARŞİK FLAT KOMUT ÇUBUĞU
-        # ═════════════════════════════════════════════════════════════════════
-        btn_row = QHBoxLayout()
-        btn_row.setSpacing(10)
+        tools_row = QHBoxLayout()
+        tools_row.setSpacing(10)
 
-        self.btn_select_roi = QPushButton("  Altyazı Alanı Seç   (F7)")
-        self.btn_select_roi.setIcon(make_flat_icon("target", "#E4E4E7", 14))
-        self.btn_select_roi.setIconSize(QSize(14, 14))
-        self.btn_select_roi.setMinimumHeight(40)
-        self.btn_select_roi.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #18181B;
-                border: 1px solid #2E2E36;
-                color: #FAFAFA;
-                font-size: 9.4pt;
-                font-weight: 600;
-            }
-            QPushButton:hover {
-                background-color: #222228;
-                border-color: #3F3F46;
-            }
-            """
-        )
-        self.btn_select_roi.clicked.connect(self.open_roi_selector)
-        btn_row.addWidget(self.btn_select_roi, stretch=3)
-
-        self.btn_toggle = QPushButton("  Anlık Çeviriyi Başlat   (F8)")
-        self.btn_toggle.setIcon(make_flat_icon("play", "#FFFFFF", 13))
-        self.btn_toggle.setIconSize(QSize(13, 13))
-        self.btn_toggle.setMinimumHeight(40)
-        self.btn_toggle.setEnabled(False)
-        self._set_toggle_button_style(active=False)
-        self.btn_toggle.clicked.connect(self.toggle_translation)
-        btn_row.addWidget(self.btn_toggle, stretch=3)
-
-        self.btn_test = QPushButton("  Örnek Sahne   (F9)")
-        self.btn_test.setIcon(make_flat_icon("preview", "#D4D4D8", 14))
-        self.btn_test.setIconSize(QSize(14, 14))
-        self.btn_test.setMinimumHeight(40)
-        self.btn_test.setEnabled(False)
-        self.btn_test.clicked.connect(self.run_sample_test)
-        btn_row.addWidget(self.btn_test, stretch=2)
-
-        self.btn_benchmark = QPushButton("  Benchmark")
-        self.btn_benchmark.setIcon(make_flat_icon("gauge", "#D4D4D8", 14))
+        self.btn_benchmark = QPushButton("  Donanım Hız Testi Yap (Benchmark)")
+        self.btn_benchmark.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_benchmark.setIcon(make_flat_icon("gauge", "#38BDF8", 14))
         self.btn_benchmark.setIconSize(QSize(14, 14))
-        self.btn_benchmark.setMinimumHeight(40)
+        self.btn_benchmark.setMinimumHeight(38)
         self.btn_benchmark.setEnabled(False)
         self.btn_benchmark.clicked.connect(self.run_benchmark_suite)
-        btn_row.addWidget(self.btn_benchmark, stretch=2)
+        tools_row.addWidget(self.btn_benchmark)
 
-        self.btn_manage = QPushButton("  Bileşenler / Kaldır")
-        self.btn_manage.setIcon(make_flat_icon("manage", "#D4D4D8", 14))
+        self.btn_manage = QPushButton("  İndirilen Bileşenler / Uygulamayı Kaldır")
+        self.btn_manage.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_manage.setIcon(make_flat_icon("manage", "#FACC15", 14))
         self.btn_manage.setIconSize(QSize(14, 14))
-        self.btn_manage.setMinimumHeight(40)
-        self.btn_manage.setToolTip("İndirilen yapay zeka modelini, çalışma ortamını ve kaldırma seçeneklerini yönet")
+        self.btn_manage.setMinimumHeight(38)
         self.btn_manage.clicked.connect(self.open_component_manager)
-        btn_row.addWidget(self.btn_manage, stretch=2)
+        tools_row.addWidget(self.btn_manage)
 
-        main_layout.addLayout(btn_row)
+        sys_lay.addLayout(tools_row)
+        settings_lay.addWidget(sys_card)
+        settings_lay.addStretch(1)
 
-        # ═════════════════════════════════════════════════════════════════════
-        # 4. İKİ SÜTUNLU FLAT STUDIO WORKSPACE
-        # ═════════════════════════════════════════════════════════════════════
-        workspace_row = QHBoxLayout()
-        workspace_row.setSpacing(12)
-
-        # ─────────────────────────────────────────────────────────────────────
-        # SOL SÜTUN (%56): CANLI AKIŞ & DİYALOG GEÇMİŞİ
-        # ─────────────────────────────────────────────────────────────────────
-        left_panel = QFrame()
-        left_panel.setObjectName("studioPanel")
-        left_lay = QVBoxLayout(left_panel)
-        left_lay.setContentsMargins(16, 14, 16, 14)
-        left_lay.setSpacing(10)
-
-        left_hdr = QHBoxLayout()
-        lbl_left_title = QLabel("CANLI AKIŞ")
-        lbl_left_title.setStyleSheet(
-            "color: #A1A1AA; font-size: 8.2pt; font-weight: 700; letter-spacing: 0.9px;"
-        )
-        left_hdr.addWidget(lbl_left_title)
-
-        self.lbl_scene_tag = QLabel(f"Canlı Yakalama · {self.tuning.scan_fps} FPS")
-        self.lbl_scene_tag.setStyleSheet(
-            "color: #A1A1AA; background-color: #18181B; border: 1px solid #232329; border-radius: 5px; padding: 2px 8px; font-size: 7.9pt; font-weight: 600;"
-        )
-        left_hdr.addWidget(self.lbl_scene_tag, alignment=Qt.AlignmentFlag.AlignRight)
-        left_lay.addLayout(left_hdr)
-
-        lbl_en_cap = QLabel("KAYNAK METİN (EN)")
-        lbl_en_cap.setStyleSheet(
-            "color: #71717A; font-size: 7.5pt; font-weight: 700; letter-spacing: 0.6px; padding-top: 2px;"
-        )
-        left_lay.addWidget(lbl_en_cap)
-
-        self.lbl_en_preview = QLabel(
-            "Altyazı bekleniyor. F7 ile yakalama bölgesini seçip F8 ile çeviriyi başlatabilirsiniz."
-        )
-        self.lbl_en_preview.setWordWrap(True)
-        self.lbl_en_preview.setMinimumHeight(46)
-        self.lbl_en_preview.setStyleSheet(
-            """
-            background-color: #18181B;
-            border: 1px solid #232329;
-            padding: 10px 13px;
-            border-radius: 8px;
-            color: #E4E4E7;
-            font-size: 9.8pt;
-            font-weight: 500;
-            """
-        )
-        left_lay.addWidget(self.lbl_en_preview)
-
-        tr_hdr = QHBoxLayout()
-        lbl_tr_cap = QLabel("TÜRKÇE ÇEVİRİ (TR)")
-        lbl_tr_cap.setStyleSheet(
-            "color: #71717A; font-size: 7.5pt; font-weight: 700; letter-spacing: 0.6px; padding-top: 2px;"
-        )
-        tr_hdr.addWidget(lbl_tr_cap)
-
-        btn_copy = QPushButton(" Kopyala")
-        btn_copy.setIcon(make_flat_icon("copy", "#A1A1AA", 12))
-        btn_copy.setIconSize(QSize(12, 12))
-        btn_copy.setStyleSheet(
-            """
-            QPushButton {
-                background-color: transparent;
-                color: #A1A1AA;
-                border: 1px solid #232329;
-                padding: 3px 9px;
-                font-size: 7.8pt;
-                font-weight: 600;
-                border-radius: 5px;
-            }
-            QPushButton:hover {
-                background-color: #18181B;
-                color: #FAFAFA;
-                border-color: #3F3F46;
-            }
-            """
-        )
-        btn_copy.clicked.connect(self._copy_current_translation)
-        tr_hdr.addWidget(btn_copy, alignment=Qt.AlignmentFlag.AlignRight)
-        left_lay.addLayout(tr_hdr)
-
-        self.lbl_tr_preview = QLabel("Çeviri bekleniyor...")
-        self.lbl_tr_preview.setWordWrap(True)
-        self.lbl_tr_preview.setMinimumHeight(52)
-        self.lbl_tr_preview.setStyleSheet(
-            """
-            background-color: #18181B;
-            border: 1px solid #2E2E36;
-            padding: 10px 13px;
-            border-radius: 8px;
-            color: #FACC15;
-            font-size: 11pt;
-            font-weight: 700;
-            """
-        )
-        left_lay.addWidget(self.lbl_tr_preview)
-
-        hist_hdr = QHBoxLayout()
-        lbl_hist = QLabel("DİYALOG GEÇMİŞİ")
-        lbl_hist.setStyleSheet(
-            "color: #71717A; font-size: 7.5pt; font-weight: 700; letter-spacing: 0.6px; padding-top: 4px;"
-        )
-        hist_hdr.addWidget(lbl_hist)
-
-        btn_clear_hist = QPushButton("Temizle")
-        btn_clear_hist.setStyleSheet(
-            """
-            QPushButton {
-                background-color: transparent;
-                color: #71717A;
-                border: none;
-                padding: 2px 6px;
-                font-size: 8pt;
-                font-weight: 600;
-            }
-            QPushButton:hover {
-                color: #EF4444;
-                background-color: transparent;
-            }
-            """
-        )
-        btn_clear_hist.clicked.connect(lambda: self.list_history.clear())
-        hist_hdr.addWidget(btn_clear_hist, alignment=Qt.AlignmentFlag.AlignRight)
-        left_lay.addLayout(hist_hdr)
-
-        self.list_history = QListWidget()
-        self.list_history.setWordWrap(True)
-        self.list_history.setTextElideMode(Qt.TextElideMode.ElideNone)
-        self.list_history.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.list_history.setMinimumHeight(130)
-        left_lay.addWidget(self.list_history, stretch=1)
-
-        workspace_row.addWidget(left_panel, stretch=56)
-
-        # ─────────────────────────────────────────────────────────────────────
-        # SAĞ SÜTUN (%44): YAPILANDIRMA & OVERLAY ÖNİZLEME
-        # ─────────────────────────────────────────────────────────────────────
-        right_panel = QFrame()
-        right_panel.setObjectName("studioPanel")
-        right_lay = QVBoxLayout(right_panel)
-        right_lay.setContentsMargins(16, 14, 16, 14)
-        right_lay.setSpacing(10)
-
-        lbl_right_title = QLabel("YAPILANDIRMA & OVERLAY")
-        lbl_right_title.setStyleSheet(
-            "color: #A1A1AA; font-size: 8.2pt; font-weight: 700; letter-spacing: 0.9px;"
-        )
-        right_lay.addWidget(lbl_right_title)
-
-        # İşlemci & Performans Profili
-        lbl_perf_prof = QLabel("İşlemci Profili")
-        lbl_perf_prof.setStyleSheet("color: #A1A1AA; font-size: 8.3pt; font-weight: 600;")
-        right_lay.addWidget(lbl_perf_prof)
-
-        self.combo_perf_profile = FlatComboBox()
-        self.combo_perf_profile.addItem("Otomatik — İşlemciye Göre En İyi", PROFILE_AUTO)
-        self.combo_perf_profile.addItem("Eko — Eski / Düşük CPU (15 FPS)", PROFILE_ECO)
-        self.combo_perf_profile.addItem("Dengeli — Orta Seviye CPU (24 FPS)", PROFILE_BALANCED)
-        self.combo_perf_profile.addItem("Performans — Çok Çekirdekli CPU (30 FPS)", PROFILE_PERFORMANCE)
-        self.combo_perf_profile.currentIndexChanged.connect(self._on_perf_profile_changed)
-        right_lay.addWidget(self.combo_perf_profile)
-
-        # OCR Algılama Profili
-        lbl_ocr_prof = QLabel("OCR Algılama Modu")
-        lbl_ocr_prof.setStyleSheet("color: #A1A1AA; font-size: 8.3pt; font-weight: 600;")
-        right_lay.addWidget(lbl_ocr_prof)
-
-        self.combo_ocr_mode = FlatComboBox()
-        self.combo_ocr_mode.addItem("Kontürlü / Adaptif Maske — Oyun & Dizi (Önerilen)", "fast_mask")
-        self.combo_ocr_mode.addItem("Hibrit — Oyun, Dizi & Açık Zemin (Akıllı Yedek)", "hybrid")
-        self.combo_ocr_mode.addItem("Tam Kare OCR — Genel Ekran & Video", "full_ocr")
-        self.combo_ocr_mode.currentIndexChanged.connect(self._on_ocr_mode_changed)
-        right_lay.addWidget(self.combo_ocr_mode)
-
-        # Altyazı Konumu (Flat Segmented Control)
-        lbl_pos_title = QLabel("Overlay Konumu")
-        lbl_pos_title.setStyleSheet("color: #A1A1AA; font-size: 8.3pt; font-weight: 600;")
-        right_lay.addWidget(lbl_pos_title)
-
-        seg_frame = QFrame()
-        seg_frame.setStyleSheet(
-            "QFrame { background-color: #09090B; border: 1px solid #232329; border-radius: 8px; }"
-        )
-        pos_row = QHBoxLayout(seg_frame)
-        pos_row.setContentsMargins(3, 3, 3, 3)
-        pos_row.setSpacing(3)
-        self.btn_mode_cover = QPushButton("Orijinalin Üstünü Kapat")
-        if not self.hw_profile.capture_exclude_supported:
-            self.btn_mode_cover.setToolTip(
-                "Bu işletim sistemi sürümünde WDA_EXCLUDEFROMCAPTURE desteklenmediği için "
-                "OCR döngüsünü önlemek adına 'Hemen Üstünde' konumu otomatik uygulanır."
-            )
-        self.btn_mode_above = QPushButton("Hemen Üstünde Göster")
-        self.btn_mode_cover.clicked.connect(lambda: self._select_overlay_mode("cover"))
-        self.btn_mode_above.clicked.connect(lambda: self._select_overlay_mode("above"))
-        pos_row.addWidget(self.btn_mode_cover)
-        pos_row.addWidget(self.btn_mode_above)
-        right_lay.addWidget(seg_frame)
-
-        # Altyazı Renk Paleti (Vektörel Renk Noktalı Flat Swatch'lar)
-        lbl_col_title = QLabel("Altyazı Rengi")
-        lbl_col_title.setStyleSheet("color: #A1A1AA; font-size: 8.3pt; font-weight: 600;")
-        right_lay.addWidget(lbl_col_title)
-
-        swatch_row = QHBoxLayout()
-        swatch_row.setSpacing(6)
-        self._color_buttons: Dict[str, QPushButton] = {}
-        color_presets = [
-            ("#FFFFFF", "Beyaz"),
-            ("#FACC15", "Sarı"),
-            ("#38BDF8", "Turkuaz"),
-            ("#4ADE80", "Yeşil"),
-        ]
-        for hex_code, label_txt in color_presets:
-            b = QPushButton(f" {label_txt}")
-            b.setIcon(make_flat_icon("dot", hex_code, 10))
-            b.setIconSize(QSize(10, 10))
-            b.clicked.connect(lambda checked=False, c=hex_code: self._select_color_swatch(c))
-            self._color_buttons[hex_code] = b
-            swatch_row.addWidget(b)
-        right_lay.addLayout(swatch_row)
-
-        # Yazı Boyutu & Arka Plan Opaklığı Sliders
-        sliders_grid = QGridLayout()
-        sliders_grid.setSpacing(8)
-        sliders_grid.setContentsMargins(0, 2, 0, 2)
-
-        self.lbl_font_cap = QLabel("Maks. Boyut")
-        self.lbl_font_cap.setStyleSheet("color: #A1A1AA; font-size: 8.3pt; font-weight: 600;")
-        sliders_grid.addWidget(self.lbl_font_cap, 0, 0)
-
-        self.slider_font = QSlider(Qt.Orientation.Horizontal)
-        self.slider_font.setRange(14, 36)
-        self.slider_font.setValue(self.settings.get("font_size", 22))
-        self.slider_font.valueChanged.connect(self._on_appearance_changed)
-        sliders_grid.addWidget(self.slider_font, 0, 1)
-
-        self.lbl_font_val = QLabel("22 pt")
-        self.lbl_font_val.setMinimumWidth(42)
-        self.lbl_font_val.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        self.lbl_font_val.setStyleSheet("color: #E4E4E7; font-size: 8.3pt; font-weight: 600;")
-        sliders_grid.addWidget(self.lbl_font_val, 0, 2)
-
-        lbl_alpha_cap = QLabel("Arka Plan")
-        lbl_alpha_cap.setStyleSheet("color: #A1A1AA; font-size: 8.3pt; font-weight: 600;")
-        sliders_grid.addWidget(lbl_alpha_cap, 1, 0)
-
-        init_alpha = self.settings.get("bg_alpha", 225)
-        self.slider_alpha = QSlider(Qt.Orientation.Horizontal)
-        self.slider_alpha.setRange(90, 250)
-        self.slider_alpha.setValue(init_alpha)
-        self.slider_alpha.valueChanged.connect(self._on_appearance_changed)
-        sliders_grid.addWidget(self.slider_alpha, 1, 1)
-
-        self.lbl_alpha_val = QLabel(f"%{int(init_alpha / 255 * 100)}")
-        self.lbl_alpha_val.setMinimumWidth(42)
-        self.lbl_alpha_val.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        self.lbl_alpha_val.setStyleSheet("color: #E4E4E7; font-size: 8.3pt; font-weight: 600;")
-        sliders_grid.addWidget(self.lbl_alpha_val, 1, 2)
-
-        right_lay.addLayout(sliders_grid)
-
-        # Görünüm Seçenekleri (Modern Flat Toggle Switches)
-        self.chk_autofit = FlatSwitch("Otomatik yazı boyutu (Orijinali tam kapat)")
-        self.chk_autofit.setChecked(self.settings.get("auto_fit_font", True))
-        self.chk_autofit.toggled.connect(self._on_appearance_changed)
-        right_lay.addWidget(self.chk_autofit)
-
-        self.chk_bilingual = FlatSwitch("Çift dilli görünüm (Üstte EN + Altta TR)")
-        self.chk_bilingual.setChecked(self.settings.get("show_bilingual", False))
-        self.chk_bilingual.toggled.connect(self._on_appearance_changed)
-        right_lay.addWidget(self.chk_bilingual)
-
-        self.chk_guide = FlatSwitch("Ekranda hizalama kılavuz çerçevesini göster")
-        self.chk_guide.setChecked(False)
-        self.chk_guide.toggled.connect(self.overlay.set_guide_border)
-        right_lay.addWidget(self.chk_guide)
-
-        # Canlı Overlay Önizleme Kutusu
-        lbl_prev_hdr = QLabel("CANLI ÖNİZLEME")
-        lbl_prev_hdr.setStyleSheet(
-            "color: #71717A; font-size: 7.5pt; font-weight: 700; letter-spacing: 0.6px; padding-top: 4px;"
-        )
-        right_lay.addWidget(lbl_prev_hdr)
-
-        self.preview_box = QFrame()
-        self.preview_box.setMinimumHeight(88)
-        prev_v = QVBoxLayout(self.preview_box)
-        prev_v.setContentsMargins(14, 10, 14, 10)
-        prev_v.setSpacing(3)
-
-        self.lbl_mini_en = QLabel("Detective: Everything points to a much bigger conspiracy.")
-        self.lbl_mini_en.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lbl_mini_en.setWordWrap(True)
-        prev_v.addWidget(self.lbl_mini_en)
-
-        self.lbl_mini_tr = QLabel("Dedektif: Her şey çok daha büyük bir komploya işaret ediyor.")
-        self.lbl_mini_tr.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lbl_mini_tr.setWordWrap(True)
-        prev_v.addWidget(self.lbl_mini_tr)
-
-        right_lay.addWidget(self.preview_box, stretch=1)
-        workspace_row.addWidget(right_panel, stretch=44)
-
-        main_layout.addLayout(workspace_row, stretch=1)
+        self.stack.addWidget(page_settings)
 
         # ═════════════════════════════════════════════════════════════════════
-        # 5. MINIMAL ALT BİLGİ ÇUBUĞU
+        # 3. SADE KISAYOL ALT BİLGİ ÇUBUĞU
         # ═════════════════════════════════════════════════════════════════════
         footer = QLabel(
-            "Oyunlarda 'Borderless Windowed' modunu kullanın  ·  Netflix, YouTube, Prime Video, Twitch ve VLC ile uyumlu  ·  "
-            "Kısayollar: F7 Alan Seç  |  F8 Başlat/Durdur  |  F9 Örnek Sahne"
+            "Kısayollar (Oyun ve video içindeyken çalışır):   F7 Altyazı Alanını Seç   ·   "
+            "F8 Çeviriyi Başlat / Durdur   ·   F9 Örnek Altyazı Testi"
         )
+        footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
         footer.setWordWrap(True)
-        footer.setStyleSheet("color: #71717A; font-size: 8.1pt; font-weight: 500; padding-top: 2px;")
+        footer.setStyleSheet("color: #64748B; font-size: 8.2pt; font-weight: 600; padding-top: 2px;")
         main_layout.addWidget(footer)
+
+        self._switch_tab(0)
+
+    def _switch_tab(self, index: int) -> None:
+        self.stack.setCurrentIndex(index)
+        active_css = (
+            "QPushButton { background-color: #162642; border: 1px solid #38BDF8; border-radius: 7px; "
+            "color: #FFFFFF; padding: 5px 13px; font-size: 8.4pt; font-weight: 700; }"
+        )
+        idle_css = (
+            "QPushButton { background-color: transparent; border: 1px solid transparent; border-radius: 7px; "
+            "color: #94A3B8; padding: 5px 13px; font-size: 8.4pt; font-weight: 600; }"
+            "QPushButton:hover { color: #F8FAFC; background-color: #0F172A; }"
+        )
+        tabs = (self.btn_tab_main, self.btn_tab_history, self.btn_tab_settings)
+        for i, btn in enumerate(tabs):
+            btn.setStyleSheet(active_css if i == index else idle_css)
+
+    def _clear_history(self) -> None:
+        self.list_history.clear()
+        self.btn_tab_history.setText("Geçmiş")
 
     def _set_toggle_button_style(self, active: bool) -> None:
         if active:
@@ -1532,14 +1719,15 @@ class MainWindow(QMainWindow):
                 """
                 QPushButton {
                     background-color: #DC2626;
-                    border: 1px solid #EF4444;
+                    border: 1px solid #F87171;
+                    border-radius: 10px;
                     color: #FFFFFF;
-                    font-size: 9.4pt;
-                    font-weight: 600;
+                    font-size: 10pt;
+                    font-weight: 700;
                 }
                 QPushButton:hover {
                     background-color: #B91C1C;
-                    border-color: #F87171;
+                    border-color: #FCA5A5;
                 }
                 """
             )
@@ -1550,19 +1738,20 @@ class MainWindow(QMainWindow):
                 """
                 QPushButton {
                     background-color: #2563EB;
-                    border: 1px solid #3B82F6;
+                    border: 1px solid #38BDF8;
+                    border-radius: 10px;
                     color: #FFFFFF;
-                    font-size: 9.4pt;
-                    font-weight: 600;
+                    font-size: 10pt;
+                    font-weight: 700;
                 }
                 QPushButton:hover {
                     background-color: #1D4ED8;
-                    border-color: #60A5FA;
+                    border-color: #7DD3FC;
                 }
                 QPushButton:disabled {
-                    background-color: #18181B;
-                    border-color: #232329;
-                    color: #52525B;
+                    background-color: #0F172A;
+                    border-color: #1E293B;
+                    color: #475569;
                 }
                 """
             )
@@ -1576,13 +1765,14 @@ class MainWindow(QMainWindow):
         self._on_appearance_changed()
 
     def _update_designer_button_styles(self) -> None:
-        # Flat Segmented Control (Konum)
         active_pos_css = (
-            "QPushButton { background-color: #27272A; border: none; border-radius: 6px; color: #FAFAFA; padding: 6px 10px; font-size: 8.5pt; font-weight: 600; }"
+            "QPushButton { background-color: #162642; border: 1px solid #38BDF8; border-radius: 6px; "
+            "color: #FFFFFF; padding: 6px 10px; font-size: 8.4pt; font-weight: 700; }"
         )
         idle_pos_css = (
-            "QPushButton { background-color: transparent; border: none; border-radius: 6px; color: #71717A; padding: 6px 10px; font-size: 8.5pt; font-weight: 500; } "
-            "QPushButton:hover { color: #D4D4D8; background-color: #18181B; }"
+            "QPushButton { background-color: transparent; border: 1px solid transparent; border-radius: 6px; "
+            "color: #94A3B8; padding: 6px 10px; font-size: 8.4pt; font-weight: 500; } "
+            "QPushButton:hover { color: #F8FAFC; background-color: #0F172A; }"
         )
         self.btn_mode_cover.setStyleSheet(
             active_pos_css if self._selected_overlay_mode == "cover" else idle_pos_css
@@ -1591,16 +1781,17 @@ class MainWindow(QMainWindow):
             active_pos_css if self._selected_overlay_mode == "above" else idle_pos_css
         )
 
-        # Flat Renk Paleti Swatch Butonları
         for hex_code, btn in self._color_buttons.items():
             if hex_code == self._selected_color:
                 btn.setStyleSheet(
-                    "QPushButton { background-color: #27272A; border: 1px solid #52525B; border-radius: 7px; color: #FAFAFA; padding: 6px 8px; font-size: 8.4pt; font-weight: 600; }"
+                    "QPushButton { background-color: #162642; border: 1px solid #38BDF8; border-radius: 8px; "
+                    "color: #FFFFFF; padding: 6px 8px; font-size: 8.5pt; font-weight: 700; }"
                 )
             else:
                 btn.setStyleSheet(
-                    "QPushButton { background-color: #18181B; border: 1px solid #232329; border-radius: 7px; color: #A1A1AA; padding: 6px 8px; font-size: 8.4pt; font-weight: 500; } "
-                    "QPushButton:hover { border-color: #3F3F46; color: #FAFAFA; background-color: #1E1E24; }"
+                    "QPushButton { background-color: #090F1C; border: 1px solid #1C2940; border-radius: 8px; "
+                    "color: #94A3B8; padding: 6px 8px; font-size: 8.5pt; font-weight: 500; } "
+                    "QPushButton:hover { border-color: #38BDF8; color: #FFFFFF; background-color: #111C33; }"
                 )
 
     def _apply_saved_appearance(self) -> None:
@@ -1656,20 +1847,17 @@ class MainWindow(QMainWindow):
             self.worker.update_timing(
                 self.tuning.scan_interval_sec, self.tuning.idle_scan_interval_sec
             )
-            ms_interval = int(round(self.tuning.scan_interval_sec * 1000))
-            self.lbl_model_status.setText(
-                f"●  Canlı Tarama Aktif  ·  {self.tuning.scan_fps} FPS ({ms_interval} ms)"
-            )
+            self.lbl_model_status.setText(f"●  Canlı Çeviri Aktif ({self.tuning.scan_fps} FPS)")
 
         self.hw_badge.setText(self._format_hw_badge_text())
         self.hw_badge.setToolTip(format_hardware_summary(self.hw_profile, self.tuning))
         self.lbl_scene_tag.setText(f"Canlı Yakalama · {self.tuning.scan_fps} FPS")
         self.card_ocr.set_metric(
             self.card_ocr.lbl_val.text(),
-            sub_text=f"2 Aşamalı Kare Kilidi · {self.tuning.ocr_intra_threads} Thread",
+            sub_text=f"Kare Kilidi · {self.tuning.ocr_intra_threads} Thread",
         )
         ctype = self.translator.active_compute_type.upper()
-        self.card_nmt.lbl_title.setText(f"NMT ÇEVİRİ ({ctype})")
+        self.card_nmt.lbl_title.setText(f"ÇEVİRİ ({ctype})")
         self.card_nmt.set_metric(
             self.card_nmt.lbl_val.text(),
             badge_text=f"{self.translator.cpu_threads} THREAD",
@@ -1692,12 +1880,18 @@ class MainWindow(QMainWindow):
         ctype = self.translator.active_compute_type.upper()
         self.hw_badge.setText(self._format_hw_badge_text())
         self.hw_badge.setToolTip(format_hardware_summary(self.hw_profile, self.tuning))
-        self.card_nmt.lbl_title.setText(f"NMT ÇEVİRİ ({ctype})")
-        self.lbl_model_status.setText(
-            f"●  Hazır  ·  Opus-MT {ctype} ({self.translator.cpu_threads}T CPU)"
-        )
+        self.card_nmt.lbl_title.setText(f"ÇEVİRİ ({ctype})")
+        self.lbl_model_status.setText("●  Çeviriye Hazır")
         self.lbl_model_status.setStyleSheet(
-            "color: #22C55E; font-weight: 600; font-size: 8.5pt; border: none; background: transparent;"
+            """
+            color: #34D399;
+            background-color: #06281E;
+            border: 1px solid #059669;
+            border-radius: 9px;
+            padding: 2px 10px;
+            font-size: 8.2pt;
+            font-weight: 700;
+            """
         )
         self.progress_bar.setValue(100)
         self.progress_bar.hide()
@@ -1706,9 +1900,17 @@ class MainWindow(QMainWindow):
         self.btn_benchmark.setEnabled(True)
 
     def _on_model_failed(self, err: str) -> None:
-        self.lbl_model_status.setText(f"●  Model yükleme hatası: {err}")
+        self.lbl_model_status.setText(f"●  Hata: {err}")
         self.lbl_model_status.setStyleSheet(
-            "color: #EF4444; font-weight: 600; font-size: 8.5pt; border: none; background: transparent;"
+            """
+            color: #F87171;
+            background-color: #2A0F14;
+            border: 1px solid #DC2626;
+            border-radius: 9px;
+            padding: 2px 10px;
+            font-size: 8.2pt;
+            font-weight: 700;
+            """
         )
 
     def open_roi_selector(self) -> None:
@@ -1716,13 +1918,37 @@ class MainWindow(QMainWindow):
         self._resume_after_roi = was_running
         if was_running:
             self.toggle_translation()
+
+        # Kullanıcı alanı seçerken ana pencere arkadaki videoyu/oyunu kapatmasın
+        self._restore_window_after_roi = self.isVisible() and not self.isMinimized()
+        if self._restore_window_after_roi:
+            self.hide()
+
         self.roi_selector.show_selector()
+
+    def _on_roi_cancelled(self) -> None:
+        if self._restore_window_after_roi:
+            self._restore_window_after_roi = False
+            self.showNormal()
+            self.raise_()
+            self.activateWindow()
+        if self._resume_after_roi and self.translator.is_ready:
+            self._resume_after_roi = False
+            self.toggle_translation()
 
     def _on_roi_selected(self, new_roi: Dict[str, int]) -> None:
         self.roi = new_roi
         self.overlay.align_to_roi(self.roi)
+        self.lbl_roi_badge.setText(f"✓ Seçili: {self.roi['width']}×{self.roi['height']} px")
         self._update_session_kpi()
         self._save_settings()
+
+        if self._restore_window_after_roi:
+            self._restore_window_after_roi = False
+            self.showNormal()
+            self.raise_()
+            self.activateWindow()
+
         if self._resume_after_roi and self.translator.is_ready:
             self._resume_after_roi = False
             self.toggle_translation()
@@ -1743,23 +1969,22 @@ class MainWindow(QMainWindow):
         self.lbl_alpha_val.setText(f"%{alpha_pct}")
         self._update_designer_button_styles()
 
-        # Mini Canlı Önizleme Kutusunu Güncelle
-        preview_font_pt = max(10, min(15, int(f_size * 0.54)))
-        en_font_pt = max(8, int(preview_font_pt * 0.72))
+        # Birleşik Canlı Önizleme Kutusunu Güncelle
+        preview_font_pt = max(11, min(17, int(f_size * 0.58)))
+        en_font_pt = max(9, int(preview_font_pt * 0.72))
         self.preview_box.setStyleSheet(
             f"""
             QFrame {{
-                background-color: rgba(9, 9, 11, {alpha});
-                border: 1px solid #232329;
-                border-radius: 8px;
+                background-color: rgba(7, 11, 20, {alpha});
+                border: 1px solid #1E2D45;
+                border-radius: 12px;
             }}
             """
         )
-        self.lbl_mini_en.setVisible(bilingual)
-        self.lbl_mini_en.setStyleSheet(
-            f"color: #A1A1AA; font-size: {en_font_pt}pt; font-weight: 500; border: none; background: transparent;"
+        self.lbl_en_preview.setStyleSheet(
+            f"color: #94A3B8; font-size: {en_font_pt}pt; font-weight: 500; border: none; background: transparent;"
         )
-        self.lbl_mini_tr.setStyleSheet(
+        self.lbl_tr_preview.setStyleSheet(
             f"color: {self._selected_color}; font-size: {preview_font_pt}pt; font-weight: 700; border: none; background: transparent;"
         )
 
@@ -1782,13 +2007,19 @@ class MainWindow(QMainWindow):
 
     def _copy_current_translation(self) -> None:
         tr = self.lbl_tr_preview.text().strip()
-        if tr and tr != "Çeviri bekleniyor...":
+        if tr and not tr.startswith("Türkçe çeviri burada"):
             QGuiApplication.clipboard().setText(tr)
+
+    def _on_history_item_clicked(self, item: QListWidgetItem) -> None:
+        tr_text = item.data(Qt.ItemDataRole.UserRole)
+        if isinstance(tr_text, str) and tr_text.strip():
+            QGuiApplication.clipboard().setText(tr_text.strip())
 
     def _update_session_kpi(self) -> None:
         req = self.translator.total_requests
         hits = self.translator.cache_hits
         hit_pct = int((hits / req) * 100) if req > 0 else 0
+        self.lbl_roi_badge.setText(f"Seçili: {self.roi['width']}×{self.roi['height']} px")
         self.card_stats.set_metric(
             f"{req} Çeviri",
             sub_text=f"ROI {self.roi['width']}×{self.roi['height']} px · Hit %{hit_pct}",
@@ -1804,13 +2035,20 @@ class MainWindow(QMainWindow):
             self.worker.stop()
             self.worker = None
             self._set_toggle_button_style(active=False)
-            ctype = self.translator.active_compute_type.upper()
-            self.lbl_model_status.setText(
-                f"●  Hazır  ·  Opus-MT {ctype} ({self.translator.cpu_threads}T CPU)"
-            )
+            self.lbl_model_status.setText("●  Çeviriye Hazır")
             self.lbl_model_status.setStyleSheet(
-                "color: #22C55E; font-weight: 600; font-size: 8.5pt; border: none; background: transparent;"
+                """
+                color: #34D399;
+                background-color: #06281E;
+                border: 1px solid #059669;
+                border-radius: 9px;
+                padding: 2px 10px;
+                font-size: 8.2pt;
+                font-weight: 700;
+                """
             )
+            self.lbl_toggle_desc.setText("Canlı çeviri duraklatıldı. Tekrar başlatmak için F8 tuşuna basın.")
+            self.lbl_scene_tag.setText(f"Hazır · {self.tuning.scan_fps} FPS")
             self.overlay.set_subtitle("")
         else:
             self.overlay.align_to_roi(self.roi)
@@ -1830,13 +2068,19 @@ class MainWindow(QMainWindow):
             )
             self.worker.start()
 
-            ms_interval = int(round(self.tuning.scan_interval_sec * 1000))
-            self.lbl_model_status.setText(
-                f"●  Canlı Tarama Aktif  ·  {self.tuning.scan_fps} FPS ({ms_interval} ms)"
-            )
+            self.lbl_model_status.setText(f"●  Canlı Çeviri Aktif ({self.tuning.scan_fps} FPS)")
             self.lbl_model_status.setStyleSheet(
-                "color: #3B82F6; font-weight: 600; font-size: 8.5pt; border: none; background: transparent;"
+                """
+                color: #38BDF8;
+                background-color: #0A2239;
+                border: 1px solid #0284C7;
+                border-radius: 9px;
+                padding: 2px 10px;
+                font-size: 8.2pt;
+                font-weight: 700;
+                """
             )
+            self.lbl_toggle_desc.setText("Ekrandaki altyazılar canlı olarak takip ediliyor ve Türkçeye çevriliyor.")
             self._set_toggle_button_style(active=True)
 
     def _on_subtitle_updated(
@@ -1851,8 +2095,6 @@ class MainWindow(QMainWindow):
         self.overlay.set_subtitle(tr_text, en_text, orig_line_h_px=orig_line_h)
         self.lbl_en_preview.setText(en_text)
         self.lbl_tr_preview.setText(tr_text)
-        self.lbl_mini_en.setText(en_text)
-        self.lbl_mini_tr.setText(tr_text)
 
         total_ms = ocr_ms + tr_ms
         ocr_pct = int(min(100, (ocr_ms / 80.0) * 100)) if ocr_ms > 0 else 8
@@ -1867,7 +2109,7 @@ class MainWindow(QMainWindow):
         )
         self.card_nmt.set_metric(
             f"{tr_ms:.3f} ms" if is_cached else f"{tr_ms:.1f} ms",
-            sub_text="RAM LRU Cache / Sözlük"
+            sub_text="Önbellek / Sözlük"
             if is_cached
             else f"CTranslate2 {ctype} · {self.translator.cpu_threads} Thread",
             badge_text="CACHE" if is_cached else ctype,
@@ -1884,17 +2126,25 @@ class MainWindow(QMainWindow):
         self._update_session_kpi()
 
         stamp = datetime.now().strftime("%H:%M:%S")
-        tag = "CACHE" if is_cached else ctype
+        tag = "ÖNBELLEK" if is_cached else ctype
         card = self._create_history_card(stamp, total_ms, tag, en_text, tr_text)
         item = QListWidgetItem()
-        avail_w = max(320, self.list_history.viewport().width() - 12)
-        card.setFixedWidth(avail_w)
-        card.adjustSize()
-        item.setSizeHint(card.sizeHint())
+        item.setData(Qt.ItemDataRole.UserRole, tr_text)
+        vp_w = self.list_history.viewport().width()
+        avail_w = (vp_w - 16) if vp_w > 400 else max(520, self.width() - 84)
+        card.resize(avail_w, 64)
+        card_lay = card.layout()
+        if card_lay is not None:
+            card_lay.activate()
+        hint_h = card.sizeHint().height()
+        if card_lay is not None and card_lay.hasHeightForWidth():
+            hint_h = max(hint_h, card_lay.totalHeightForWidth(avail_w))
+        item.setSizeHint(QSize(avail_w, max(62, hint_h + 4)))
         self.list_history.insertItem(0, item)
         self.list_history.setItemWidget(item, card)
         if self.list_history.count() > 25:
             self.list_history.takeItem(self.list_history.count() - 1)
+        self.btn_tab_history.setText(f"Geçmiş ({self.list_history.count()})")
 
     @staticmethod
     def _create_history_card(
@@ -1903,21 +2153,21 @@ class MainWindow(QMainWindow):
         card = QWidget()
         card.setStyleSheet("background: transparent;")
         lay = QVBoxLayout(card)
-        lay.setContentsMargins(10, 8, 10, 8)
-        lay.setSpacing(2)
+        lay.setContentsMargins(12, 8, 12, 8)
+        lay.setSpacing(3)
 
         lbl_meta = QLabel(f"{stamp}  ·  {total_ms:.1f} ms  ·  {tag}")
-        lbl_meta.setStyleSheet("color: #71717A; font-size: 7.7pt; font-weight: 600;")
+        lbl_meta.setStyleSheet("color: #38BDF8; font-size: 7.8pt; font-weight: 600;")
         lay.addWidget(lbl_meta)
 
         lbl_en = QLabel(en_text)
         lbl_en.setWordWrap(True)
-        lbl_en.setStyleSheet("color: #A1A1AA; font-size: 8.6pt; font-weight: 500;")
+        lbl_en.setStyleSheet("color: #94A3B8; font-size: 8.8pt; font-weight: 500;")
         lay.addWidget(lbl_en)
 
         lbl_tr = QLabel(tr_text)
         lbl_tr.setWordWrap(True)
-        lbl_tr.setStyleSheet("color: #F4F4F5; font-size: 9pt; font-weight: 600;")
+        lbl_tr.setStyleSheet("color: #FACC15; font-size: 9.6pt; font-weight: 700;")
         lay.addWidget(lbl_tr)
 
         return card
@@ -1930,9 +2180,8 @@ class MainWindow(QMainWindow):
             return
         category, sample_en = self._samples[self._sample_idx % len(self._samples)]
         self._sample_idx += 1
-        self.lbl_scene_tag.setText(f"Simülasyon · {category}")
+        self.lbl_scene_tag.setText(f"Örnek Sahne · {category}")
         tr_text, tr_ms, is_cached = self.translator.translate_with_metrics(sample_en)
-        # Simülasyonda gerçekçi 19.8 ms OCR süresi ile birlikte uçtan uca göster
         self._on_subtitle_updated(sample_en, tr_text, 19.8, tr_ms, is_cached)
 
     def run_benchmark_suite(self) -> None:
@@ -1949,7 +2198,7 @@ class MainWindow(QMainWindow):
 
     def _on_benchmark_finished(self, rep: dict) -> None:
         self.btn_benchmark.setEnabled(True)
-        self.btn_benchmark.setText("  Benchmark")
+        self.btn_benchmark.setText("  Donanım Hız Testi Yap (Benchmark)")
 
         self.card_ocr.set_metric(
             f"{rep['avg_ocr_ms']:.1f} ms",
@@ -1968,17 +2217,17 @@ class MainWindow(QMainWindow):
         )
 
         msg = (
-            f"SubVision AI Studio — Donanım Performans Raporu\n"
+            f"SubVision AI — Donanım Performans Raporu\n"
             f"─────────────────────────────────────────────────\n"
             f"İşlemci:  {rep['cpu_name']} ({rep['cores']})\n"
             f"Profil / Mod:  {self.tuning.effective_profile.upper()} · CTranslate2 {rep['compute_type']}\n\n"
-            f"1. Frame Diff Lock (Sabit Kare Atlama):  {rep['pixel_lock_ms']:.3f} ms\n"
-            f"2. Fast Line Projection OCR (RapidOCR):  {rep['avg_ocr_ms']:.1f} ms\n"
-            f"3. CTranslate2 {rep['compute_type']} NMT ({rep['threads']} Thread):  {rep['avg_nmt_ms']:.1f} ms\n"
-            f"4. LRU Cache / Sözlük Yanıtı:  {rep['cache_ms']:.4f} ms\n\n"
+            f"1. Sabit Kare Kilidi (Frame Diff Lock):  {rep['pixel_lock_ms']:.3f} ms\n"
+            f"2. Hızlı Satır Okuma (RapidOCR):  {rep['avg_ocr_ms']:.1f} ms\n"
+            f"3. Yapay Zeka Çeviri ({rep['threads']} Thread):  {rep['avg_nmt_ms']:.1f} ms\n"
+            f"4. Önbellek / Sözlük Yanıtı:  {rep['cache_ms']:.4f} ms\n\n"
             f"Toplam Gecikme (Yeni Altyazı):  {rep['total_cold_ms']:.1f} ms\n"
             f"Toplam Gecikme (Önbellekli):  {rep['total_cached_ms']:.1f} ms\n"
-            f"GPU / VRAM Kullanımı:  0 MB (%100 CPU)"
+            f"Ekran Kartı (VRAM) Yükü:  0 MB (%100 CPU)"
         )
         QMessageBox.information(self, "Donanım Performans Raporu", msg)
 
@@ -2010,17 +2259,18 @@ class MainWindow(QMainWindow):
 
         dlg = QDialog(self)
         dlg.setWindowTitle("SubVision AI — Bileşen ve Kaldırma Yöneticisi")
-        dlg.setMinimumWidth(520)
+        dlg.setWindowIcon(create_app_icon())
+        dlg.setMinimumWidth(540)
         dlg.setStyleSheet(
             """
             QDialog {
-                background-color: #09090B;
-                color: #FAFAFA;
+                background-color: #060A13;
+                color: #F8FAFC;
             }
             QFrame#mgrCard {
-                background-color: #111114;
-                border: 1px solid #232329;
-                border-radius: 10px;
+                background-color: #0C1322;
+                border: 1px solid #1E2D45;
+                border-radius: 12px;
             }
             """
         )
@@ -2035,26 +2285,34 @@ class MainWindow(QMainWindow):
         v_card.setContentsMargins(16, 14, 16, 14)
         v_card.setSpacing(10)
 
+        hdr_row = QHBoxLayout()
+        hdr_row.setSpacing(12)
+        dlg_logo = QLabel()
+        dlg_logo.setPixmap(create_app_pixmap(38))
+        dlg_logo.setFixedSize(38, 38)
+        hdr_row.addWidget(dlg_logo)
+
         lbl_h = QLabel("İndirilen Bileşenler ve Kaldırma Seçenekleri")
-        lbl_h.setStyleSheet("color: #FAFAFA; font-size: 11.5pt; font-weight: 700;")
-        v_card.addWidget(lbl_h)
+        lbl_h.setStyleSheet("color: #FFFFFF; font-size: 11.5pt; font-weight: 700;")
+        hdr_row.addWidget(lbl_h, stretch=1)
+        v_card.addLayout(hdr_row)
 
         lbl_desc = QLabel(
             "Program ile birlikte yüklenen bileşenleri aşağıdan opsiyonel olarak seçip "
             "temizleyebilir veya tam kaldırma sihirbazını başlatabilirsiniz:"
         )
         lbl_desc.setWordWrap(True)
-        lbl_desc.setStyleSheet("color: #A1A1AA; font-size: 8.8pt;")
+        lbl_desc.setStyleSheet("color: #94A3B8; font-size: 8.8pt;")
         v_card.addWidget(lbl_desc)
 
         chk_cache = QCheckBox(
-            f"1. RAM Çeviri Önbelleği ve Geçici Kayıtları Temizle ({self.translator.cache_size} cümle)"
+            f"1. Çeviri Önbelleği ve Geçmişi Temizle ({self.translator.cache_size} cümle)"
         )
         chk_cache.setChecked(True)
         v_card.addWidget(chk_cache)
 
         chk_settings = QCheckBox(
-            "2. Kişisel Kullanıcı Ayarları ve ROI Kalibrasyonunu Sıfırla (user_settings.json)"
+            "2. Kişisel Kullanıcı Ayarları ve Alan Kalibrasyonunu Sıfırla (user_settings.json)"
         )
         chk_settings.setChecked(False)
         v_card.addWidget(chk_settings)
@@ -2070,7 +2328,7 @@ class MainWindow(QMainWindow):
             f"• Taşınabilir Çalışma Ortamı (runtime/): {runtime_mb:.1f} MB  |  Konum: {app_dir}"
         )
         lbl_runtime_info.setWordWrap(True)
-        lbl_runtime_info.setStyleSheet("color: #71717A; font-size: 8.2pt; padding-top: 4px;")
+        lbl_runtime_info.setStyleSheet("color: #64748B; font-size: 8.2pt; padding-top: 4px;")
         v_card.addWidget(lbl_runtime_info)
 
         v_main.addWidget(card)
@@ -2080,11 +2338,11 @@ class MainWindow(QMainWindow):
 
         btn_clean = QPushButton("Seçili Bileşenleri Temizle")
         btn_clean.setStyleSheet(
-            "QPushButton { background-color: #18181B; border: 1px solid #D97706; color: #FBBF24; padding: 8px 14px; }"
-            "QPushButton:hover { background-color: #27272A; }"
+            "QPushButton { background-color: #131D31; border: 1px solid #D97706; color: #FBBF24; padding: 8px 14px; }"
+            "QPushButton:hover { background-color: #1E293B; }"
         )
 
-        btn_uninst = QPushButton("Tam Kaldırma Yardımcısını Aç (Uninstaller)")
+        btn_uninst = QPushButton("Tam Kaldırma Yardımcısını Aç")
         btn_uninst.setStyleSheet(
             "QPushButton { background-color: #DC2626; border: 1px solid #EF4444; color: #FFFFFF; padding: 8px 14px; }"
             "QPushButton:hover { background-color: #B91C1C; }"
@@ -2101,9 +2359,9 @@ class MainWindow(QMainWindow):
             cleaned_items: List[str] = []
             if chk_cache.isChecked():
                 self.translator.clear_cache()
-                self.list_history.clear()
+                self._clear_history()
                 self._update_session_kpi()
-                cleaned_items.append("RAM çeviri önbelleği ve geçmiş")
+                cleaned_items.append("Çeviri önbelleği ve diyalog geçmişi")
 
             if chk_settings.isChecked():
                 for p in (CONFIG_PATH, CRASH_LOG_PATH, os.path.join(app_dir, "benchmark_results.json")):
@@ -2125,7 +2383,7 @@ class MainWindow(QMainWindow):
 
                 shutil.rmtree(self.translator.model_dir, ignore_errors=True)
                 self.btn_toggle.setEnabled(False)
-                self.lbl_model_status.setText("●  Yapay zeka modeli silindi (Yeniden indirmek için uygulamayı başlatın)")
+                self.lbl_model_status.setText("●  Model Silindi")
                 cleaned_items.append("İndirilen yapay zeka çeviri modeli (~227 MB)")
 
             QMessageBox.information(
@@ -2179,14 +2437,12 @@ class MainWindow(QMainWindow):
         dlg.exec()
 
     def _register_global_hotkeys(self) -> None:
-        # Tüm işletim sistemlerinde (Windows / macOS / Linux) çalışan pencere kısayolları
         self._shortcuts = [
             QShortcut(QKeySequence("F7"), self, activated=self.open_roi_selector),
             QShortcut(QKeySequence("F8"), self, activated=self.toggle_translation),
             QShortcut(QKeySequence("F9"), self, activated=self.run_sample_test),
         ]
 
-        # Windows'ta oyun/video penceresi odaktayken de çalışan global kısayol taraması
         if sys.platform == "win32":
             self._key_states = {VK_F7: False, VK_F8: False, VK_F9: False}
             self._hotkey_timer = QTimer(self)

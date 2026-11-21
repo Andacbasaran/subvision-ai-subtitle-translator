@@ -93,8 +93,7 @@ def generate_visual_assets(bm: Dict) -> None:
 
     # 2. Studio Arayüz Önizleme Görseli (assets/ui_preview.png)
     win = app_main.MainWindow()
-    win.resize(1080, 850)
-    win._on_model_ready()
+    win.resize(880, 665)
     win.chk_bilingual.setChecked(True)
     win._select_color_swatch("#FACC15")
     win.translator.total_requests = 24
@@ -120,7 +119,9 @@ def generate_visual_assets(bm: Dict) -> None:
         bm["nmt_short_ms"],
         False,
     )
-    win.lbl_scene_tag.setText("Mod: Canlı Ekran Yakalama (30 FPS / 1080p)")
+    app.processEvents()
+    win._on_model_ready()
+    win.lbl_scene_tag.setText("Canlı Yakalama · 30 FPS")
     win.repaint()
     app.processEvents()
     ui_pix = win.grab()

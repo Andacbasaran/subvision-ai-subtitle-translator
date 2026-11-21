@@ -6,6 +6,7 @@ Oyunlar, Diziler, Filmler ve Yayınlar ile %100 uyumludur.
 """
 
 import ctypes
+import os
 import sys
 from typing import Callable, Dict, Optional
 
@@ -18,13 +19,36 @@ from PyQt6.QtGui import (
     QGuiApplication,
     QPainter,
     QPen,
+    QPixmap,
 )
 from PyQt6.QtWidgets import QGraphicsDropShadowEffect, QLabel, QVBoxLayout, QWidget
 
-from hardware import get_ui_font_family, get_windows_build
+from hardware import get_app_base_dir, get_ui_font_family, get_windows_build
 
 WDA_NONE = 0x00000000
 WDA_EXCLUDEFROMCAPTURE = 0x00000011
+
+
+def _load_brand_logo_pixmap(size: int = 32) -> Optional[QPixmap]:
+    search_roots = [get_app_base_dir()]
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass and meipass not in search_roots:
+        search_roots.append(meipass)
+    for root in search_roots:
+        for fname in ("app_icon.png", "app_icon.ico"):
+            p = os.path.join(root, "assets", fname)
+            if os.path.exists(p):
+                src = QPixmap(p)
+                if not src.isNull():
+                    scaled = src.scaled(
+                        size * 2,
+                        size * 2,
+                        Qt.AspectRatioMode.KeepAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation,
+                    )
+                    scaled.setDevicePixelRatio(2.0)
+                    return scaled
+    return None
 
 
 def set_window_exclude_from_capture(widget: QWidget, exclude: bool = True) -> bool:
@@ -54,13 +78,19 @@ class ROISelectorOverlay(QWidget):
     çıktığı alanı (ROI) seçme ekranı. Çoklu monitör ve 4K yüksek DPI (%125-%200) uyumludur.
     """
 
-    def __init__(self, on_selected: Callable[[Dict[str, int]], None]):
+    def __init__(
+        self,
+        on_selected: Callable[[Dict[str, int]], None],
+        on_cancelled: Optional[Callable[[], None]] = None,
+    ):
         super().__init__()
         self.on_selected = on_selected
+        self.on_cancelled = on_cancelled
         self.start_pos: Optional[QPoint] = None
         self.end_pos: Optional[QPoint] = None
         self.is_selecting = False
         self._active_screen = QGuiApplication.primaryScreen()
+        self._logo_pix = _load_brand_logo_pixmap(34)
 
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint
@@ -89,26 +119,43 @@ class ROISelectorOverlay(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        # Yarı saydam koyu ekran karartma
-        painter.fillRect(self.rect(), QColor(9, 9, 11, 155))
+        # Yarı saydam koyu sinematik ekran karartma
+        painter.fillRect(self.rect(), QColor(6, 10, 18, 165))
 
-        # Sade Flat Üst HUD Bilgi Çubuğu
+        # Modern Logolu Üst HUD Rehber Kartı
         bw = min(680, self.width() - 40)
+        bh = 62
         bx = (self.width() - bw) // 2
-        banner_rect = QRect(bx, 32, bw, 52)
+        by = 32
+        banner_rect = QRect(bx, by, bw, bh)
 
-        painter.setBrush(QColor(17, 17, 20, 245))
-        painter.setPen(QPen(QColor(63, 63, 70, 220), 1))
-        painter.drawRoundedRect(banner_rect, 10, 10)
+        painter.setBrush(QColor(11, 17, 30, 245))
+        painter.setPen(QPen(QColor(56, 189, 248, 130), 1.5))
+        painter.drawRoundedRect(banner_rect, 14, 14)
 
-        painter.setPen(QColor(250, 250, 250))
         ui_font = get_ui_font_family()
-        font = QFont(ui_font, 11, QFont.Weight.DemiBold)
-        painter.setFont(font)
+        text_left = bx + 20
+        if self._logo_pix and not self._logo_pix.isNull():
+            painter.drawPixmap(bx + 18, by + (bh - 34) // 2, 34, 34, self._logo_pix)
+            text_left = bx + 64
+
+        title_rect = QRect(text_left, by + 11, bw - (text_left - bx) - 18, 22)
+        sub_rect = QRect(text_left, by + 33, bw - (text_left - bx) - 18, 18)
+
+        painter.setPen(QColor(248, 250, 252))
+        painter.setFont(QFont(ui_font, 10, QFont.Weight.Bold))
         painter.drawText(
-            banner_rect,
-            Qt.AlignmentFlag.AlignCenter,
-            "Altyazı bölgesini fare ile sürükleyip seçin   ·   İptal: ESC",
+            title_rect,
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+            "Altyazı Bölgesini Seçin",
+        )
+
+        painter.setPen(QColor(148, 163, 184))
+        painter.setFont(QFont(ui_font, 8.8, QFont.Weight.Medium))
+        painter.drawText(
+            sub_rect,
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+            "İngilizce altyazının çıktığı alanı fareyle sürükleyip kutu içine alın   ·   İptal: ESC",
         )
 
         if self.start_pos and self.end_pos:
@@ -117,16 +164,16 @@ class ROISelectorOverlay(QWidget):
             painter.fillRect(sel_rect, Qt.GlobalColor.transparent)
             painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceOver)
 
-            # Ana İnce Çerçeve
-            pen = QPen(QColor(59, 130, 246, 220), 1.5, Qt.PenStyle.SolidLine)
+            # Ana Çerçeve (Turkuaz-Mavi)
+            pen = QPen(QColor(56, 189, 248, 230), 1.8, Qt.PenStyle.SolidLine)
             painter.setPen(pen)
             painter.setBrush(Qt.BrushStyle.NoBrush)
-            painter.drawRect(sel_rect)
+            painter.drawRoundedRect(sel_rect, 6, 6)
 
-            # Köşe Vurguları (Minimal Viewfinder Brackets)
-            corner_pen = QPen(QColor(250, 250, 250), 2.5, Qt.PenStyle.SolidLine)
+            # Köşe Vurguları (Altın Sarısı Viewfinder Brackets)
+            corner_pen = QPen(QColor(250, 204, 21), 3.0, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
             painter.setPen(corner_pen)
-            cl = min(16, sel_rect.width() // 4, sel_rect.height() // 3)
+            cl = min(18, sel_rect.width() // 4, sel_rect.height() // 3)
             x1, y1, x2, y2 = sel_rect.left(), sel_rect.top(), sel_rect.right(), sel_rect.bottom()
 
             painter.drawLine(x1, y1, x1 + cl, y1)
@@ -138,20 +185,20 @@ class ROISelectorOverlay(QWidget):
             painter.drawLine(x2, y2, x2 - cl, y2)
             painter.drawLine(x2, y2, x2, y2 - cl)
 
-            # Boyut Rozeti
-            dim_text = f"{sel_rect.width()} × {sel_rect.height()} px"
-            badge_w = 124
-            badge_h = 24
+            # Boyut ve Onay Rozeti
+            dim_text = f"{sel_rect.width()} × {sel_rect.height()} px  ·  Kaydetmek için bırakın"
+            badge_w = 235
+            badge_h = 26
             badge_x = sel_rect.left()
-            badge_y = max(12, sel_rect.top() - badge_h - 6)
+            badge_y = max(12, sel_rect.top() - badge_h - 8)
             badge_rect = QRect(badge_x, badge_y, badge_w, badge_h)
 
-            painter.setBrush(QColor(17, 17, 20, 238))
-            painter.setPen(QPen(QColor(63, 63, 70, 220), 1))
-            painter.drawRoundedRect(badge_rect, 6, 6)
+            painter.setBrush(QColor(11, 17, 30, 242))
+            painter.setPen(QPen(QColor(56, 189, 248, 180), 1))
+            painter.drawRoundedRect(badge_rect, 7, 7)
 
-            painter.setFont(QFont(ui_font, 8, QFont.Weight.DemiBold))
-            painter.setPen(QColor(228, 228, 231))
+            painter.setFont(QFont(ui_font, 8.2, QFont.Weight.DemiBold))
+            painter.setPen(QColor(248, 250, 252))
             painter.drawText(badge_rect, Qt.AlignmentFlag.AlignCenter, dim_text)
 
     def mousePressEvent(self, event) -> None:
@@ -197,11 +244,17 @@ class ROISelectorOverlay(QWidget):
                         "qt_height": qt_height,
                     }
                     self.on_selected(roi)
+                    return
+
+            if self.on_cancelled:
+                self.on_cancelled()
 
     def keyPressEvent(self, event) -> None:
         if event.key() == Qt.Key.Key_Escape:
             self.is_selecting = False
             self.hide()
+            if self.on_cancelled:
+                self.on_cancelled()
 
 
 def compute_autofit_font_size(
@@ -431,7 +484,6 @@ class SubtitleOverlayWindow(QWidget):
 
         min_h = 78 if self.show_bilingual else 56
         if effective_mode == "cover":
-            # Orijinal İngilizce satırların kenarlarını eksiksiz kapatmak için hafif dikey/yatay kaplama payı
             pad_x = 6
             pad_y = 4
             box_h = max(h + pad_y * 2, min_h)
@@ -445,7 +497,6 @@ class SubtitleOverlayWindow(QWidget):
             if above_y >= s_top + 6:
                 target_y = above_y
             else:
-                # ROI ekranın en üstündeyse kutuyu ROI'nin hemen altına yerleştir
                 target_y = min(s_bottom - box_h - 6, y + h + 6)
             self.setGeometry(x, target_y, w, box_h)
 
@@ -486,10 +537,11 @@ class SubtitleOverlayWindow(QWidget):
 
         has_text = bool(self._current_tr.strip())
         if has_text or self.show_guide_border:
-            bg_color = QColor(9, 9, 11, self.bg_alpha if has_text else 115)
+            box = self.rect().adjusted(2, 2, -2, -2)
+            bg_color = QColor(7, 11, 20, self.bg_alpha if has_text else 130)
             painter.setBrush(bg_color)
             if self.show_guide_border:
-                painter.setPen(QPen(QColor(59, 130, 246, 220), 1.5, Qt.PenStyle.DashLine))
+                painter.setPen(QPen(QColor(56, 189, 248, 220), 1.6, Qt.PenStyle.DashLine))
             else:
-                painter.setPen(QPen(QColor(255, 255, 255, 22), 1, Qt.PenStyle.SolidLine))
-            painter.drawRoundedRect(self.rect().adjusted(2, 2, -2, -2), 10, 10)
+                painter.setPen(QPen(QColor(255, 255, 255, 26), 1, Qt.PenStyle.SolidLine))
+            painter.drawRoundedRect(box, 12, 12)

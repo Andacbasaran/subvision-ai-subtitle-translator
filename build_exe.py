@@ -132,8 +132,8 @@ namespace SubVisionAI
         {
             _value = 0;
             _maximum = 100;
-            _trackColor = Color.FromArgb(24, 24, 29);
-            _fillColor = Color.FromArgb(59, 130, 246);
+            _trackColor = Color.FromArgb(19, 29, 49);
+            _fillColor = Color.FromArgb(56, 189, 248);
             this.DoubleBuffered = true;
             this.Height = 10;
         }
@@ -496,6 +496,52 @@ namespace SubVisionAI
             if (mb < 0.1) return "< 0.1 MB";
             return string.Format("{0:F1} MB", mb);
         }
+
+        public static Image LoadEmbeddedLogoImage(string appDir)
+        {
+            try
+            {
+                Assembly asm = Assembly.GetExecutingAssembly();
+                using (Stream s = asm.GetManifestResourceStream("res_app_icon.png"))
+                {
+                    if (s != null)
+                    {
+                        return Image.FromStream(s);
+                    }
+                }
+            }
+            catch { }
+            try
+            {
+                string p = Path.Combine(appDir, "assets", "app_icon.png");
+                if (File.Exists(p)) return Image.FromFile(p);
+            }
+            catch { }
+            return null;
+        }
+
+        public static Icon LoadEmbeddedAppIcon(string appDir)
+        {
+            try
+            {
+                Assembly asm = Assembly.GetExecutingAssembly();
+                using (Stream s = asm.GetManifestResourceStream("res_app_icon.ico"))
+                {
+                    if (s != null)
+                    {
+                        return new Icon(s);
+                    }
+                }
+            }
+            catch { }
+            try
+            {
+                string p = Path.Combine(appDir, "assets", "app_icon.ico");
+                if (File.Exists(p)) return new Icon(p);
+            }
+            catch { }
+            return null;
+        }
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -547,15 +593,15 @@ namespace SubVisionAI
 
         private void InitializeUi()
         {
-            Color bgDark = Color.FromArgb(9, 9, 11);
-            Color cardDark = Color.FromArgb(17, 17, 20);
-            Color borderCol = Color.FromArgb(36, 36, 41);
-            Color textPrimary = Color.FromArgb(244, 244, 245);
+            Color bgDark = Color.FromArgb(6, 10, 19);
+            Color cardDark = Color.FromArgb(12, 19, 34);
+            Color borderCol = Color.FromArgb(30, 45, 69);
+            Color textPrimary = Color.FromArgb(248, 250, 252);
             Color textMuted = Color.FromArgb(148, 163, 184);
             Color accent = Color.FromArgb(37, 99, 235);
-            Color greenCol = Color.FromArgb(16, 185, 129);
+            Color cyanCol = Color.FromArgb(56, 189, 248);
 
-            this.Text = "SubVision AI v1.3 — Kurulum Yardımcısı";
+            this.Text = "SubVision AI — Hızlı Kurulum";
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = true;
@@ -565,10 +611,10 @@ namespace SubVisionAI
             this.Font = new Font("Segoe UI", 9.25F, FontStyle.Regular);
             this.ClientSize = new Size(580, 360);
 
-            string iconPath = Path.Combine(_appDir, "assets", "app_icon.ico");
-            if (File.Exists(iconPath))
+            Icon appIco = SystemIntegrationHelper.LoadEmbeddedAppIcon(_appDir);
+            if (appIco != null)
             {
-                try { this.Icon = new Icon(iconPath); } catch { }
+                this.Icon = appIco;
             }
 
             Panel mainCard = new Panel();
@@ -584,51 +630,63 @@ namespace SubVisionAI
             };
             this.Controls.Add(mainCard);
 
+            PictureBox picLogo = new PictureBox();
+            picLogo.Location = new Point(18, 16);
+            picLogo.Size = new Size(52, 52);
+            picLogo.SizeMode = PictureBoxSizeMode.Zoom;
+            picLogo.BackColor = Color.Transparent;
+            Image logoImg = SystemIntegrationHelper.LoadEmbeddedLogoImage(_appDir);
+            if (logoImg != null)
+            {
+                picLogo.Image = logoImg;
+            }
+            mainCard.Controls.Add(picLogo);
+
             _lblTitle = new Label();
-            _lblTitle.Text = "SubVision AI  v1.3 — Kurulum Yardımcısı";
-            _lblTitle.Font = new Font("Segoe UI Semibold", 13.5F, FontStyle.Bold);
+            _lblTitle.Text = "SubVision AI";
+            _lblTitle.Font = new Font("Segoe UI", 15F, FontStyle.Bold);
             _lblTitle.ForeColor = textPrimary;
-            _lblTitle.Location = new Point(18, 14);
+            _lblTitle.Location = new Point(80, 13);
             _lblTitle.AutoSize = true;
             mainCard.Controls.Add(_lblTitle);
 
             _lblSecurityBadge = new Label();
-            _lblSecurityBadge.Text = "✓ SHA-256 Authenticode Dijital İmzalı   ·   Yönetici İzni Gerektirmez (asInvoker)";
-            _lblSecurityBadge.Font = new Font("Segoe UI Semibold", 8.25F, FontStyle.Bold);
-            _lblSecurityBadge.ForeColor = greenCol;
-            _lblSecurityBadge.Location = new Point(18, 42);
-            _lblSecurityBadge.Size = new Size(504, 18);
+            _lblSecurityBadge.Text = "Oyun, Dizi ve Videolar İçin Anlık Türkçe Altyazı Çevirici";
+            _lblSecurityBadge.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold);
+            _lblSecurityBadge.ForeColor = cyanCol;
+            _lblSecurityBadge.Location = new Point(82, 42);
+            _lblSecurityBadge.Size = new Size(440, 18);
             mainCard.Controls.Add(_lblSecurityBadge);
 
             _lblSubtitle = new Label();
-            _lblSubtitle.Text = "Kurulum seçeneklerini belirleyip 'Kurulumu Başlat' butonuna tıklayın. İşlem siyah terminal açmadan tamamlanır.";
+            _lblSubtitle.Text = "Tek tıklamayla kurulumu başlatın. Tamamlandığında uygulama otomatik olarak açılacaktır.";
             _lblSubtitle.Font = new Font("Segoe UI", 8.5F, FontStyle.Regular);
             _lblSubtitle.ForeColor = textMuted;
-            _lblSubtitle.Location = new Point(18, 64);
-            _lblSubtitle.Size = new Size(504, 20);
+            _lblSubtitle.Location = new Point(18, 76);
+            _lblSubtitle.Size = new Size(504, 18);
             mainCard.Controls.Add(_lblSubtitle);
 
             _chkDesktopShortcut = new CheckBox();
-            _chkDesktopShortcut.Text = "Masaüstü kısayolu oluştur (SubVision AI)";
+            _chkDesktopShortcut.Text = "Masaüstüne kısayol ekle (SubVision AI)";
             _chkDesktopShortcut.Checked = true;
             _chkDesktopShortcut.ForeColor = textPrimary;
-            _chkDesktopShortcut.Location = new Point(20, 94);
+            _chkDesktopShortcut.Location = new Point(20, 102);
             _chkDesktopShortcut.Size = new Size(490, 22);
             mainCard.Controls.Add(_chkDesktopShortcut);
 
             _chkRegisterUninstaller = new CheckBox();
-            _chkRegisterUninstaller.Text = "Başlat Menüsü ve Windows 'Yüklü Uygulamalar' kaldırıcı (Uninstaller) kaydı oluştur";
+            _chkRegisterUninstaller.Text = "Başlat Menüsü ve kolay kaldırma (Uninstaller) aracını kaydet";
             _chkRegisterUninstaller.Checked = true;
             _chkRegisterUninstaller.ForeColor = textPrimary;
-            _chkRegisterUninstaller.Location = new Point(20, 118);
+            _chkRegisterUninstaller.Location = new Point(20, 126);
             _chkRegisterUninstaller.Size = new Size(500, 22);
             mainCard.Controls.Add(_chkRegisterUninstaller);
 
             _chkTrustPublisherCert = new CheckBox();
-            _chkTrustPublisherCert.Text = "Yayıncı dijital imza sertifikasını kullanıcı güvenilir deposuna kaydet (Uyarı önleyici)";
+            _chkTrustPublisherCert.Text = "Dijital imza sertifikasını doğrula (Güvenli çalışma)";
             _chkTrustPublisherCert.Checked = true;
             _chkTrustPublisherCert.ForeColor = textPrimary;
-            _chkTrustPublisherCert.Location = new Point(20, 142);
+            _chkTrustPublisherCert.Location = new Point(20, 150);
             _chkTrustPublisherCert.Size = new Size(500, 22);
             mainCard.Controls.Add(_chkTrustPublisherCert);
 
@@ -636,41 +694,41 @@ namespace SubVisionAI
             _lblStep.Text = "Kurulumu başlatmak için hazır.";
             _lblStep.Font = new Font("Segoe UI Semibold", 9.25F, FontStyle.Bold);
             _lblStep.ForeColor = Color.FromArgb(226, 232, 240);
-            _lblStep.Location = new Point(18, 178);
+            _lblStep.Location = new Point(18, 184);
             _lblStep.Size = new Size(430, 20);
             mainCard.Controls.Add(_lblStep);
 
             _lblPercent = new Label();
             _lblPercent.Text = "0%";
             _lblPercent.Font = new Font("Segoe UI Semibold", 9.25F, FontStyle.Bold);
-            _lblPercent.ForeColor = Color.FromArgb(59, 130, 246);
+            _lblPercent.ForeColor = cyanCol;
             _lblPercent.TextAlign = ContentAlignment.MiddleRight;
-            _lblPercent.Location = new Point(458, 178);
+            _lblPercent.Location = new Point(458, 184);
             _lblPercent.Size = new Size(64, 20);
             mainCard.Controls.Add(_lblPercent);
 
             _progressBar = new FlatProgressBar();
-            _progressBar.Location = new Point(18, 204);
+            _progressBar.Location = new Point(18, 208);
             _progressBar.Size = new Size(504, 12);
             mainCard.Controls.Add(_progressBar);
 
             _lblDetail = new Label();
-            _lblDetail.Text = "Hedef Klasör: " + _appDir;
+            _lblDetail.Text = "Kurulum Konumu: " + _appDir;
             _lblDetail.Font = new Font("Segoe UI", 8.25F, FontStyle.Regular);
             _lblDetail.ForeColor = textMuted;
-            _lblDetail.Location = new Point(18, 226);
+            _lblDetail.Location = new Point(18, 228);
             _lblDetail.Size = new Size(504, 36);
             mainCard.Controls.Add(_lblDetail);
 
-            _btnToggleLog = CreateFlatButton("Detayları Göster", new Point(20, 310), new Size(126, 34), cardDark, textMuted, borderCol);
+            _btnToggleLog = CreateFlatButton("Detaylar", new Point(20, 310), new Size(106, 34), cardDark, textMuted, borderCol);
             _btnToggleLog.Click += delegate { ToggleLogPanel(); };
             this.Controls.Add(_btnToggleLog);
 
-            _btnOpenUninstaller = CreateFlatButton("Kaldırma Aracı", new Point(154, 310), new Size(120, 34), cardDark, textMuted, borderCol);
+            _btnOpenUninstaller = CreateFlatButton("Kaldırma Aracı", new Point(134, 310), new Size(124, 34), cardDark, textMuted, borderCol);
             _btnOpenUninstaller.Click += delegate { OpenUninstallerDialog(); };
             this.Controls.Add(_btnOpenUninstaller);
 
-            _btnStartInstall = CreateFlatButton("Kurulumu Başlat", new Point(304, 310), new Size(140, 34), accent, Color.White, accent);
+            _btnStartInstall = CreateFlatButton("Kurulumu Başlat", new Point(292, 310), new Size(152, 34), accent, Color.White, cyanCol);
             _btnStartInstall.Click += delegate { StartSetupAsync(); };
             this.Controls.Add(_btnStartInstall);
 
@@ -1185,15 +1243,15 @@ namespace SubVisionAI
 
         private void InitializeUi()
         {
-            Color bgDark = Color.FromArgb(9, 9, 11);
-            Color cardDark = Color.FromArgb(17, 17, 20);
-            Color borderCol = Color.FromArgb(36, 36, 41);
-            Color textPrimary = Color.FromArgb(244, 244, 245);
+            Color bgDark = Color.FromArgb(6, 10, 19);
+            Color cardDark = Color.FromArgb(12, 19, 34);
+            Color borderCol = Color.FromArgb(30, 45, 69);
+            Color textPrimary = Color.FromArgb(248, 250, 252);
             Color textMuted = Color.FromArgb(148, 163, 184);
             Color dangerCol = Color.FromArgb(220, 38, 38);
             Color amberCol = Color.FromArgb(217, 119, 6);
 
-            this.Text = "SubVision AI — Kaldırma ve Bileşen Temizleme Yardımcısı";
+            this.Text = "SubVision AI — Kaldırma ve Bileşen Yöneticisi";
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = true;
@@ -1203,10 +1261,10 @@ namespace SubVisionAI
             this.Font = new Font("Segoe UI", 9.25F, FontStyle.Regular);
             this.ClientSize = new Size(600, 395);
 
-            string iconPath = Path.Combine(_appDir, "assets", "app_icon.ico");
-            if (File.Exists(iconPath))
+            Icon appIco = SystemIntegrationHelper.LoadEmbeddedAppIcon(_appDir);
+            if (appIco != null)
             {
-                try { this.Icon = new Icon(iconPath); } catch { }
+                this.Icon = appIco;
             }
 
             // Bileşen boyutlarını hesapla
@@ -1232,20 +1290,32 @@ namespace SubVisionAI
             };
             this.Controls.Add(card);
 
+            PictureBox picLogo = new PictureBox();
+            picLogo.Location = new Point(18, 14);
+            picLogo.Size = new Size(44, 44);
+            picLogo.SizeMode = PictureBoxSizeMode.Zoom;
+            picLogo.BackColor = Color.Transparent;
+            Image logoImg = SystemIntegrationHelper.LoadEmbeddedLogoImage(_appDir);
+            if (logoImg != null)
+            {
+                picLogo.Image = logoImg;
+            }
+            card.Controls.Add(picLogo);
+
             Label lblTitle = new Label();
             lblTitle.Text = "SubVision AI — Kaldırma ve Bileşen Yöneticisi";
-            lblTitle.Font = new Font("Segoe UI Semibold", 13F, FontStyle.Bold);
+            lblTitle.Font = new Font("Segoe UI", 13F, FontStyle.Bold);
             lblTitle.ForeColor = textPrimary;
-            lblTitle.Location = new Point(18, 14);
+            lblTitle.Location = new Point(72, 13);
             lblTitle.AutoSize = true;
             card.Controls.Add(lblTitle);
 
             Label lblSub = new Label();
-            lblSub.Text = "Uygulama ile birlikte indirilen bileşenlerden hangilerinin silineceğini opsiyonel olarak seçebilirsiniz:";
-            lblSub.Font = new Font("Segoe UI", 8.5F, FontStyle.Regular);
+            lblSub.Text = "Silmek istediğiniz bileşenleri aşağıdan seçebilirsiniz:";
+            lblSub.Font = new Font("Segoe UI", 8.8F, FontStyle.Regular);
             lblSub.ForeColor = textMuted;
-            lblSub.Location = new Point(18, 42);
-            lblSub.Size = new Size(524, 20);
+            lblSub.Location = new Point(74, 38);
+            lblSub.Size = new Size(468, 20);
             card.Controls.Add(lblSub);
 
             _chkCoreApp = new CheckBox();
@@ -1488,6 +1558,27 @@ namespace SubVisionAI
 
     static class Program
     {
+        private static string ResolveAppDirectory()
+        {
+            string exeDir = (AppDomain.CurrentDomain.BaseDirectory ?? "").TrimEnd(
+                Path.DirectorySeparatorChar,
+                Path.AltDirectorySeparatorChar
+            );
+            if (File.Exists(Path.Combine(exeDir, "main.py")) ||
+                Directory.Exists(Path.Combine(exeDir, ".git")) ||
+                Directory.Exists(Path.Combine(exeDir, ".venv")) ||
+                Directory.Exists(Path.Combine(exeDir, "runtime")))
+            {
+                return exeDir;
+            }
+            string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            if (!string.IsNullOrEmpty(localAppData))
+            {
+                return Path.Combine(localAppData, "Programs", "SubVisionAI");
+            }
+            return exeDir;
+        }
+
         private static string FindReadyPythonw(string appDir)
         {
             string venvPyw = Path.Combine(appDir, ".venv", "Scripts", "pythonw.exe");
@@ -1517,7 +1608,7 @@ namespace SubVisionAI
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
-            string appDir = AppDomain.CurrentDomain.BaseDirectory;
+            string appDir = ResolveAppDirectory();
             string exeName = Path.GetFileName(Application.ExecutablePath) ?? "";
 
             bool isUninstallMode = exeName.IndexOf("Uninstall", StringComparison.OrdinalIgnoreCase) >= 0;
@@ -1551,11 +1642,28 @@ namespace SubVisionAI
             string mainPy = Path.Combine(appDir, "main.py");
             string readyPyw = FindReadyPythonw(appDir);
 
-            // Eğer zaten kuruluysa doğrudan uygulamayı başlat (kaldırma yardımcısı eksikse tamamla)
+            // Eğer zaten kuruluysa doğrudan uygulamayı başlat (yeni bir .exe indirildiyse gömülü modülleri güncelle)
             if (!isSetupMode && readyPyw != null && File.Exists(mainPy))
             {
                 try
                 {
+                    bool isGitRepo = Directory.Exists(Path.Combine(appDir, ".git"));
+                    if (!isGitRepo)
+                    {
+                        string currentExe = Application.ExecutablePath;
+                        string targetMainExe = Path.Combine(appDir, "SubVisionAI.exe");
+                        bool isExternalLaunch = !string.Equals(
+                            Path.GetFullPath(currentExe),
+                            Path.GetFullPath(targetMainExe),
+                            StringComparison.OrdinalIgnoreCase
+                        );
+                        bool isNewerExe = File.GetLastWriteTimeUtc(currentExe) > File.GetLastWriteTimeUtc(mainPy);
+                        if (isExternalLaunch || isNewerExe)
+                        {
+                            SystemIntegrationHelper.ExtractEmbeddedFiles(appDir, null);
+                        }
+                    }
+
                     string uninstExe = Path.Combine(appDir, "SubVisionAI-Uninstaller.exe");
                     if (!File.Exists(uninstExe))
                     {
@@ -1650,9 +1758,24 @@ if ($cert) {{
     $targets = @({targets_ps_array})
     foreach ($exe in $targets) {{
         if (Test-Path $exe) {{
-            $sig = Set-AuthenticodeSignature -FilePath $exe -Certificate $cert -HashAlgorithm SHA256 -TimestampServer 'http://timestamp.digicert.com' -ErrorAction SilentlyContinue
+            $sig = $null
+            for ($attempt = 1; $attempt -le 6; $attempt++) {{
+                Start-Sleep -Milliseconds (350 * $attempt)
+                try {{
+                    $sig = Set-AuthenticodeSignature -FilePath $exe -Certificate $cert -HashAlgorithm SHA256 -TimestampServer 'http://timestamp.digicert.com' -ErrorAction Stop
+                }} catch {{
+                    $sig = $null
+                }}
+                if ($sig -and $sig.Status -ne 'NotSigned' -and $sig.Status -ne 'HashMismatch') {{
+                    break
+                }}
+            }}
             if (-not $sig -or $sig.Status -eq 'NotSigned') {{
-                $sig = Set-AuthenticodeSignature -FilePath $exe -Certificate $cert -HashAlgorithm SHA256
+                try {{
+                    $sig = Set-AuthenticodeSignature -FilePath $exe -Certificate $cert -HashAlgorithm SHA256 -ErrorAction Stop
+                }} catch {{
+                    throw "Imzalama basarisiz oldu: $exe"
+                }}
             }}
             Write-Host "[İMZALANDI] $([System.IO.Path]::GetFileName($exe)) -> Durum: $($sig.Status) | Thumbprint: $($cert.Thumbprint)"
         }}

@@ -6,6 +6,7 @@
 
 **Oyunlar, Diziler, Filmler ve Canlı Yayınlar İçin Ultra Düşük Gecikmeli Lokal AI Altyazı Çeviri Motoru**
 
+[![Website](https://img.shields.io/badge/Live_Website-subvisionai.andacbasaran.com-0EA5E9?style=for-the-badge&logo=cloudflare&logoColor=white)](https://subvisionai.andacbasaran.com/)
 [![Release](https://img.shields.io/badge/Download_Release-v1.3.0_(.EXE)-2563EB?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/Andacbasaran/subvision-ai-subtitle-translator/releases/latest)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![PyQt6](https://img.shields.io/badge/UI-PyQt6_Studio-41CD52?style=for-the-badge&logo=qt&logoColor=white)](https://pypi.org/project/PyQt6/)
@@ -50,12 +51,12 @@
 ## 🖥️ Uygulama Arayüzü (SubVision AI Studio v1.3)
 
 <div align="center">
-  <img src="assets/ui_preview.png" alt="SubVision AI Studio UI Preview" width="960" />
+  <img src="assets/ui_preview.png" alt="SubVision AI Studio UI Preview" width="880" />
 </div>
 
-* **Sol Panel (Canlı Yakalama Stüdyosu):** Yakalanan İngilizce kaynak cümleyi, anlık Türkçe çeviriyi ve geçmiş diyalog akışını milisaniye bazlı gecikme etiketleriyle canlı gösterir.
-* **Sağ Panel (Sahne Profili & Overlay Tasarımcısı):** Algılama modunu (`Kontürlü / Adaptif Maske — Önerilen`), **Otomatik Yazı Boyutu (Orijinali tam kapat)** anahtarını, konum/renk/opaklık ayarlarını ve çift dilli sinema modunu **Canlı Önizleme Kutusu** üzerinden anında özelleştirmenizi sağlar.
-* **Üst Telemetri Kartları:** `OCR Yakalama`, `NMT Çeviri`, `Uçtan Uca Gecikme` ve `LRU Cache Hit` oranlarını görsel barlarla gerçek zamanlı raporlar.
+* **Ana Ekran (2 Adımda Hızlı Kullanım & Canlı Önizleme):** **1. Adım (`F7` Altyazı Alanını Seç)** ve **2. Adım (`F8` Anlık Çeviriyi Başlat)** kartlarını, birleşik **Canlı Altyazı & Önizleme** kutusunu (`F9` Örnek Sahne Dene ve Tek Tıkla Kopyala) ve **Altyazı Görünümü** kontrollerini (renk, ekrandaki konum, maksimum boyut, arka plan koyuluğu, hizalama çerçevesi, çift dilli görünüm ve otomatik sığdırma) kaydırmasız tek ekranda sunar.
+* **Geçmiş Sekmesi:** Yakalanan İngilizce kaynak cümleleri ve Türkçe çevirilerini zaman damgası, gecikme (`ms`) ve kaynak (`INT8` / `ÖNBELLEK`) etiketleriyle listeler; tıklanan çeviriyi panoya kopyalar.
+* **Ayarlar Sekmesi:** Algılama modunu (`Kontürlü / Adaptif Maske — Önerilen`, `Akıllı Hibrit`, `Tam Kare Okuma`), işlemci hız profilini (`Otomatik`, `Eko`, `Dengeli`, `Performans`), gerçek zamanlı donanım telemetri kartlarını (`OCR Okuma`, `Çeviri`, `Toplam Süre`, `Oturum`), **Donanım Hız Testi (Benchmark)** aracını ve **İndirilen Bileşenler / Uygulamayı Kaldır** yöneticisini içerir.
 
 ---
 
@@ -136,8 +137,8 @@ flowchart TD
 2. Kurulum sihirbazını çalıştırın — Python/PowerShell/terminal açmadan doğrudan Masaüstü ve Başlat Menüsü kısayolunu oluşturur.
 3. İlk açılışta yalnızca `227 MB` boyutundaki yerel çeviri modeli otomatik indirilir, sonrasında tamamen çevrimdışı çalışır.
 
-### Seçenek 2: Dijital İmzalı İnteraktif GUI Kurulum Yardımcısı (`SubVisionAI.exe`)
-- **`SubVisionAI-OnlineSetup`** / **`SubVisionAI.exe`** dosyası, **SHA-256 Authenticode dijital imzalı ve DigiCert zaman damgalıdır**. Kullanıcı onayı olmadan arka planda hiçbir dosya çıkartmaz (*Zero Silent-Dropper*); ilk açılışta Masaüstü kısayolu, Başlat Menüsü / Windows *Yüklü Uygulamalar* kaydı ve Yayıncı Sertifikası seçeneklerini sunan koyu temalı grafik kurulum yardımcısını açar.
+### Seçenek 2: Resmi Web Sitesi & Dijital İmzalı İnteraktif GUI Kurulum Yardımcısı (`SubVisionAI.exe`)
+- [**🌐 subvisionai.andacbasaran.com**](https://subvisionai.andacbasaran.com/) resmi web sitesinden veya GitHub üzerinden indirilen **`SubVisionAI.exe`** dosyası, **SHA-256 Authenticode dijital imzalı ve DigiCert zaman damgalıdır**. Kullanıcı onayı olmadan arka planda hiçbir dosya çıkartmaz (*Zero Silent-Dropper*); ilk açılışta uygulamayı temiz bir şekilde `%LOCALAPPDATA%\Programs\SubVisionAI` dizinine kuran, Masaüstü kısayolu, Başlat Menüsü / Windows *Yüklü Uygulamalar* kaydı ve Yayıncı Sertifikası seçeneklerini sunan koyu temalı grafik kurulum yardımcısını açar.
 
 ### 🗑️ Otomatik Kurulan Opsiyonel Bileşen Seçimli Kaldırma Yardımcısı (`SubVisionAI-Uninstaller.exe`)
 `SubVisionAI.exe` ile programı kurduğunuzda **`SubVisionAI-Uninstaller.exe`** bilgisayarınızdaki kurulum klasörüne, Başlat Menüsüne ve *Windows Ayarlar ➔ Uygulamalar ➔ Yüklü Uygulamalar* listesine **otomatik olarak** eklenir. Ayrıca uygulama içi **`Bileşenler / Kaldır`** butonu üzerinden de programla birlikte indirilen bileşenleri **opsiyonel olarak** seçip silebilirsiniz:
@@ -209,6 +210,7 @@ python main.py
 ├── build_exe.py                         # Authenticode imzalayıcı, WinForms Kurulum/Kaldırma Sihirbazı ve PyInstaller derleyici
 ├── installer.iss                        # Inno Setup 6 Windows x64 kurulum ve opsiyonel model/ayar kaldırma betiği
 ├── .github/workflows/release-windows.yml # Otomatik test, Authenticode imzalama, Defender taraması ve GitHub Release iş akışı
+├── website/                             # Resmi web sitesi (subvisionai.andacbasaran.com) arayüzü ve Cloudflare Worker
 ├── start.sh                             # Linux & macOS (Intel / Apple Silicon) otomatik kurulum ve başlatma script'i
 ├── requirements.txt                     # Python bağımlılıkları
 └── assets/                              # Uygulama ikonu (.ico/.png), yayıncı sertifikası (.cer), UI ve benchmark görselleri
