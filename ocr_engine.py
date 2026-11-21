@@ -25,7 +25,7 @@ import mss
 import numpy as np
 from rapidocr_onnxruntime import RapidOCR
 
-from glossary import clean_ocr_text
+from glossary import clean_ocr_text, is_plausible_subtitle_text
 from hardware import (
     RuntimeTuning,
     apply_thread_env_defaults,
@@ -75,6 +75,14 @@ class SubtitleOCREngine:
         self._prev_thumb: Optional[np.ndarray] = None
         self._last_clean_text: str = ""
         self._empty_frames_count: int = 0
+        self._last_bright_ratio: float = 0.0
+        self._fade_wait_frames: int = 0
+        self._pending_borderline_text: str = ""
+        self._last_hybrid_dbnet_ts: float = 0.0
+
+        # Auto-Fit overlay için ölçülen orijinal altyazı satır metrikleri (fiziksel ROI pikselinde)
+        self.last_line_height_px: int = 0
+        self.last_line_count: int = 0
 
         if not lazy_init:
             self.ensure_initialized()
@@ -139,8 +147,8 @@ class SubtitleOCREngine:
     def set_mode(self, mode: str) -> None:
         """
         Algılama modunu değiştirir:
-        - 'fast_mask': Oyun & Dizi/Film (Kontür ve Altyazı Kutusu Filtreli - Ultra Hızlı)
-        - 'hybrid': Akıllı Hibrit (Önce Hızlı Filtre, bulamazsa Tam Kare OCR)
+        - 'fast_mask': Oyun & Dizi/Film (Adaptif Kontür & Yerel Kontrast Filtresi - Ultra Hızlı, Önerilen)
+        - 'hybrid': Akıllı Hibrit (Önce Hızlı Filtre, kenar yoğunluğu varsa kısıtlı DBNet yedeklemesi)
         - 'full_ocr': Genel Ekran & Video (Tam Kare OCR - Açık Zemin / Kontürsüz Metinler)
         """
         self.ocr_mode = mode
@@ -152,12 +160,21 @@ class SubtitleOCREngine:
         self._prev_thumb = None
         self._last_clean_text = ""
         self._empty_frames_count = 0
+        self._last_bright_ratio = 0.0
+        self._fade_wait_frames = 0
+        self._pending_borderline_text = ""
+        self._last_hybrid_dbnet_ts = 0.0
+        self.last_line_height_px = 0
+        self.last_line_count = 0
 
     @staticmethod
     def compute_subtitle_binary_mask(bgr_img: np.ndarray) -> Tuple[np.ndarray, float]:
         """
-        Yalnızca ikili (binary) altyazı maskesini ve parlak piksel oranını üretir.
-        Değişmeyen karelerde gereksiz GRAY2BGR dönüşümünü atlayarak düşük CPU'larda ek tasarruf sağlar.
+        Adaptif Yerel Kontrast ve Renkli Konuşmacı Destekli Altyazı Maskesi:
+        - Beyaz (yarı saydam / 4K anti-aliased ince fontlar dahil), Sarı, Turkuaz altyazıları
+        - Spider-Man 2 gibi modern oyunlardaki renkli konuşmacı adlarını (kırmızı, mavi, yeşil, turuncu)
+        - Parlak gökyüzü üzerindeki yarı saydam koyu altyazı bantlarını yakalar.
+        - Düz parlak gökyüzü, bulut ve düşük kontrastlı oyun arka planlarını reddeder.
         """
         b = bgr_img[:, :, 0]
         g = bgr_img[:, :, 1]
@@ -165,24 +182,32 @@ class SubtitleOCREngine:
 
         max_c = np.maximum(np.maximum(r, g), b)
         min_c = np.minimum(np.minimum(r, g), b)
+        chroma = max_c - min_c
 
-        # 1. Parlak Beyaz Altyazı Maskesi (Oyunlar, Netflix, YouTube, VLC standart beyaz altyazı)
-        white_mask = (min_c > 175) & ((max_c - min_c) < 50)
+        # Hızlı tamsayı parlaklık (luma) + yerel minimum (9x9 komşuluktaki en koyu kontür/zemin)
+        luma = ((r.astype(np.uint16) * 77 + g.astype(np.uint16) * 150 + b.astype(np.uint16) * 29) >> 8).astype(
+            np.uint8
+        )
+        local_min = cv2.erode(luma, _KERNEL_DARK_NEIGHBOR)
+        local_contrast = luma.astype(np.int16) - local_min.astype(np.int16)
 
-        # 2. Parlak Sarı/Altın Altyazı Maskesi (Sinema/Film sarı altyazıları ve oyun diyalogları)
-        yellow_mask = (r > 185) & (g > 155) & (b < 135)
+        # 1. Beyaz / Açık Gri Altyazı (ince 4K fontlar ve %80 opaklıklı oyun altyazıları dahil)
+        white_mask = (min_c > 152) & (chroma < 56)
 
-        # 3. Parlak Turkuaz/Camgöbeği Altyazı Maskesi (Bilim-kurgu oyunları ve ikincil konuşmacılar)
-        cyan_mask = (b > 180) & (g > 175) & (r < 120)
+        # 2. Sarı / Altın Sinema & Oyun Altyazısı
+        yellow_mask = (r > 175) & (g > 145) & (b < 140)
 
-        bright_mask = white_mask | yellow_mask | cyan_mask
+        # 3. Turkuaz / Camgöbeği Altyazı
+        cyan_mask = (b > 170) & (g > 165) & (r < 130)
 
-        # 4. Koyu Kontür / Gölge veya Yarı Saydam Altyazı Kutusu Doğrulaması:
-        # Oyun ve dizi altyazılarının etrafında siyah kontür/gölge veya koyu arka plan bulunur (min_c < 120).
-        dark_pixels = (min_c < 120).astype(np.uint8) * 255
-        has_dark_neighbor = cv2.dilate(dark_pixels, _KERNEL_DARK_NEIGHBOR) > 0
+        # 4. Renkli Konuşmacı İsimleri (örn. Spider-Man 2: Peter/Miles/MJ mavi, kırmızı, yeşil, turuncu)
+        speaker_color_mask = (max_c > 178) & (chroma > 65) & (local_min < 120) & (local_contrast >= 60)
 
-        combined_mask = bright_mask & has_dark_neighbor
+        # Standart altyazı renkleri için koyu kontür / yarı saydam şerit + yerel kontrast doğrulaması
+        standard_bright = white_mask | yellow_mask | cyan_mask
+        has_dark_outline = (local_min < 145) & (local_contrast >= 48)
+
+        combined_mask = (standard_bright & has_dark_outline) | speaker_color_mask
         mask_u8 = (combined_mask.astype(np.uint8)) * 255
         bright_ratio = float(np.mean(combined_mask))
         return mask_u8, bright_ratio
@@ -196,8 +221,7 @@ class SubtitleOCREngine:
     @classmethod
     def apply_subtitle_color_mask(cls, bgr_img: np.ndarray) -> Tuple[np.ndarray, np.ndarray, float]:
         """
-        Oyunlar, diziler ve medya oynatıcılardaki Beyaz, Sarı ve Turkuaz altyazı piksellerini ayıklar.
-        Etrafında koyu kontür/gölge veya koyu altyazı şeridi olmayan büyük parlak arka planları siler.
+        Oyunlar, diziler ve medya oynatıcılardaki altyazı piksellerini yerel kontrast doğrulamasıyla ayıklar.
         Dönüş: (ocr_ready_bgr, binary_mask_u8, parlak_piksel_orani)
         """
         mask_u8, bright_ratio = cls.compute_subtitle_binary_mask(bgr_img)
@@ -205,17 +229,23 @@ class SubtitleOCREngine:
         return ocr_ready_bgr, mask_u8, bright_ratio
 
     @staticmethod
-    def extract_fast_line_crops(
+    def extract_fast_line_crops_with_metrics(
         ocr_ready_bgr: np.ndarray, mask_u8: np.ndarray
-    ) -> List[np.ndarray]:
+    ) -> Tuple[List[np.ndarray], int, int]:
         """
         0.2 ms'de ikili (binary) altyazı maskesinden 1-4 satırlık sıkı (tight) altyazı şeritlerini çıkarır.
+        Ayrıca:
+        - Far / pencere / HUD kutusu gibi aşırı dolu veya çok yüksek parazit bloklarını (ink-ratio & yükseklik) eler.
+        - Geniş ROI içinde 'No!', 'Hey!', 'Wait.' gibi kısa 1 kelimelik altyazıları korur.
+        - Auto-Fit overlay için ölçülen medyan satır yüksekliğini ve satır sayısını döndürür.
+        Dönüş: (line_crops, median_line_height_px, line_count)
         """
         h, w = mask_u8.shape[:2]
         connected = cv2.morphologyEx(mask_u8, cv2.MORPH_CLOSE, _KERNEL_HORIZ_CONNECT)
 
         row_counts = np.sum(connected > 0, axis=1)
-        min_pixels_in_row = max(8, int(w * 0.014))
+        # Geniş ROI'lerde tek kelimelik kısa replikleri ("No!", "Hey!") kaybetmemek için %0.5 taban
+        min_pixels_in_row = max(5, int(w * 0.005))
         active_rows = row_counts >= min_pixels_in_row
 
         lines_y: List[Tuple[int, int]] = []
@@ -234,27 +264,42 @@ class SubtitleOCREngine:
                     gap_count += 1
                     if gap_count > 2:
                         y_end = y - gap_count + 1
-                        if (y_end - y_start) >= 9:
+                        if (y_end - y_start) >= 8:
                             lines_y.append((y_start, y_end))
                         in_line = False
                         gap_count = 0
 
         if in_line:
             y_end = h
-            if (y_end - y_start) >= 9:
+            if (y_end - y_start) >= 8:
                 lines_y.append((y_start, y_end))
 
+        max_valid_line_h = max(64, int(h * 0.80))
         crops: List[np.ndarray] = []
+        valid_heights: List[int] = []
+
         for y1, y2 in lines_y[:4]:
+            line_h = y2 - y1
+            if line_h > max_valid_line_h:
+                continue
+
             band = connected[y1:y2, :]
             col_counts = np.sum(band > 0, axis=0)
             xs = np.where(col_counts >= 2)[0]
-            if len(xs) < 6:
+            if len(xs) < 4:
                 continue
 
             x1 = int(xs[0])
             x2 = int(xs[-1])
-            if (x2 - x1) < 15:
+            line_w = x2 - x1
+            if line_w < 10:
+                continue
+
+            # Geometrik Mürekkep Yoğunluğu (Ink-Ratio) Kontrolü:
+            # Gerçek metin satırları %3.5 - %66 arası dolu olur; solid beyaz far/kutu (>%68) veya
+            # dağınık tek piksellik parazitler (<%3.5) OCR'a hiç gönderilmeden elenir.
+            raw_ink_ratio = float(np.mean(mask_u8[y1:y2, x1 : x2 + 1] > 0))
+            if raw_ink_ratio < 0.035 or raw_ink_ratio > 0.68:
                 continue
 
             cy1 = max(0, y1 - 5)
@@ -279,8 +324,31 @@ class SubtitleOCREngine:
                         value=(255, 255, 255),
                     )
             crops.append(raw_crop)
+            valid_heights.append(line_h)
 
+        median_h = sorted(valid_heights)[len(valid_heights) // 2] if valid_heights else 0
+        return crops, median_h, len(crops)
+
+    @classmethod
+    def extract_fast_line_crops(
+        cls, ocr_ready_bgr: np.ndarray, mask_u8: np.ndarray
+    ) -> List[np.ndarray]:
+        """Geriye dönük uyumlu yardımcı: yalnızca satır kırpmalarını döndürür."""
+        crops, _, _ = cls.extract_fast_line_crops_with_metrics(ocr_ready_bgr, mask_u8)
         return crops
+
+    @staticmethod
+    def _has_text_like_edges(frame_bgr: np.ndarray) -> bool:
+        """
+        Hibrit modda boş/hareketli oyun sahnelerinde gereksiz 200-600 ms DBNet çağrısını
+        önlemek için hızlı yatay dikey-kenar (Sobel X) metin yoğunluğu kontrolü yapar.
+        """
+        gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
+        small = cv2.resize(gray, (240, max(16, int(gray.shape[0] * (240.0 / max(1, gray.shape[1]))))))
+        grad_x = cv2.Sobel(small, cv2.CV_16S, 1, 0, ksize=3)
+        abs_gx = np.abs(grad_x)
+        edge_ratio = float(np.mean(abs_gx > 90))
+        return 0.020 <= edge_ratio <= 0.42
 
     def _has_raw_frame_changed(self, frame_bgr: np.ndarray) -> bool:
         """
@@ -323,50 +391,114 @@ class SubtitleOCREngine:
         ratio = SequenceMatcher(None, a, b).ratio()
         return ratio >= self.similarity_threshold
 
-    def read_image_fast(
+    def _read_image_detailed(
         self,
         frame_bgr: np.ndarray,
         precomputed_mask: Optional[Tuple[np.ndarray, np.ndarray]] = None,
-    ) -> Tuple[str, float]:
+        allow_hybrid_fallback: bool = True,
+    ) -> Tuple[str, float, float, int, int]:
+        """
+        Görüntüyü okuyup (temiz_metin, sure_ms, ortalama_guven, satir_yuksekligi_px, satir_sayisi) döner.
+        """
         self.ensure_initialized()
         assert self.ocr is not None
 
         t0 = time.perf_counter()
         valid_lines: List[str] = []
+        scores: List[float] = []
+        measured_h = 0
+        measured_lines = 0
 
         if self.use_color_mask:
             if precomputed_mask is not None:
                 ocr_ready_bgr, mask_u8 = precomputed_mask
             else:
                 ocr_ready_bgr, mask_u8, _ = self.apply_subtitle_color_mask(frame_bgr)
-            line_crops = self.extract_fast_line_crops(ocr_ready_bgr, mask_u8)
+            line_crops, measured_h, measured_lines = self.extract_fast_line_crops_with_metrics(
+                ocr_ready_bgr, mask_u8
+            )
 
             if line_crops:
                 rec_res, _ = self.ocr.text_rec(line_crops)
                 if rec_res:
                     for text, score in rec_res:
-                        if float(score) >= 0.50 and text.strip():
-                            valid_lines.append(text.strip())
+                        t_clean = text.strip()
+                        sc = float(score)
+                        # Kısa 1-4 harfli okumalarda hayalet paraziti önlemek için daha sıkı güven eşiği
+                        min_req = 0.72 if len(t_clean) <= 4 else 0.60
+                        if sc >= min_req and t_clean:
+                            valid_lines.append(t_clean)
+                            scores.append(sc)
 
-            # Hibrit modda hızlı filtre metin bulamazsa tam kare OCR ile yedekle
-            if not valid_lines and self.ocr_mode == "hybrid":
-                res, _ = self.ocr(frame_bgr)
-                if res:
-                    sorted_boxes = sorted(res, key=lambda item: (item[0][0][1], item[0][0][0]))
-                    for _, text, score in sorted_boxes:
-                        if float(score) >= 0.52 and text.strip():
-                            valid_lines.append(text.strip())
+            # Hibrit modda hızlı filtre metin bulamazsa YALNIZCA cooldown + kenar yoğunluğu uygunsa DBNet çalıştır
+            if not valid_lines and self.ocr_mode == "hybrid" and allow_hybrid_fallback:
+                now = time.perf_counter()
+                if (now - self._last_hybrid_dbnet_ts) >= 0.40 and self._has_text_like_edges(
+                    frame_bgr
+                ):
+                    self._last_hybrid_dbnet_ts = now
+                    res, _ = self.ocr(frame_bgr)
+                    if res:
+                        sorted_boxes = sorted(res, key=lambda item: (item[0][0][1], item[0][0][0]))
+                        box_heights: List[int] = []
+                        for box, text, score in sorted_boxes:
+                            t_clean = text.strip()
+                            sc = float(score)
+                            min_req = 0.74 if len(t_clean) <= 4 else 0.64
+                            if sc >= min_req and t_clean:
+                                valid_lines.append(t_clean)
+                                scores.append(sc)
+                                try:
+                                    ys = [pt[1] for pt in box]
+                                    box_heights.append(int(max(ys) - min(ys)))
+                                except Exception:
+                                    pass
+                        if box_heights:
+                            measured_h = sorted(box_heights)[len(box_heights) // 2]
+                            measured_lines = len(valid_lines)
         else:
             res, _ = self.ocr(frame_bgr)
             if res:
                 sorted_boxes = sorted(res, key=lambda item: (item[0][0][1], item[0][0][0]))
-                for _, text, score in sorted_boxes:
-                    if float(score) >= 0.50:
-                        valid_lines.append(text)
+                box_heights = []
+                for box, text, score in sorted_boxes:
+                    t_clean = text.strip()
+                    sc = float(score)
+                    min_req = 0.72 if len(t_clean) <= 4 else 0.60
+                    if sc >= min_req and t_clean:
+                        valid_lines.append(t_clean)
+                        scores.append(sc)
+                        try:
+                            ys = [pt[1] for pt in box]
+                            box_heights.append(int(max(ys) - min(ys)))
+                        except Exception:
+                            pass
+                if box_heights:
+                    measured_h = sorted(box_heights)[len(box_heights) // 2]
+                    measured_lines = len(valid_lines)
 
         raw_joined = " ".join(valid_lines)
         cleaned = clean_ocr_text(raw_joined)
+        avg_conf = (sum(scores) / len(scores)) if scores else 0.0
+
+        if cleaned and not is_plausible_subtitle_text(cleaned, avg_confidence=avg_conf):
+            cleaned = ""
+            avg_conf = 0.0
+
         elapsed_ms = (time.perf_counter() - t0) * 1000.0
+        return cleaned, elapsed_ms, avg_conf, measured_h, measured_lines
+
+    def read_image_fast(
+        self,
+        frame_bgr: np.ndarray,
+        precomputed_mask: Optional[Tuple[np.ndarray, np.ndarray]] = None,
+    ) -> Tuple[str, float]:
+        cleaned, elapsed_ms, _, measured_h, measured_lines = self._read_image_detailed(
+            frame_bgr, precomputed_mask=precomputed_mask
+        )
+        if cleaned:
+            self.last_line_height_px = measured_h
+            self.last_line_count = measured_lines
         return cleaned, elapsed_ms
 
     @staticmethod
@@ -407,13 +539,14 @@ class SubtitleOCREngine:
             elapsed = (time.perf_counter() - t0) * 1000.0
             return "UNCHANGED", self._last_clean_text, elapsed
 
-        h, w = frame_bgr.shape[:2]
-        if w > self.max_capture_width:
-            scale = float(self.max_capture_width) / w
+        orig_h, orig_w = frame_bgr.shape[:2]
+        resize_scale = 1.0
+        if orig_w > self.max_capture_width:
+            resize_scale = float(self.max_capture_width) / orig_w
             frame_bgr = cv2.resize(
                 frame_bgr,
-                (self.max_capture_width, max(24, int(h * scale))),
-                interpolation=cv2.INTER_LINEAR,
+                (self.max_capture_width, max(24, int(orig_h * resize_scale))),
+                interpolation=cv2.INTER_AREA,
             )
 
         mask_u8_cached: Optional[np.ndarray] = None
@@ -422,22 +555,43 @@ class SubtitleOCREngine:
             mask_u8_cached = mask_u8
             # Ekran parlaması / flaş durumunda mevcut altyazıyı koru
             if bright_ratio > 0.55:
+                self._last_bright_ratio = bright_ratio
                 elapsed = (time.perf_counter() - t0) * 1000.0
                 return "UNCHANGED", self._last_clean_text, elapsed
 
-            # Ekranda hiç parlak altyazı harfi kalmadıysa (5 kare sonra temizle)
-            if bright_ratio < 0.0012 and self.ocr_mode == "fast_mask":
+            # Ekranda hiç parlak altyazı harfi kalmadıysa (4 kare sonra temizle)
+            if bright_ratio < 0.0008 and self.ocr_mode == "fast_mask":
+                self._last_bright_ratio = bright_ratio
+                self._fade_wait_frames = 0
+                self._pending_borderline_text = ""
                 self._empty_frames_count += 1
-                if self._empty_frames_count >= 5:
+                if self._empty_frames_count >= 4:
                     self._last_clean_text = ""
                     self._prev_thumb = None
                     elapsed = (time.perf_counter() - t0) * 1000.0
                     return "EMPTY", "", elapsed
                 elapsed = (time.perf_counter() - t0) * 1000.0
                 return "UNCHANGED", self._last_clean_text, elapsed
+
+            # Fade-In Stabilizasyon Kilidi:
+            # Altyazı boş sahneden aniden belirirken (fade-in 1. karesi) 1 kare (~30ms) oturmasını bekle;
+            # böylece silik/yarım harfleri okuyup 2 kez NMT çalıştırma maliyeti sıfırlanır.
+            if (
+                self._last_bright_ratio < 0.0010
+                and bright_ratio >= 0.0015
+                and self._fade_wait_frames == 0
+            ):
+                self._last_bright_ratio = bright_ratio
+                self._fade_wait_frames = 1
+                elapsed = (time.perf_counter() - t0) * 1000.0
+                return "UNCHANGED", self._last_clean_text, elapsed
+
+            self._last_bright_ratio = bright_ratio
+            self._fade_wait_frames = 0
+
             check_plane = (
                 mask_u8
-                if (self.ocr_mode == "fast_mask" or bright_ratio >= 0.0012)
+                if (self.ocr_mode == "fast_mask" or bright_ratio >= 0.0008)
                 else cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
             )
         else:
@@ -451,12 +605,15 @@ class SubtitleOCREngine:
         if mask_u8_cached is not None:
             precomputed = (self.mask_to_ocr_bgr(mask_u8_cached), mask_u8_cached)
 
-        cleaned, _ = self.read_image_fast(frame_bgr, precomputed_mask=precomputed)
+        cleaned, _, avg_conf, measured_h, measured_lines = self._read_image_detailed(
+            frame_bgr, precomputed_mask=precomputed
+        )
         elapsed = (time.perf_counter() - t0) * 1000.0
 
         if not cleaned:
+            self._pending_borderline_text = ""
             self._empty_frames_count += 1
-            if self._empty_frames_count >= 5:
+            if self._empty_frames_count >= 4:
                 self._last_clean_text = ""
                 return "EMPTY", "", elapsed
             return "UNCHANGED", self._last_clean_text, elapsed
@@ -464,7 +621,29 @@ class SubtitleOCREngine:
         self._empty_frames_count = 0
 
         if self.is_similar_to_last(cleaned):
+            self._pending_borderline_text = ""
             return "UNCHANGED", self._last_clean_text, elapsed
+
+        # Sınır güvenli okumalarda (0.58 - 0.78) tek karelik hayalet paraziti önlemek için 2 kare onayı
+        if avg_conf < 0.78:
+            if self._pending_borderline_text and (
+                SequenceMatcher(None, cleaned.lower(), self._pending_borderline_text.lower()).ratio()
+                >= 0.80
+            ):
+                self._pending_borderline_text = ""
+            else:
+                self._pending_borderline_text = cleaned
+                # Sonraki karede tekrar kontrol edilebilmesi için kare kilidini gevşet
+                self._prev_raw_thumb = None
+                self._prev_thumb = None
+                return "UNCHANGED", self._last_clean_text, elapsed
+        else:
+            self._pending_borderline_text = ""
+
+        # Ölçülen satır yüksekliğini orijinal yakalama piksel ölçeğine geri çevir
+        if measured_h > 0 and resize_scale > 0:
+            self.last_line_height_px = int(round(measured_h / resize_scale))
+            self.last_line_count = max(1, measured_lines)
 
         self._last_clean_text = cleaned
         return "NEW_TEXT", cleaned, elapsed

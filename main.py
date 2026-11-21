@@ -7,6 +7,7 @@ import ctypes
 import json
 import os
 import sys
+import threading
 import time
 import traceback
 from datetime import datetime
@@ -196,9 +197,14 @@ def create_app_pixmap(size: int = 64) -> QPixmap:
 
 
 def create_app_icon() -> QIcon:
-    ico_path = os.path.join(get_app_base_dir(), "assets", "app_icon.ico")
-    if os.path.exists(ico_path):
-        return QIcon(ico_path)
+    search_roots = [get_app_base_dir()]
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass and meipass not in search_roots:
+        search_roots.append(meipass)
+    for root in search_roots:
+        ico_path = os.path.join(root, "assets", "app_icon.ico")
+        if os.path.exists(ico_path):
+            return QIcon(ico_path)
     return QIcon(create_app_pixmap(64))
 
 
@@ -328,8 +334,65 @@ class BenchmarkWorker(QThread):
         self.finished_report.emit(report)
 
 
+class LatestTextSlot:
+    """
+    1 elemanlı 'en güncel cümle kazanır' (Latest-Frame-Wins) iş parçacığı güvenli kanal.
+    NMT bir cümleyi çevirirken yeni altyazı gelirse arada biriken eski cümleleri anında düşürür;
+    EMPTY geldiğinde nesil (generation) sayacını artırarak bayat çevirilerin ekrana yanmasını önler.
+    """
+
+    def __init__(self) -> None:
+        self._cond = threading.Condition()
+        self._generation: int = 0
+        self._pending: Optional[Tuple[int, str, float, int]] = None
+        self._closed: bool = False
+        self.dropped_count: int = 0
+
+    @property
+    def generation(self) -> int:
+        with self._cond:
+            return self._generation
+
+    def submit(self, en_text: str, ocr_ms: float, orig_line_h: int = 0) -> int:
+        with self._cond:
+            if self._pending is not None:
+                self.dropped_count += 1
+            self._generation += 1
+            gen = self._generation
+            self._pending = (gen, en_text, ocr_ms, orig_line_h)
+            self._cond.notify()
+            return gen
+
+    def invalidate(self) -> int:
+        with self._cond:
+            self._generation += 1
+            self._pending = None
+            return self._generation
+
+    def close(self) -> None:
+        with self._cond:
+            self._closed = True
+            self._pending = None
+            self._generation += 1
+            self._cond.notify_all()
+
+    def take(self, timeout: float = 0.25) -> Optional[Tuple[int, str, float, int]]:
+        with self._cond:
+            if self._pending is None and not self._closed:
+                self._cond.wait(timeout=timeout)
+            if self._closed or self._pending is None:
+                return None
+            item = self._pending
+            self._pending = None
+            return item
+
+    def is_current(self, generation: int) -> bool:
+        with self._cond:
+            return (not self._closed) and (generation == self._generation)
+
+
 class CaptureTranslateWorker(QThread):
-    subtitle_updated = pyqtSignal(str, str, float, float, bool)
+    subtitle_updated = pyqtSignal(str, str, float, float, bool, int)
     subtitle_cleared = pyqtSignal()
     status_tick = pyqtSignal(str)
 
@@ -348,14 +411,41 @@ class CaptureTranslateWorker(QThread):
         self.scan_interval_sec = max(0.025, float(scan_interval_sec))
         self.idle_scan_interval_sec = max(self.scan_interval_sec, float(idle_scan_interval_sec))
         self.running = False
+        self._slot = LatestTextSlot()
+        self._nmt_thread: Optional[threading.Thread] = None
 
     def update_timing(self, scan_interval_sec: float, idle_scan_interval_sec: float) -> None:
         self.scan_interval_sec = max(0.025, float(scan_interval_sec))
         self.idle_scan_interval_sec = max(self.scan_interval_sec, float(idle_scan_interval_sec))
 
+    def _translation_loop(self) -> None:
+        while self.running:
+            item = self._slot.take(timeout=0.25)
+            if item is None:
+                continue
+            gen, en_text, ocr_ms, orig_line_h = item
+            if not self._slot.is_current(gen):
+                continue
+            try:
+                tr_text, tr_ms, is_cached = self.translator.translate_with_metrics(en_text)
+                if tr_text and self.running and self._slot.is_current(gen):
+                    self.subtitle_updated.emit(
+                        en_text, tr_text, ocr_ms, tr_ms, is_cached, orig_line_h
+                    )
+            except Exception as exc:
+                self.status_tick.emit(f"Çeviri hatası: {exc}")
+
     def run(self) -> None:
         self.running = True
         self.ocr_engine.reset_state()
+        self._slot = LatestTextSlot()
+        self._nmt_thread = threading.Thread(
+            target=self._translation_loop,
+            name="SubVision-NMT-Worker",
+            daemon=True,
+        )
+        self._nmt_thread.start()
+
         idle_streak_sec = 0.0
 
         with mss.mss() as sct:
@@ -371,13 +461,22 @@ class CaptureTranslateWorker(QThread):
                     status, en_text, ocr_ms = self.ocr_engine.capture_and_read(capture_box, sct)
 
                     if status == "EMPTY":
+                        self._slot.invalidate()
                         self.subtitle_cleared.emit()
                         idle_streak_sec += self.scan_interval_sec
                     elif status == "NEW_TEXT" and en_text:
                         idle_streak_sec = 0.0
-                        tr_text, tr_ms, is_cached = self.translator.translate_with_metrics(en_text)
-                        if tr_text:
-                            self.subtitle_updated.emit(en_text, tr_text, ocr_ms, tr_ms, is_cached)
+                        orig_line_h = self.ocr_engine.last_line_height_px
+                        # Hızlı Yol (0.01 ms): Önbellek / Sözlükte varsa NMT kuyruğunu hiç beklemeden anında göster!
+                        fast_hit = self.translator.try_fast_lookup(en_text)
+                        if fast_hit is not None:
+                            self._slot.invalidate()
+                            tr_text, tr_ms, is_cached = fast_hit
+                            self.subtitle_updated.emit(
+                                en_text, tr_text, ocr_ms, tr_ms, is_cached, orig_line_h
+                            )
+                        else:
+                            self._slot.submit(en_text, ocr_ms, orig_line_h)
                     else:
                         idle_streak_sec += self.scan_interval_sec
                 except Exception as exc:
@@ -393,9 +492,14 @@ class CaptureTranslateWorker(QThread):
                 sleep_time = max(0.012, target_interval - elapsed)
                 time.sleep(sleep_time)
 
+        self._slot.close()
+        if self._nmt_thread and self._nmt_thread.is_alive():
+            self._nmt_thread.join(timeout=1.5)
+
     def stop(self) -> None:
         self.running = False
-        self.wait(1500)
+        self._slot.close()
+        self.wait(1800)
 
 
 class FlatSwitch(QCheckBox):
@@ -695,6 +799,7 @@ class MainWindow(QMainWindow):
             "ocr_mode": self.combo_ocr_mode.currentData(),
             "performance_profile": self.combo_perf_profile.currentData(),
             "show_bilingual": self.chk_bilingual.isChecked(),
+            "auto_fit_font": self.chk_autofit.isChecked(),
         }
         try:
             with open(CONFIG_PATH, "w", encoding="utf-8") as f:
@@ -906,7 +1011,7 @@ class MainWindow(QMainWindow):
         title_lbl.setStyleSheet("color: #FAFAFA; border: none; background: transparent;")
         title_row.addWidget(title_lbl)
 
-        ver_pill = QLabel("v1.2")
+        ver_pill = QLabel("v1.3")
         ver_pill.setStyleSheet(
             "color: #A1A1AA; background-color: #18181B; border: 1px solid #27272A; border-radius: 4px; padding: 1px 6px; font-size: 7.5pt; font-weight: 700;"
         )
@@ -1234,8 +1339,8 @@ class MainWindow(QMainWindow):
         right_lay.addWidget(lbl_ocr_prof)
 
         self.combo_ocr_mode = FlatComboBox()
-        self.combo_ocr_mode.addItem("Hibrit — Oyun, Dizi & Film (Önerilen)", "hybrid")
-        self.combo_ocr_mode.addItem("Hızlı Maske — Sadece Kontürlü Altyazı", "fast_mask")
+        self.combo_ocr_mode.addItem("Kontürlü / Adaptif Maske — Oyun & Dizi (Önerilen)", "fast_mask")
+        self.combo_ocr_mode.addItem("Hibrit — Oyun, Dizi & Açık Zemin (Akıllı Yedek)", "hybrid")
         self.combo_ocr_mode.addItem("Tam Kare OCR — Genel Ekran & Video", "full_ocr")
         self.combo_ocr_mode.currentIndexChanged.connect(self._on_ocr_mode_changed)
         right_lay.addWidget(self.combo_ocr_mode)
@@ -1293,17 +1398,17 @@ class MainWindow(QMainWindow):
         sliders_grid.setSpacing(8)
         sliders_grid.setContentsMargins(0, 2, 0, 2)
 
-        lbl_font_cap = QLabel("Yazı Boyutu")
-        lbl_font_cap.setStyleSheet("color: #A1A1AA; font-size: 8.3pt; font-weight: 600;")
-        sliders_grid.addWidget(lbl_font_cap, 0, 0)
+        self.lbl_font_cap = QLabel("Maks. Boyut")
+        self.lbl_font_cap.setStyleSheet("color: #A1A1AA; font-size: 8.3pt; font-weight: 600;")
+        sliders_grid.addWidget(self.lbl_font_cap, 0, 0)
 
         self.slider_font = QSlider(Qt.Orientation.Horizontal)
         self.slider_font.setRange(14, 36)
-        self.slider_font.setValue(self.settings.get("font_size", 21))
+        self.slider_font.setValue(self.settings.get("font_size", 22))
         self.slider_font.valueChanged.connect(self._on_appearance_changed)
         sliders_grid.addWidget(self.slider_font, 0, 1)
 
-        self.lbl_font_val = QLabel("21 pt")
+        self.lbl_font_val = QLabel("22 pt")
         self.lbl_font_val.setMinimumWidth(42)
         self.lbl_font_val.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self.lbl_font_val.setStyleSheet("color: #E4E4E7; font-size: 8.3pt; font-weight: 600;")
@@ -1329,6 +1434,11 @@ class MainWindow(QMainWindow):
         right_lay.addLayout(sliders_grid)
 
         # Görünüm Seçenekleri (Modern Flat Toggle Switches)
+        self.chk_autofit = FlatSwitch("Otomatik yazı boyutu (Orijinali tam kapat)")
+        self.chk_autofit.setChecked(self.settings.get("auto_fit_font", True))
+        self.chk_autofit.toggled.connect(self._on_appearance_changed)
+        right_lay.addWidget(self.chk_autofit)
+
         self.chk_bilingual = FlatSwitch("Çift dilli görünüm (Üstte EN + Altta TR)")
         self.chk_bilingual.setChecked(self.settings.get("show_bilingual", False))
         self.chk_bilingual.toggled.connect(self._on_appearance_changed)
@@ -1590,7 +1700,9 @@ class MainWindow(QMainWindow):
         alpha = self.slider_alpha.value()
         alpha_pct = int(alpha / 255 * 100)
         bilingual = self.chk_bilingual.isChecked()
+        auto_fit = self.chk_autofit.isChecked()
 
+        self.lbl_font_cap.setText("Maks. Boyut" if auto_fit else "Yazı Boyutu")
         self.lbl_font_val.setText(f"{f_size} pt")
         self.lbl_alpha_val.setText(f"%{alpha_pct}")
         self._update_designer_button_styles()
@@ -1621,6 +1733,7 @@ class MainWindow(QMainWindow):
             bg_alpha=alpha,
             overlay_mode=self._selected_overlay_mode,
             show_bilingual=bilingual,
+            auto_fit_font=auto_fit,
         )
         self.overlay.align_to_roi(self.roi)
         self._save_settings()
@@ -1691,9 +1804,15 @@ class MainWindow(QMainWindow):
             self._set_toggle_button_style(active=True)
 
     def _on_subtitle_updated(
-        self, en_text: str, tr_text: str, ocr_ms: float, tr_ms: float, is_cached: bool
+        self,
+        en_text: str,
+        tr_text: str,
+        ocr_ms: float,
+        tr_ms: float,
+        is_cached: bool,
+        orig_line_h: int = 0,
     ) -> None:
-        self.overlay.set_subtitle(tr_text, en_text)
+        self.overlay.set_subtitle(tr_text, en_text, orig_line_h_px=orig_line_h)
         self.lbl_en_preview.setText(en_text)
         self.lbl_tr_preview.setText(tr_text)
         self.lbl_mini_en.setText(en_text)

@@ -4,15 +4,18 @@ SubVision AI — Otomatik Birim ve Entegrasyon Test Paketi (Unit & Integration T
     python -m unittest test_pipeline.py -v
 """
 
+import os
 import unittest
 from unittest.mock import patch
 
+import cv2
 import numpy as np
 
 from benchmark import make_synthetic_subtitle_frame
 from glossary import (
     clean_ocr_text,
     extract_speaker_and_body,
+    is_plausible_subtitle_text,
     lookup_exact_phrase,
     normalize_all_caps_text,
     normalize_slang_for_nmt,
@@ -247,6 +250,156 @@ class TestSubVisionPipeline(unittest.TestCase):
         self.assertTrue(is_cached_warm)
         self.assertEqual(tr_cold, tr_warm)
         self.assertLess(warm_ms, 5.0)
+
+    def test_08_plausible_subtitle_anti_gibberish(self) -> None:
+        """Gerçek kısa altyazıları kabul edip hayalet/anlamsız OCR çıktılarını reddettiğini doğrular."""
+        for valid in ("No!", "Hey!", "Wait.", "MJ", "OK", "Stop right there!"):
+            self.assertTrue(
+                is_plausible_subtitle_text(valid, avg_confidence=0.82),
+                f"Geçerli altyazı reddedildi: {valid}",
+            )
+        for junk in ("", "...", "IIII", "rrrt", "11--@", "x", "zzzzz", "|||///"):
+            self.assertFalse(
+                is_plausible_subtitle_text(junk, avg_confidence=0.65),
+                f"Hayalet/gürültü metin kabul edildi: {junk}",
+            )
+
+    def test_09_zero_phantom_on_noisy_empty_game_scene(self) -> None:
+        """Altyazısız karmaşık/parlak oyun arka planında 0 hayalet altyazı üretildiğini doğrular."""
+        h, w = 110, 960
+        rng = np.random.default_rng(42)
+        scene = np.zeros((h, w, 3), dtype=np.uint8)
+        # Parlak gündüz gökyüzü + bina kenarı + beyaz araç farı bloğu + hafif doku
+        scene[:, :480] = (235, 205, 165)
+        scene[:, 480:] = (42, 48, 55)
+        cv2.circle(scene, (620, 55), 18, (250, 250, 250), -1)
+        cv2.rectangle(scene, (180, 20), (310, 95), (25, 28, 32), -1)
+        noise = rng.integers(-8, 9, size=scene.shape, dtype=np.int16)
+        scene = np.clip(scene.astype(np.int16) + noise, 0, 255).astype(np.uint8)
+
+        for mode in ("fast_mask", "hybrid"):
+            self.ocr_engine.set_mode(mode)
+            text, _ = self.ocr_engine.read_image_fast(scene)
+            self.assertEqual(
+                text,
+                "",
+                f"{mode} modunda altyazısız oyun sahnesinde hayalet metin üretildi: {text!r}",
+            )
+        self.ocr_engine.set_mode("fast_mask")
+
+    def test_10_spiderman2_colored_speaker_over_bright_sky(self) -> None:
+        """Parlak gökyüzü + yarı saydam bant + renkli konuşmacı adı (Miles:) senaryosunu doğrular."""
+        h, w = 110, 960
+        frame = np.full((h, w, 3), (240, 212, 175), dtype=np.uint8)
+        # Yarı saydam koyu altyazı arka plan bandı (~%60 koyuluk)
+        overlay = frame.copy()
+        cv2.rectangle(overlay, (140, 24), (820, 86), (18, 20, 26), -1)
+        frame = cv2.addWeighted(overlay, 0.62, frame, 0.38, 0)
+
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        scale = 0.95
+        speaker_txt = "Miles: "
+        body_txt = "We have to stop him now!"
+        (sw, sh), _ = cv2.getTextSize(speaker_txt, font, scale, 2)
+        (bw, _), _ = cv2.getTextSize(body_txt, font, scale, 2)
+        start_x = (w - (sw + bw)) // 2
+        base_y = 66
+
+        # İnce koyu kontür + mercan-kırmızı (BGR) konuşmacı adı + beyaz diyalog
+        cv2.putText(frame, speaker_txt, (start_x, base_y), font, scale, (10, 10, 10), 4, cv2.LINE_AA)
+        cv2.putText(frame, speaker_txt, (start_x, base_y), font, scale, (95, 115, 250), 2, cv2.LINE_AA)
+        cv2.putText(frame, body_txt, (start_x + sw, base_y), font, scale, (10, 10, 10), 4, cv2.LINE_AA)
+        cv2.putText(frame, body_txt, (start_x + sw, base_y), font, scale, (245, 245, 245), 2, cv2.LINE_AA)
+
+        self.ocr_engine.set_mode("fast_mask")
+        text, _ = self.ocr_engine.read_image_fast(frame)
+        self.assertIn("miles", text.lower())
+        self.assertIn("stop", text.lower())
+        self.assertGreater(self.ocr_engine.last_line_height_px, 12)
+
+    def test_11_short_one_word_subtitle_in_wide_roi(self) -> None:
+        """Geniş 960x110 ROI içindeki tek kelimelik kısa altyazının ('Wait!') kaçırılmadığını doğrular."""
+        frame = make_synthetic_subtitle_frame(["Wait!"], width=960, height=110)
+        self.ocr_engine.set_mode("fast_mask")
+        text, _ = self.ocr_engine.read_image_fast(frame)
+        self.assertIn("wait", text.lower())
+
+    def test_12_dynamic_decoding_limit_and_fast_lookup(self) -> None:
+        """Dinamik max_decoding_length hesabını ve sıfır-beklemeli önbellek/sözlük dönüşünü doğrular."""
+        short_limit = LocalEnTrTranslator.compute_dynamic_max_length([["▁No", "!"]])
+        long_limit = LocalEnTrTranslator.compute_dynamic_max_length([["▁word"] * 50])
+        self.assertLessEqual(short_limit, 35)
+        self.assertGreaterEqual(short_limit, 20)
+        self.assertEqual(long_limit, 88)
+
+        # Sözlük hit'i model çağrısı olmadan anında dönmeli
+        fast_hit = self.translator.try_fast_lookup("To be continued...")
+        self.assertIsNotNone(fast_hit)
+        self.assertEqual(fast_hit[0], "Devam edecek...")
+
+        # Önbellekte olmayan yeni cümle None döndürmeli
+        self.translator.clear_cache()
+        self.assertIsNone(self.translator.try_fast_lookup("Unique untested orbital telemetry signal."))
+
+    def test_13_latest_text_slot_latest_frame_wins(self) -> None:
+        """Asenkron LatestTextSlot kuyruğunun eski cümleleri atıp daima en günceli verdiğini doğrular."""
+        from main import LatestTextSlot
+
+        slot = LatestTextSlot()
+        g1 = slot.submit("First line", 15.0, 28)
+        g2 = slot.submit("Second line", 16.0, 28)
+        g3 = slot.submit("Third latest line", 17.0, 30)
+        self.assertEqual(slot.dropped_count, 2)
+        self.assertTrue(slot.is_current(g3))
+        self.assertFalse(slot.is_current(g1))
+        self.assertFalse(slot.is_current(g2))
+
+        item = slot.take(timeout=0.1)
+        self.assertIsNotNone(item)
+        gen, text, ocr_ms, line_h = item
+        self.assertEqual(gen, g3)
+        self.assertEqual(text, "Third latest line")
+        self.assertEqual(line_h, 30)
+
+        slot.invalidate()
+        self.assertFalse(slot.is_current(g3))
+
+    def test_14_autofit_overlay_font_sizing(self) -> None:
+        """Auto-Fit font hesabının uzun Türkçe cümleyi kutuya sığdıracak şekilde otomatik küçülttüğünü doğrular."""
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PyQt6.QtWidgets import QApplication
+        from overlay_ui import compute_autofit_font_size
+
+        app = QApplication.instance() or QApplication([])
+        self.assertIsNotNone(app)
+
+        short_pt = compute_autofit_font_size(
+            tr_text="Bekle!",
+            en_text="",
+            avail_w=760,
+            avail_h=78,
+            max_pt=24,
+            min_pt=12,
+            orig_line_h=30,
+            show_bilingual=False,
+        )
+        long_pt = compute_autofit_font_size(
+            tr_text=(
+                "Şehrin diğer ucundaki araştırma laboratuvarında bulduğumuz tüm veriler "
+                "bunun çok daha büyük ve tehlikeli bir komplonun parçası olduğunu gösteriyor."
+            ),
+            en_text="",
+            avail_w=760,
+            avail_h=78,
+            max_pt=24,
+            min_pt=12,
+            orig_line_h=30,
+            show_bilingual=False,
+        )
+        self.assertGreaterEqual(short_pt, 12)
+        self.assertLessEqual(short_pt, 24)
+        self.assertGreaterEqual(long_pt, 12)
+        self.assertLess(long_pt, short_pt)
 
 
 if __name__ == "__main__":

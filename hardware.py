@@ -453,7 +453,7 @@ def compute_runtime_tuning(
         det_limit_side_len = 480
         warmup_buckets = (10, 16, 22)
         warmup_double_line = True
-        default_ocr_mode = "hybrid"
+        default_ocr_mode = "fast_mask"
     else:
         # PROFILE_BALANCED
         nmt_threads = max(1, min(4, hw.physical_cores, safe_max_threads))
@@ -465,7 +465,7 @@ def compute_runtime_tuning(
         det_limit_side_len = 480
         warmup_buckets = (10, 16, 22)
         warmup_double_line = False
-        default_ocr_mode = "hybrid"
+        default_ocr_mode = "fast_mask"
 
     compute_candidates = select_compute_type_candidates(
         hw.supported_ct2_types, hw.isa_features

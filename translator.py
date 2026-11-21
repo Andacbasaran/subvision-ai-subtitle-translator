@@ -294,6 +294,55 @@ class LocalEnTrTranslator:
         if len(self._cache) > self._cache_max_size:
             self._cache.popitem(last=False)
 
+    @staticmethod
+    def compute_dynamic_max_length(token_batches: List[List[str]]) -> int:
+        """
+        Kaynak cümle uzunluğuna göre dinamik çıkış token sınırı hesaplar.
+        Kısa cümlelerde veya gürültülü OCR çıktılarında modelin 80 token tekrar
+        döngüsüne girip 500-800 ms kilitlenmesini engeller.
+        """
+        if not token_batches:
+            return 32
+        max_src = max(len(t) for t in token_batches)
+        return min(88, max(20, int(max_src * 1.75) + 10))
+
+    def try_fast_lookup(self, english_text: str) -> Optional[Tuple[str, float, bool]]:
+        """
+        Yalnızca sözlük ve RAM LRU Cache üzerinden 0.01 ms'de anlık sonuç arar.
+        Asenkron pipeline'da NMT kuyruğunu hiç beklemeden anında overlay güncellemesi sağlar.
+        """
+        t0 = time.perf_counter()
+        speaker, body = extract_speaker_and_body(english_text)
+        if not body:
+            return None
+
+        sentences: List[str] = [
+            s.strip() for s in re.split(r"(?<=[.!?])\s+", body) if s.strip()
+        ]
+        if not sentences:
+            sentences = [body]
+
+        with self._lock:
+            tr_parts: List[str] = []
+            for sent in sentences:
+                exact = lookup_exact_phrase(sent)
+                if exact is not None:
+                    tr_parts.append(exact)
+                    continue
+                cached_val = self._cache_get(sent.lower())
+                if cached_val is not None:
+                    tr_parts.append(cached_val)
+                    continue
+                return None
+
+            self.total_requests += 1
+            self.cache_hits += 1
+
+        tr_body = " ".join(tr_parts)
+        final_tr = f"{speaker}: {tr_body}" if speaker else tr_body
+        elapsed_ms = (time.perf_counter() - t0) * 1000.0
+        return final_tr, elapsed_ms, True
+
     def translate_with_metrics(self, english_text: str) -> Tuple[str, float, bool]:
         """
         İngilizce altyazıyı en düşük gecikmeyle Türkçeye çevirir.
@@ -342,10 +391,13 @@ class LocalEnTrTranslator:
 
             # 3. Önbellekte olmayan tüm cümleleri TEK BİR CTranslate2 Batch çağrısında paralel çevir
             if uncached_token_batches and self.translator and self.target_sp:
+                max_dec_len = self.compute_dynamic_max_length(uncached_token_batches)
                 batch_out = self.translator.translate_batch(
                     uncached_token_batches,
                     beam_size=1,
-                    max_decoding_length=80,
+                    max_decoding_length=max_dec_len,
+                    repetition_penalty=1.15,
+                    no_repeat_ngram_size=3,
                     replace_unknowns=True,
                 )
                 for idx, res in zip(uncached_indices, batch_out):

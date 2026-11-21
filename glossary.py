@@ -382,3 +382,86 @@ def normalize_slang_for_nmt(text: str) -> str:
     for pattern, replacement in SLANG_PATTERNS:
         result = pattern.sub(replacement, result)
     return result
+
+
+# Oyun/film arka plan dokularından kaynaklanan hayalet OCR parazitlerini elemek için
+# geçerli kısa İngilizce ifadeler ve sesli harf/tekrar kuralları
+SHORT_VALID_WORDS = frozenset(
+    {
+        "no", "ok", "hi", "me", "go", "up", "oh", "ah", "ya", "so", "do", "be",
+        "he", "we", "us", "it", "in", "on", "to", "my", "if", "or", "by", "mj",
+        "yes", "hey", "run", "who", "why", "how", "now", "out", "off", "all",
+        "get", "let", "god", "man", "sir", "kid", "mom", "dad", "bro", "doc",
+        "car", "gun", "cop", "way", "day", "one", "two", "end", "die", "hit",
+        "bye", "huh", "ugh", "wow", "hmm", "shh", "cry", "try", "fly", "spy",
+        "sky", "dry", "wtf", "omg", "you", "she", "him", "her", "not", "too",
+        "see", "did", "can", "are", "was", "has", "had", "big", "bad", "new",
+        "old", "own", "our", "out", "put", "say", "use", "may", "boy", "war",
+        "eye", "far", "few", "got", "hot", "job", "law", "lot", "low", "pay",
+        "red", "set", "sit", "six", "ten", "top", "win", "yet", "yep", "nah",
+    }
+)
+_VOWELS = frozenset("aeiouyAEIOUY")
+_RE_REPEATED_RUN = re.compile(r"(.)\1{3,}")
+_RE_ALPHA_WORDS = re.compile(r"[A-Za-z]+(?:'[A-Za-z]+)?")
+
+
+def is_plausible_subtitle_text(text: str, avg_confidence: float = 1.0) -> bool:
+    """
+    OCR'dan gelen temizlenmiş metnin gerçek bir İngilizce altyazı olup olmadığını
+    doğrular. Oyun arka planı, far, pencere kenarı veya HUD parazitlerinden doğan
+    anlamsız harf yığınlarını (örn. 'IIl', 'rrt', 'oo0', '---I') sıfır maliyetle eler.
+    """
+    if not text:
+        return False
+
+    stripped = text.strip()
+    if len(stripped) < 2:
+        return False
+
+    # Aşırı tekrarlı tek karakter parazitlerini reddet (örn. "IIII", "llll", "oooo")
+    if _RE_REPEATED_RUN.search(stripped):
+        return False
+
+    # Harf oranı çok düşükse (sembol/rakam çöpü) reddet
+    non_space = [c for c in stripped if not c.isspace()]
+    if not non_space:
+        return False
+    alpha_chars = [c for c in non_space if c.isalpha()]
+    if len(alpha_chars) < 2:
+        return False
+    if (len(alpha_chars) / len(non_space)) < 0.45:
+        return False
+
+    words = _RE_ALPHA_WORDS.findall(stripped)
+    if not words:
+        return False
+
+    # Tek kelimelik çok kısa çıktılarda (2-3 harf) sözlük veya çok yüksek güven şartı ara
+    if len(words) == 1:
+        w = words[0]
+        wl = w.lower()
+        if len(wl) <= 3:
+            if wl in SHORT_VALID_WORDS:
+                return avg_confidence >= 0.68
+            return False
+        # 4+ harfli tek kelimede en az 1 sesli harf (a,e,i,o,u,y) bulunmalı
+        if not any(ch in _VOWELS for ch in wl):
+            return False
+        return avg_confidence >= 0.68
+
+    # Çok kelimelik cümlelerde gerçek okunabilir kelime oranını kontrol et
+    plausible_words = 0
+    for w in words:
+        wl = w.lower()
+        if len(wl) == 1 and wl in ("i", "a"):
+            plausible_words += 1
+        elif wl in SHORT_VALID_WORDS:
+            plausible_words += 1
+        elif len(wl) >= 2 and any(ch in _VOWELS for ch in wl):
+            plausible_words += 1
+
+    if (plausible_words / len(words)) < 0.50:
+        return False
+
+    return avg_confidence >= 0.58

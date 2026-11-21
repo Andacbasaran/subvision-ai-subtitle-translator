@@ -14,6 +14,7 @@ from PyQt6.QtGui import (
     QColor,
     QCursor,
     QFont,
+    QFontMetrics,
     QGuiApplication,
     QPainter,
     QPen,
@@ -203,16 +204,72 @@ class ROISelectorOverlay(QWidget):
             self.hide()
 
 
+def compute_autofit_font_size(
+    tr_text: str,
+    en_text: str,
+    avail_w: int,
+    avail_h: int,
+    max_pt: int = 24,
+    min_pt: int = 11,
+    orig_line_h: int = 0,
+    show_bilingual: bool = False,
+    font_family: Optional[str] = None,
+) -> int:
+    """
+    QFontMetrics kullanarak Türkçe altyazının seçili kutuya taşmadan, kırpılmadan
+    ve orijinal altyazıyı doğal bir ölçekle örtecek en uygun yazı boyutunu (pt) hesaplar.
+    """
+    if not tr_text or not tr_text.strip():
+        return max(min_pt, min(max_pt, 20))
+
+    family = font_family or get_ui_font_family()
+    safe_w = max(120, int(avail_w))
+    safe_h = max(36, int(avail_h))
+
+    # Orijinal İngilizce satır yüksekliği biliniyorsa doğal eşleşme üst sınırı belirle
+    upper_pt = max(min_pt, int(max_pt))
+    if orig_line_h > 0:
+        natural_pt = int(round(orig_line_h * 0.80))
+        # Kısa satırların aşırı devasa olmasını engelle, ancak kullanıcı üst sınırını aşma
+        upper_pt = max(min_pt, min(upper_pt, max(14, natural_pt + 4)))
+
+    flags = int(Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap)
+    best_pt = min_pt
+
+    lo, hi = min_pt, upper_pt
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        tr_font = QFont(family, mid, QFont.Weight.Bold)
+        tr_rect = QFontMetrics(tr_font).boundingRect(QRect(0, 0, safe_w, 4096), flags, tr_text)
+        total_h = tr_rect.height()
+
+        if show_bilingual and en_text and en_text.strip():
+            en_pt = max(9, int(mid * 0.56))
+            en_font = QFont(family, en_pt, QFont.Weight.DemiBold)
+            en_rect = QFontMetrics(en_font).boundingRect(QRect(0, 0, safe_w, 4096), flags, en_text)
+            total_h += en_rect.height() + 4
+
+        if total_h <= safe_h:
+            best_pt = mid
+            lo = mid + 1
+        else:
+            hi = mid - 1
+
+    return max(min_pt, min(upper_pt, best_pt))
+
+
 class SubtitleOverlayWindow(QWidget):
     """
     Oyun, dizi veya film üzerinde tıklamaları arkaya geçiren (Click-Through),
     her zaman üstte duran ve WDA_EXCLUDEFROMCAPTURE ile OCR'a görünmez olan Türkçe altyazı katmanı.
-    İsteğe bağlı Çift Dilli (EN + TR) gösterim modunu destekler.
+    Otomatik yazı boyutu (Auto-Fit) ve Çift Dilli (EN + TR) gösterim modunu destekler.
     """
 
     def __init__(self):
         super().__init__()
-        self.font_size = 21
+        self.font_size = 22
+        self._active_font_size = 22
+        self.auto_fit_font = True
         self.text_color = "#FFFFFF"
         self.bg_alpha = 225
         self.overlay_mode = "cover"  # 'cover' (Orijinalin Tam Üstünü Kapat) veya 'above' (Hemen Üstünde)
@@ -221,6 +278,8 @@ class SubtitleOverlayWindow(QWidget):
         self.capture_excluded = False
         self._current_tr = ""
         self._current_en = ""
+        self._last_orig_line_h = 0
+        self._last_roi: Optional[Dict[str, int]] = None
 
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint
@@ -232,7 +291,7 @@ class SubtitleOverlayWindow(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 8, 20, 8)
+        layout.setContentsMargins(16, 6, 16, 6)
         layout.setSpacing(2)
 
         # İkincil (İngilizce Orijinal) Satır - Çift Dilli Mod aktifken görünür
@@ -270,7 +329,8 @@ class SubtitleOverlayWindow(QWidget):
         self.capture_excluded = set_window_exclude_from_capture(self, True)
 
     def _apply_text_style(self) -> None:
-        en_size = max(10, int(self.font_size * 0.58))
+        pt = self._active_font_size if self.auto_fit_font else self.font_size
+        en_size = max(9, int(pt * 0.56))
         ui_font = get_ui_font_family()
         self.en_label.setStyleSheet(
             f"""
@@ -288,12 +348,38 @@ class SubtitleOverlayWindow(QWidget):
             QLabel {{
                 color: {self.text_color};
                 font-family: '{ui_font}', 'Segoe UI', 'DejaVu Sans', 'Arial', sans-serif;
-                font-size: {self.font_size}pt;
+                font-size: {pt}pt;
                 font-weight: 700;
                 background: transparent;
             }}
             """
         )
+
+    def _recompute_autofit_if_needed(self) -> None:
+        if not self.auto_fit_font:
+            if self._active_font_size != self.font_size:
+                self._active_font_size = self.font_size
+                self._apply_text_style()
+            return
+
+        if not self._current_tr.strip():
+            return
+
+        avail_w = max(120, self.width() - 36)
+        avail_h = max(36, self.height() - 16)
+        fitted = compute_autofit_font_size(
+            tr_text=self._current_tr,
+            en_text=self._current_en,
+            avail_w=avail_w,
+            avail_h=avail_h,
+            max_pt=self.font_size,
+            min_pt=11,
+            orig_line_h=self._last_orig_line_h,
+            show_bilingual=self.show_bilingual,
+        )
+        if fitted != self._active_font_size:
+            self._active_font_size = fitted
+            self._apply_text_style()
 
     def update_appearance(
         self,
@@ -302,6 +388,7 @@ class SubtitleOverlayWindow(QWidget):
         bg_alpha: Optional[int] = None,
         overlay_mode: Optional[str] = None,
         show_bilingual: Optional[bool] = None,
+        auto_fit_font: Optional[bool] = None,
     ) -> None:
         if font_size is not None:
             self.font_size = font_size
@@ -314,7 +401,14 @@ class SubtitleOverlayWindow(QWidget):
         if show_bilingual is not None:
             self.show_bilingual = show_bilingual
             self._refresh_labels()
-        self._apply_text_style()
+        if auto_fit_font is not None:
+            self.auto_fit_font = auto_fit_font
+
+        if self.auto_fit_font and self._current_tr.strip():
+            self._recompute_autofit_if_needed()
+        else:
+            self._active_font_size = self.font_size
+            self._apply_text_style()
         self.update()
 
     def align_to_roi(self, roi: Dict[str, int]) -> None:
@@ -324,6 +418,7 @@ class SubtitleOverlayWindow(QWidget):
         OCR'ın kendi Türkçe çıktısını okumasını engellemek için otomatik olarak
         ROI dışına (hemen üstüne veya altına) yerleştirir.
         """
+        self._last_roi = roi
         x = roi.get("qt_left", roi["left"])
         y = roi.get("qt_top", roi["top"])
         w = roi.get("qt_width", roi["width"])
@@ -334,9 +429,13 @@ class SubtitleOverlayWindow(QWidget):
         if effective_mode == "cover" and not self.capture_excluded:
             effective_mode = "above"
 
-        min_h = 84 if self.show_bilingual else 64
+        min_h = 78 if self.show_bilingual else 56
         if effective_mode == "cover":
-            self.setGeometry(x, y, w, max(h, min_h))
+            # Orijinal İngilizce satırların kenarlarını eksiksiz kapatmak için hafif dikey/yatay kaplama payı
+            pad_x = 6
+            pad_y = 4
+            box_h = max(h + pad_y * 2, min_h)
+            self.setGeometry(x - pad_x, y - pad_y, w + pad_x * 2, box_h)
         else:
             box_h = max(h, min_h + 12)
             screen = QGuiApplication.screenAt(QPoint(x + w // 2, y + h // 2)) or QGuiApplication.primaryScreen()
@@ -350,6 +449,7 @@ class SubtitleOverlayWindow(QWidget):
                 target_y = min(s_bottom - box_h - 6, y + h + 6)
             self.setGeometry(x, target_y, w, box_h)
 
+        self._recompute_autofit_if_needed()
         self.update()
 
     def _refresh_labels(self) -> None:
@@ -361,12 +461,19 @@ class SubtitleOverlayWindow(QWidget):
             self.en_label.hide()
         self.label.setText(self._current_tr)
 
-    def set_subtitle(self, tr_text: str, en_text: str = "") -> None:
-        if tr_text == self._current_tr and en_text == self._current_en:
+    def set_subtitle(self, tr_text: str, en_text: str = "", orig_line_h_px: int = 0) -> None:
+        if tr_text == self._current_tr and en_text == self._current_en and orig_line_h_px == 0:
             return
         self._current_tr = tr_text
         self._current_en = en_text
+
+        if orig_line_h_px > 0:
+            screen = QGuiApplication.screenAt(self.geometry().center()) or QGuiApplication.primaryScreen()
+            dpr = screen.devicePixelRatio() if screen else 1.0
+            self._last_orig_line_h = max(10, int(round(orig_line_h_px / max(1.0, dpr))))
+
         self._refresh_labels()
+        self._recompute_autofit_if_needed()
         self.update()
 
     def set_guide_border(self, enabled: bool) -> None:
