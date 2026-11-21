@@ -403,6 +403,27 @@ class TestSubVisionPipeline(unittest.TestCase):
         self.assertGreaterEqual(long_pt, 12)
         self.assertLess(long_pt, short_pt)
 
+    def test_15_installer_uninstaller_and_signing_config(self) -> None:
+        """Kurulum yardımcısı, opsiyonel kaldırıcı (Uninstaller) ve dijital imzalama yapılandırmasını doğrular."""
+        import build_exe
+
+        cs_src = build_exe.LauncherCSharpSource
+        self.assertIn("SetupWizardForm", cs_src)
+        self.assertIn("UninstallWizardForm", cs_src)
+        self.assertIn("SubVisionAI-Uninstaller.exe", cs_src)
+        self.assertNotIn("DownloadFileAsync", cs_src)
+        self.assertNotIn(".Kill()", cs_src)
+        self.assertTrue(callable(build_exe.ensure_publisher_certificate_and_sign))
+
+        iss_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "installer.iss")
+        with open(iss_path, "rb") as f:
+            raw_iss = f.read()
+        self.assertTrue(raw_iss.startswith(b"\xef\xbb\xbf"), "installer.iss UTF-8 BOM içermeli")
+        iss_text = raw_iss.decode("utf-8-sig")
+        self.assertIn("CurUninstallStepChanged", iss_text)
+        self.assertIn("DeleteModelsAndRuntime", iss_text)
+        self.assertIn("DeleteUserSettings", iss_text)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

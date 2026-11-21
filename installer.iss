@@ -1,10 +1,13 @@
-﻿; SubVision AI — Inno Setup 6 Windows Kurulum Betiği (v1.3)
+﻿﻿; SubVision AI — Inno Setup 6 Windows Kurulum ve Opsiyonel Kaldırma Betiği (v1.3)
 ; PyInstaller --onedir çıktısını (dist\SubVisionAI\*) tek bir profesyonel,
-; terminalsiz ve Windows Defender dostu Windows kurulum paketine dönüştürür.
+; dijital imzalı ve Windows Defender dostu Windows kurulum paketine dönüştürür.
+; Kaldırma (Uninstall) sırasında indirilen 227 MB yapay zeka modelini ve kullanıcı
+; ayarlarını opsiyonel olarak silme veya koruma seçeneği sunar.
 ;
 ; Derleme komutu:
 ;   python build_exe.py --only-pyinstaller
 ;   iscc /DMyAppVersion=1.3.0 installer.iss
+;   python build_exe.py --sign dist\SubVisionAI-Setup-v1.3.0-Windows-x64.exe
 
 #ifndef MyAppVersion
   #define MyAppVersion "1.3.0"
@@ -14,6 +17,7 @@
 #define MyAppPublisher "SubVision AI Open Source"
 #define MyAppURL "https://github.com/Andacbasaran/subvision-ai-subtitle-translator"
 #define MyAppExeName "SubVisionAI.exe"
+#define MyAppUninstallerHelper "SubVisionAI-Uninstaller.exe"
 
 [Setup]
 AppId={{7E8E4A24-6D52-49E1-8E65-8C6E3B7B2B13}
@@ -44,7 +48,7 @@ DisableProgramGroupPage=yes
 CloseApplications=yes
 VersionInfoVersion={#MyAppVersion}.0
 VersionInfoCompany={#MyAppPublisher}
-VersionInfoDescription={#MyAppName} Kurulum Sihirbazı
+VersionInfoDescription={#MyAppName} Kurulum ve Kaldırma Yardımcısı
 VersionInfoProductName={#MyAppName}
 VersionInfoProductVersion={#MyAppVersion}
 
@@ -60,11 +64,67 @@ Source: "dist\SubVisionAI\*"; DestDir: "{app}"; Flags: ignoreversion recursesubd
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
+Name: "{autoprograms}\{#MyAppName} Bileşen & Kaldırma Yardımcısı"; Filename: "{app}\{#MyAppUninstallerHelper}"; Parameters: "--uninstall"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
 [UninstallDelete]
-Type: files; Name: "{app}\user_settings.json"
 Type: filesandordirs; Name: "{app}\__pycache__"
+
+[Code]
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  DeleteModelsAndRuntime: Boolean;
+  DeleteUserSettings: Boolean;
+  LocalDataDir: String;
+begin
+  if CurUninstallStep = usUninstall then
+  begin
+    LocalDataDir := ExpandConstant('{localappdata}\SubVisionAI');
+    DeleteModelsAndRuntime := False;
+    DeleteUserSettings := False;
+
+    if not UninstallSilent then
+    begin
+      if MsgBox(
+        'SubVision AI ile birlikte indirilen Yapay Zeka Çeviri Modeli (~227 MB - models/opus-en-tr-ct2) ve ek çalışma ortamı dosyaları da bilgisayardan silinsin mi?' + #13#10 + #13#10 +
+        '(İpucu: İleride tekrar kurduğunuzda ~227 MB dil modelini yeniden indirmemek için "Hayır" seçebilirsiniz.)',
+        mbConfirmation,
+        MB_YESNO
+      ) = IDYES then
+      begin
+        DeleteModelsAndRuntime := True;
+      end;
+
+      if MsgBox(
+        'Kişisel kullanıcı ayarlarınız, altyazı alanı (ROI) kalibrasyonunuz ve önbellek verileriniz (user_settings.json) de silinsin mi?',
+        mbConfirmation,
+        MB_YESNO
+      ) = IDYES then
+      begin
+        DeleteUserSettings := True;
+      end;
+    end;
+
+    if DeleteModelsAndRuntime then
+    begin
+      DelTree(ExpandConstant('{app}\models'), True, True, True);
+      DelTree(ExpandConstant('{app}\runtime'), True, True, True);
+      DelTree(LocalDataDir + '\models', True, True, True);
+    end;
+
+    if DeleteUserSettings then
+    begin
+      DeleteFile(ExpandConstant('{app}\user_settings.json'));
+      DeleteFile(ExpandConstant('{app}\benchmark_results.json'));
+      DeleteFile(LocalDataDir + '\user_settings.json');
+    end;
+
+    if DeleteModelsAndRuntime and DeleteUserSettings then
+    begin
+      RemoveDir(LocalDataDir);
+    end;
+  end;
+end;

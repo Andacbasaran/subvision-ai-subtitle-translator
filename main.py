@@ -33,6 +33,7 @@ from PyQt6.QtWidgets import (
     QApplication,
     QCheckBox,
     QComboBox,
+    QDialog,
     QFrame,
     QGridLayout,
     QHBoxLayout,
@@ -149,6 +150,13 @@ def make_flat_icon(kind: str, color_hex: str = "#FAFAFA", size: int = 14) -> QIc
         p.drawRoundedRect(int(px * 0.34), int(px * 0.30), int(px * 0.50), int(px * 0.54), 3, 3)
         p.drawLine(int(px * 0.22), int(px * 0.68), int(px * 0.22), int(px * 0.20))
         p.drawLine(int(px * 0.22), int(px * 0.20), int(px * 0.64), int(px * 0.20))
+    elif kind == "manage":
+        pen = QPen(col, 2.2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
+        p.setPen(pen)
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.drawRoundedRect(int(px * 0.18), int(px * 0.22), int(px * 0.64), int(px * 0.60), 4, 4)
+        p.drawLine(int(px * 0.32), int(px * 0.42), int(px * 0.68), int(px * 0.42))
+        p.drawLine(int(px * 0.32), int(px * 0.60), int(px * 0.56), int(px * 0.60))
 
     p.end()
     pix.setDevicePixelRatio(2.0)
@@ -1165,6 +1173,14 @@ class MainWindow(QMainWindow):
         self.btn_benchmark.clicked.connect(self.run_benchmark_suite)
         btn_row.addWidget(self.btn_benchmark, stretch=2)
 
+        self.btn_manage = QPushButton("  Bileşenler / Kaldır")
+        self.btn_manage.setIcon(make_flat_icon("manage", "#D4D4D8", 14))
+        self.btn_manage.setIconSize(QSize(14, 14))
+        self.btn_manage.setMinimumHeight(40)
+        self.btn_manage.setToolTip("İndirilen yapay zeka modelini, çalışma ortamını ve kaldırma seçeneklerini yönet")
+        self.btn_manage.clicked.connect(self.open_component_manager)
+        btn_row.addWidget(self.btn_manage, stretch=2)
+
         main_layout.addLayout(btn_row)
 
         # ═════════════════════════════════════════════════════════════════════
@@ -1945,6 +1961,202 @@ class MainWindow(QMainWindow):
             f"GPU / VRAM Kullanımı:  0 MB (%100 CPU)"
         )
         QMessageBox.information(self, "Donanım Performans Raporu", msg)
+
+    @staticmethod
+    def _calc_dir_size_mb(path: str) -> float:
+        if not path or not os.path.exists(path):
+            return 0.0
+        total = 0
+        try:
+            for root_d, _, files in os.walk(path):
+                for fname in files:
+                    try:
+                        total += os.path.getsize(os.path.join(root_d, fname))
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+        return total / (1024.0 * 1024.0)
+
+    def open_component_manager(self) -> None:
+        """
+        Uygulama ile birlikte indirilen bileşenleri (227 MB yapay zeka modeli,
+        kullanıcı ayarları, önbellek ve çalışma ortamı) opsiyonel olarak sıfırlama
+        veya dijital imzalı Kaldırma Yardımcısını (SubVisionAI-Uninstaller.exe) başlatma penceresi.
+        """
+        app_dir = get_app_base_dir()
+        model_mb = self._calc_dir_size_mb(self.translator.model_dir)
+        runtime_mb = self._calc_dir_size_mb(os.path.join(app_dir, "runtime"))
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("SubVision AI — Bileşen ve Kaldırma Yöneticisi")
+        dlg.setMinimumWidth(520)
+        dlg.setStyleSheet(
+            """
+            QDialog {
+                background-color: #09090B;
+                color: #FAFAFA;
+            }
+            QFrame#mgrCard {
+                background-color: #111114;
+                border: 1px solid #232329;
+                border-radius: 10px;
+            }
+            """
+        )
+
+        v_main = QVBoxLayout(dlg)
+        v_main.setContentsMargins(18, 16, 18, 16)
+        v_main.setSpacing(12)
+
+        card = QFrame()
+        card.setObjectName("mgrCard")
+        v_card = QVBoxLayout(card)
+        v_card.setContentsMargins(16, 14, 16, 14)
+        v_card.setSpacing(10)
+
+        lbl_h = QLabel("İndirilen Bileşenler ve Kaldırma Seçenekleri")
+        lbl_h.setStyleSheet("color: #FAFAFA; font-size: 11.5pt; font-weight: 700;")
+        v_card.addWidget(lbl_h)
+
+        lbl_desc = QLabel(
+            "Program ile birlikte yüklenen bileşenleri aşağıdan opsiyonel olarak seçip "
+            "temizleyebilir veya tam kaldırma sihirbazını başlatabilirsiniz:"
+        )
+        lbl_desc.setWordWrap(True)
+        lbl_desc.setStyleSheet("color: #A1A1AA; font-size: 8.8pt;")
+        v_card.addWidget(lbl_desc)
+
+        chk_cache = QCheckBox(
+            f"1. RAM Çeviri Önbelleği ve Geçici Kayıtları Temizle ({self.translator.cache_size} cümle)"
+        )
+        chk_cache.setChecked(True)
+        v_card.addWidget(chk_cache)
+
+        chk_settings = QCheckBox(
+            "2. Kişisel Kullanıcı Ayarları ve ROI Kalibrasyonunu Sıfırla (user_settings.json)"
+        )
+        chk_settings.setChecked(False)
+        v_card.addWidget(chk_settings)
+
+        chk_model = QCheckBox(
+            f"3. İndirilen Yapay Zeka Çeviri Modelini Sil (models/opus-en-tr-ct2 — {model_mb:.1f} MB)"
+        )
+        chk_model.setChecked(False)
+        chk_model.setStyleSheet("color: #FACC15; font-weight: 600;")
+        v_card.addWidget(chk_model)
+
+        lbl_runtime_info = QLabel(
+            f"• Taşınabilir Çalışma Ortamı (runtime/): {runtime_mb:.1f} MB  |  Konum: {app_dir}"
+        )
+        lbl_runtime_info.setWordWrap(True)
+        lbl_runtime_info.setStyleSheet("color: #71717A; font-size: 8.2pt; padding-top: 4px;")
+        v_card.addWidget(lbl_runtime_info)
+
+        v_main.addWidget(card)
+
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(8)
+
+        btn_clean = QPushButton("Seçili Bileşenleri Temizle")
+        btn_clean.setStyleSheet(
+            "QPushButton { background-color: #18181B; border: 1px solid #D97706; color: #FBBF24; padding: 8px 14px; }"
+            "QPushButton:hover { background-color: #27272A; }"
+        )
+
+        btn_uninst = QPushButton("Tam Kaldırma Yardımcısını Aç (Uninstaller)")
+        btn_uninst.setStyleSheet(
+            "QPushButton { background-color: #DC2626; border: 1px solid #EF4444; color: #FFFFFF; padding: 8px 14px; }"
+            "QPushButton:hover { background-color: #B91C1C; }"
+        )
+
+        btn_close = QPushButton("Kapat")
+        btn_close.clicked.connect(dlg.reject)
+
+        def _on_clean_clicked() -> None:
+            if not (chk_cache.isChecked() or chk_settings.isChecked() or chk_model.isChecked()):
+                QMessageBox.information(dlg, "SubVision AI", "Lütfen temizlemek için en az bir bileşen seçin.")
+                return
+
+            cleaned_items: List[str] = []
+            if chk_cache.isChecked():
+                self.translator.clear_cache()
+                self.list_history.clear()
+                self._update_session_kpi()
+                cleaned_items.append("RAM çeviri önbelleği ve geçmiş")
+
+            if chk_settings.isChecked():
+                for p in (CONFIG_PATH, CRASH_LOG_PATH, os.path.join(app_dir, "benchmark_results.json")):
+                    if os.path.exists(p):
+                        try:
+                            os.remove(p)
+                        except Exception:
+                            pass
+                cleaned_items.append("Kullanıcı ayarları (user_settings.json)")
+
+            if chk_model.isChecked():
+                if self.worker and self.worker.running:
+                    self.toggle_translation()
+                self.translator.translator = None
+                self.translator.source_sp = None
+                self.translator.target_sp = None
+                self.translator.is_ready = False
+                import shutil
+
+                shutil.rmtree(self.translator.model_dir, ignore_errors=True)
+                self.btn_toggle.setEnabled(False)
+                self.lbl_model_status.setText("●  Yapay zeka modeli silindi (Yeniden indirmek için uygulamayı başlatın)")
+                cleaned_items.append("İndirilen yapay zeka çeviri modeli (~227 MB)")
+
+            QMessageBox.information(
+                dlg,
+                "SubVision AI — Temizlendi",
+                "Seçili bileşenler başarıyla temizlendi:\n• " + "\n• ".join(cleaned_items),
+            )
+            dlg.accept()
+
+        def _on_uninstaller_clicked() -> None:
+            uninst_candidates = [
+                os.path.join(app_dir, "SubVisionAI-Uninstaller.exe"),
+                os.path.join(app_dir, "SubVisionAI.exe"),
+                os.path.join(app_dir, "unins000.exe"),
+            ]
+            target_exe = next((p for p in uninst_candidates if os.path.exists(p)), None)
+            if not target_exe:
+                QMessageBox.information(
+                    dlg,
+                    "SubVision AI",
+                    "SubVisionAI-Uninstaller.exe bulunamadı.\nDerlemek için: python build_exe.py",
+                )
+                return
+
+            ans = QMessageBox.question(
+                dlg,
+                "Tam Kaldırma Yardımcısı",
+                "Kaldırma Yardımcısının (SubVisionAI-Uninstaller.exe) çalışma ortamı dosyalarını "
+                "serbestçe silebilmesi için mevcut uygulama penceresi kapatılacak.\n\n"
+                "Kaldırma Yardımcısını şimdi başlatmak istiyor musunuz?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if ans == QMessageBox.StandardButton.Yes:
+                import subprocess
+
+                args = [target_exe]
+                if not target_exe.lower().endswith("unins000.exe"):
+                    args.append("--uninstall")
+                subprocess.Popen(args, cwd=app_dir)
+                dlg.accept()
+                self.close()
+
+        btn_clean.clicked.connect(_on_clean_clicked)
+        btn_uninst.clicked.connect(_on_uninstaller_clicked)
+
+        btn_row.addWidget(btn_clean)
+        btn_row.addWidget(btn_uninst)
+        btn_row.addWidget(btn_close)
+        v_main.addLayout(btn_row)
+
+        dlg.exec()
 
     def _register_global_hotkeys(self) -> None:
         # Tüm işletim sistemlerinde (Windows / macOS / Linux) çalışan pencere kısayolları

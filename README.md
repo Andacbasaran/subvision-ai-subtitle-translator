@@ -136,8 +136,16 @@ flowchart TD
 2. Kurulum sihirbazını çalıştırın — Python/PowerShell/terminal açmadan doğrudan Masaüstü ve Başlat Menüsü kısayolunu oluşturur.
 3. İlk açılışta yalnızca `227 MB` boyutundaki yerel çeviri modeli otomatik indirilir, sonrasında tamamen çevrimdışı çalışır.
 
-### Seçenek 2: Hafif GUI Kurulum Yardımcısı (`SubVisionAI.exe`)
-- Yalnızca ~100 KB boyutundaki **`SubVisionAI-OnlineSetup`** / **`SubVisionAI.exe`** dosyası, **PowerShell veya siyah terminal penceresi açmadan** kendi koyu temalı grafik kurulum penceresi üzerinden taşınabilir Python 3.11 + kütüphaneleri adım adım ilerleme çubuğu ile kurar.
+### Seçenek 2: Dijital İmzalı İnteraktif GUI Kurulum Yardımcısı (`SubVisionAI.exe`)
+- **`SubVisionAI-OnlineSetup`** / **`SubVisionAI.exe`** dosyası, **SHA-256 Authenticode dijital imzalı ve DigiCert zaman damgalıdır**. Kullanıcı onayı olmadan arka planda hiçbir dosya çıkartmaz (*Zero Silent-Dropper*); ilk açılışta Masaüstü kısayolu, Başlat Menüsü / Windows *Yüklü Uygulamalar* kaydı ve Yayıncı Sertifikası seçeneklerini sunan koyu temalı grafik kurulum yardımcısını açar.
+
+### 🗑️ Opsiyonel Bileşen Seçimli Kaldırma Yardımcısı (`SubVisionAI-Uninstaller.exe`)
+Hem **`SubVisionAI-Uninstaller.exe`** *(Windows Ayarlar ➔ Uygulamalar ➔ Yüklü Uygulamalar üzerinden veya doğrudan çalıştırılabilir)*, hem Inno Setup kaldırıcısı, hem de uygulama içi **`Bileşenler / Kaldır`** butonu üzerinden programla birlikte indirilen bileşenleri **opsiyonel olarak** seçip silebilirsiniz:
+1. ☑️ **Ana Uygulama Dosyaları, Masaüstü / Başlat Menüsü Kısayolları ve Sistem Kaydı**
+2. ☑️ **Taşınabilir Python 3.11 Çalışma Ortamı ve Yapay Zeka Kütüphaneleri (`runtime/` — ~340 MB)**
+3. ☑️ **İndirilen Yapay Zeka Çeviri Modeli (`models/opus-en-tr-ct2` — ~227 MB)** *(İleride tekrar kurduğunuzda 227 MB modeli yeniden indirmemek için bu kutunun işaretini kaldırarak modeli koruyabilirsiniz)*
+4. ☑️ **Kişisel Kullanıcı Ayarları ve ROI Kalibrasyon Verileri (`user_settings.json`)**
+5. ☐ **Yayıncı Dijital İmza Sertifikası Kaydı (`SubVision AI Open Source`)**
 
 ### Seçenek 3: Linux & macOS (Intel / Apple Silicon M1–M4) Tek Komutla Başlatma
 
@@ -160,14 +168,14 @@ python main.py
 
 ---
 
-## 🛡️ Windows Güvenlik & SmartScreen Hakkında (Şeffaf Bilgilendirme)
+## 🛡️ Dijital İmza (Authenticode SHA-256) & Windows Defender Güvenliği
 
-- **Windows Defender Virüs Uyarısı Neden Kalktı?** v1.3 itibarıyla eski `powershell.exe -ExecutionPolicy Bypass` + `.ps1` betik çıkarıcı + `%TEMP%` sessiz kurulum davranışı **tamamen kaldırıldı**. Hem Inno Setup kurulum paketi hem de GUI başlatıcı, eksiksiz Win32 metadata/manifest bilgisiyle doğrudan temiz Microsoft GitHub Actions sunucularında derlenir ve `SHA256SUMS.txt` doğrulama özetleriyle yayınlanır.
-- **SmartScreen "Bilinmeyen Yayımcı" Ekranı:** Açık kaynak bir yazılım ticari kod imzalama sertifikasıyla (EV/OV Code Signing) imzalanmadığı sürece, Windows SmartScreen yeni yayınlanan sürümlerde ilk indirmelerde *"Windows bilgisayarınızı korudu — Bilinmeyen yayımcı"* uyarısı gösterebilir *(bu bir virüs uyarısı değil, dijital imza eksikliği uyarısıdır)*. `Ek bilgi ➔ Yine de çalıştır` ile devam edebilir veya indirilen dosyanın SHA-256 özetini `SHA256SUMS.txt` ile doğrulayabilirsiniz.
-- **Geliştiriciler / Release Sahipleri İçin:**
-  1. Her yeni sürüm etiketi (`git tag v1.3.0 && git push origin v1.3.0`) oluşturulduğunda [`.github/workflows/release-windows.yml`](.github/workflows/release-windows.yml) otomatik olarak Inno Setup `.exe`, Portable `.zip`, Online GUI Setup ve `SHA256SUMS.txt` üretir.
-  2. Ücretsiz açık kaynak kod imzalama için **[SignPath.io Foundation](https://signpath.org/)** entegrasyonu ile SmartScreen uyarısı kalıcı olarak sıfırlanabilir.
-  3. Her release sonrası çıkan `.exe` dosyasını [Microsoft Security Intelligence (Software Developer Submission)](https://www.microsoft.com/en-us/wdsi/filesubmission) sayfasına göndermek, bulut itibarını birkaç saat içinde onaylatır.
+- **Authenticode SHA-256 + DigiCert RFC 3161 Zaman Damgası:** `build_exe.py` tarafından üretilen tüm çalıştırılabilir dosyalar (`SubVisionAI.exe`, `SubVisionAI-Uninstaller.exe` ve Inno Setup `SubVisionAI-Setup-*.exe`), **RSA-3072 SHA-256 X.509 Kod İmzalama Sertifikası** (`CN=SubVision AI Open Source`) ve **DigiCert RFC 3161 Timestamp** ile otomatik imzalanır.
+- **Sıfır Sezgisel (Heuristic) Virüs Uyarısı:**
+  - Kullanıcı "Kurulumu Başlat" butonuna tıklamadan önce `Main()` içerisinde diske hiçbir dosya yazılmaz (*Silent Dropper* davranışı tamamen kaldırıldı).
+  - Antivirüs motorlarının sezgisel olarak işaretlediği `WebClient.DownloadFileAsync`, `Process.Kill()`, `powershell -ExecutionPolicy Bypass` ve 32-bit `AnyCPU` PE başlıkları yerine saf 64-bit (`/platform:x64`) PE32+ mimarisi ve standart `HttpWebRequest` akışı kullanılır.
+  - Her derleme hem yerel ortamda hem de GitHub Actions CI üzerinde **Microsoft Windows Defender (`MpCmdRun.exe -Scan -ScanType 3`)** taramasından otomatik geçirilir (**`0 Threat`**).
+- **Özel / Ticari PFX Sertifika Desteği:** Harici bir `.pfx` sertifikanız varsa `SUBVISION_CERT_PFX` ve `SUBVISION_CERT_PASS` ortam değişkenlerini tanımlamanız yeterlidir; `build_exe.py` tüm paketleri otomatik olarak sertifikanızla imzalar.
 
 ---
 
@@ -189,7 +197,9 @@ python main.py
 ## 📂 Proje Dizin Yapısı
 
 ```text
-├── main.py                              # PyQt6 Studio v1.3, asenkron Latest-Frame-Wins worker, Auto-Fit kontrolleri
+├── SubVisionAI.exe                      # SHA-256 Authenticode imzalı interaktif Kurulum Yardımcısı & Başlatıcı
+├── SubVisionAI-Uninstaller.exe          # SHA-256 Authenticode imzalı opsiyonel bileşen seçimli Kaldırma Yardımcısı
+├── main.py                              # PyQt6 Studio v1.3, asenkron Latest-Frame-Wins worker, Bileşen Yöneticisi
 ├── hardware.py                          # Evrensel CPU/ISA algılama, uyarlanabilir thread/FPS profili ve platform yardımcıları
 ├── ocr_engine.py                        # MSS regional capture, yerel kontrast/renkli konuşmacı maskesi, anti-phantom OCR
 ├── translator.py                        # CTranslate2 (INT8/FP32) NMT, dinamik decoding limiti, repetition_penalty, LRU Cache
@@ -197,12 +207,12 @@ python main.py
 ├── glossary.py                          # OCR noise cleanup, anti-gibberish plausibility filtresi, speaker parser ve sözlük
 ├── benchmark.py                         # End-to-end latency benchmark suite ve infografik üretim aracı
 ├── test_pipeline.py                     # Donanım uyumluluğu, oyun senaryosu (anti-phantom/kısa kelime/Auto-Fit) test paketi
-├── build_exe.py                         # PowerShell'siz flat WinForms GUI Kurulum Sihirbazı ve PyInstaller --onedir derleyici
-├── installer.iss                        # Inno Setup 6 Windows x64 kurulum paketi betiği
-├── .github/workflows/release-windows.yml # Otomatik test, Inno Setup, Portable ZIP ve SHA256SUMS release iş akışı
+├── build_exe.py                         # Authenticode imzalayıcı, WinForms Kurulum/Kaldırma Sihirbazı ve PyInstaller derleyici
+├── installer.iss                        # Inno Setup 6 Windows x64 kurulum ve opsiyonel model/ayar kaldırma betiği
+├── .github/workflows/release-windows.yml # Otomatik test, Authenticode imzalama, Defender taraması ve GitHub Release iş akışı
 ├── start.sh                             # Linux & macOS (Intel / Apple Silicon) otomatik kurulum ve başlatma script'i
 ├── requirements.txt                     # Python bağımlılıkları
-└── assets/                              # Uygulama ikonu (.ico/.png), Studio UI preview ve benchmark infografiği
+└── assets/                              # Uygulama ikonu (.ico/.png), yayıncı sertifikası (.cer), UI ve benchmark görselleri
 ```
 
 ---
