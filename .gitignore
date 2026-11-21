@@ -15,8 +15,9 @@ build/
 dist/
 *.spec
 
-# Kullanıcı Yerel Ayarları
+# Kullanıcı Yerel Ayarları & Hata Kayıtları
 user_settings.json
+crash.log
 
 # İşletim Sistemi Geçici Dosyaları
 .DS_Store

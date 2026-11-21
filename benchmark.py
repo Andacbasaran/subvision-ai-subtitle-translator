@@ -15,6 +15,11 @@ from typing import Dict, List
 import cv2
 import numpy as np
 
+from hardware import (
+    compute_runtime_tuning,
+    detect_hardware_profile,
+    get_ui_font_family,
+)
 from ocr_engine import SubtitleOCREngine
 from translator import LocalEnTrTranslator
 
@@ -132,15 +137,18 @@ def generate_visual_assets(bm: Dict) -> None:
     cp.drawRoundedRect(14, 14, 1052, 592, 16, 16)
 
     # Başlık
+    ui_font = get_ui_font_family()
     cp.setPen(QColor("#FFFFFF"))
-    cp.setFont(QFont("Segoe UI", 16, QFont.Weight.Black))
+    cp.setFont(QFont(ui_font, 16, QFont.Weight.Black))
     cp.drawText(36, 52, "⚡ SubVision AI — Gerçek Zamanlı Performans & Gecikme Analizi")
 
     cp.setPen(QColor("#94A3B8"))
-    cp.setFont(QFont("Segoe UI", 9, QFont.Weight.DemiBold))
+    cp.setFont(QFont(ui_font, 9, QFont.Weight.DemiBold))
+    cpu_label = bm.get("cpu_name", "CPU")
+    ctype_label = str(bm.get("compute_type", "INT8")).upper()
     sub_hdr = (
-        f"Test Donanımı: AMD Ryzen ({bm['cpu_logical_cores']} Mantıksal Çekirdek / {bm['nmt_threads']} Aktif NMT Thread)   •   "
-        f"CTranslate2 INT8 + RapidOCR ONNX   •   İnsan Gözü Anlık Algı Eşiği: < 150 ms"
+        f"Test Donanımı: {cpu_label} ({bm['cpu_logical_cores']} Mantıksal Çekirdek / {bm['nmt_threads']} Aktif NMT Thread)   •   "
+        f"CTranslate2 {ctype_label} + RapidOCR ONNX   •   Anlık Algı Eşiği: < 150 ms"
     )
     cp.drawText(36, 75, sub_hdr)
 
@@ -314,19 +322,30 @@ def run_benchmarks() -> Dict:
     print("  SubVision AI — Uçtan Uca Performans ve Gecikme Testi (Benchmark)")
     print("=" * 74)
 
-    cpu_count_logical = os.cpu_count() or 4
-    optimal_threads = max(2, min(6, cpu_count_logical // 2))
-    print(f"[*] İşletim Sistemi : {platform.system()} {platform.release()} ({platform.version()})")
-    print(f"[*] İşlemci (CPU)   : {platform.processor()}")
-    print(f"[*] Mantıksal Çekirdek: {cpu_count_logical} (NMT Aktif Thread: {optimal_threads})")
-    print("[*] Motorlar yükleniyor (RapidOCR ONNX + CTranslate2 INT8)...")
+    hw = detect_hardware_profile(query_ct2=True)
+    tuning = compute_runtime_tuning(hw)
+    cpu_count_logical = hw.logical_cores
+    optimal_threads = tuning.nmt_threads
+    print(f"[*] İşletim Sistemi : {hw.os_name} {hw.os_version} ({hw.arch})")
+    print(f"[*] İşlemci (CPU)   : {hw.cpu_name}")
+    print(
+        f"[*] Çekirdek / Profil: {hw.physical_cores} Fiziksel / {hw.logical_cores} Mantıksal "
+        f"(Profil: {tuning.effective_profile} | NMT: {optimal_threads}T | OCR: {tuning.ocr_intra_threads}T)"
+    )
+    print("[*] Motorlar yükleniyor (RapidOCR ONNX + Uyarlanabilir CTranslate2)...")
 
     t_init_start = time.perf_counter()
-    ocr_engine = SubtitleOCREngine(use_color_mask=True, ocr_mode="fast_mask")
-    translator = LocalEnTrTranslator(cpu_threads=optimal_threads)
+    ocr_engine = SubtitleOCREngine(use_color_mask=True, ocr_mode="fast_mask", tuning=tuning)
+    translator = LocalEnTrTranslator(
+        cpu_threads=optimal_threads,
+        compute_type_candidates=tuning.compute_type_candidates,
+    )
     translator.load()
     init_sec = time.perf_counter() - t_init_start
-    print(f"[OK] Motorlar {init_sec:.2f} saniyede hazırlandı.\n")
+    print(
+        f"[OK] Motorlar {init_sec:.2f} saniyede hazırlandı "
+        f"(Aktif Hesaplama Tipi: {translator.active_compute_type.upper()}).\n"
+    )
 
     frame_1 = make_synthetic_subtitle_frame(["Stay behind me, the signal is getting stronger."])
     gray_1 = cv2.cvtColor(frame_1, cv2.COLOR_BGR2GRAY)
@@ -428,8 +447,14 @@ def run_benchmarks() -> Dict:
     ocr_speedup = avg_full_ocr_1 / max(0.1, avg_fast_ocr_1)
 
     results = {
+        "cpu_name": hw.short_cpu_label,
+        "arch": hw.arch,
+        "cpu_physical_cores": hw.physical_cores,
         "cpu_logical_cores": cpu_count_logical,
+        "profile_tier": tuning.effective_profile,
+        "compute_type": translator.active_compute_type,
         "nmt_threads": optimal_threads,
+        "ocr_threads": tuning.ocr_intra_threads,
         "init_time_sec": round(init_sec, 2),
         "pixel_lock_avg_ms": round(pixel_lock_avg, 4),
         "pixel_lock_p95_ms": round(pixel_lock_p95, 4),

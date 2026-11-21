@@ -1,6 +1,6 @@
 """
-SubVision AI Studio — Oyunlar, Diziler, Filmler ve Yayınlar İçin Ultra Hızlı Lokal (EN -> TR) Anlık Altyazı Çevirici
-Mimari: CTranslate2 INT8 (Opus-MT EN->TR) + RapidOCR (ONNX CPU) + WDA_EXCLUDEFROMCAPTURE Şeffaf Overlay
+SubVision AI Studio — Oyunlar, Diziler, Filmler ve Yayınlar İçin Evrensel Lokal (EN -> TR) Anlık Altyazı Çevirici
+Mimari: Uyarlanabilir CTranslate2 (INT8/FP32) + RapidOCR (ONNX CPU) + Platforma Duyarlı Şeffaf Overlay
 """
 
 import ctypes
@@ -8,6 +8,7 @@ import json
 import os
 import sys
 import time
+import traceback
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
@@ -20,10 +21,12 @@ from PyQt6.QtGui import (
     QFont,
     QGuiApplication,
     QIcon,
+    QKeySequence,
     QLinearGradient,
     QPainter,
     QPen,
     QPixmap,
+    QShortcut,
 )
 from PyQt6.QtWidgets import (
     QApplication,
@@ -39,17 +42,35 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QProgressBar,
     QPushButton,
+    QScrollArea,
     QSlider,
     QVBoxLayout,
     QWidget,
 )
 
+from hardware import (
+    HardwareProfile,
+    PROFILE_AUTO,
+    PROFILE_BALANCED,
+    PROFILE_ECO,
+    PROFILE_PERFORMANCE,
+    RuntimeTuning,
+    apply_thread_env_defaults,
+    compute_runtime_tuning,
+    detect_hardware_profile,
+    format_hardware_summary,
+    get_app_base_dir,
+    get_ui_font_family,
+    get_writable_data_dir,
+)
 from ocr_engine import SubtitleOCREngine
 from overlay_ui import ROISelectorOverlay, SubtitleOverlayWindow
-from translator import LocalEnTrTranslator, get_app_base_dir
+from translator import LocalEnTrTranslator
 
 APP_TITLE = "SubVision AI — Real-Time Subtitle Studio (EN ➔ TR)"
-CONFIG_PATH = os.path.join(get_app_base_dir(), "user_settings.json")
+DATA_DIR = get_writable_data_dir()
+CONFIG_PATH = os.path.join(DATA_DIR, "user_settings.json")
+CRASH_LOG_PATH = os.path.join(DATA_DIR, "crash.log")
 
 # Windows Global Hotkey Sabitleri (Admin yetkisi gerektirmez)
 VK_F7 = 0x76
@@ -76,7 +97,7 @@ def create_app_pixmap(size: int = 64) -> QPixmap:
 
     painter.setPen(QColor("#FFFFFF"))
     font_sz = max(10, int(size * 0.26))
-    painter.setFont(QFont("Segoe UI", font_sz, QFont.Weight.Black))
+    painter.setFont(QFont(get_ui_font_family(), font_sz, QFont.Weight.Black))
     painter.drawText(
         QRect(pad, int(size * 0.11), size - 2 * pad, int(size * 0.45)),
         Qt.AlignmentFlag.AlignCenter,
@@ -106,17 +127,32 @@ def create_app_icon() -> QIcon:
 
 
 class ModelLoaderThread(QThread):
+    """
+    Arayüzü dondurmadan arka planda önce RapidOCR (ONNX) motorunu,
+    ardından CTranslate2 çeviri modelini işlemciye uygun modda yükler.
+    """
+
     progress = pyqtSignal(str, int)
     finished_ok = pyqtSignal()
     failed = pyqtSignal(str)
 
-    def __init__(self, translator: LocalEnTrTranslator):
+    def __init__(self, translator: LocalEnTrTranslator, ocr_engine: SubtitleOCREngine):
         super().__init__()
         self.translator = translator
+        self.ocr_engine = ocr_engine
 
     def run(self) -> None:
         try:
-            self.translator.load(progress_callback=lambda msg, pct: self.progress.emit(msg, pct))
+            self.progress.emit(
+                f"OCR motoru hazırlanıyor ({self.ocr_engine.ocr_intra_threads} Thread)...", 8
+            )
+            self.ocr_engine.ensure_initialized()
+            self.progress.emit("OCR motoru hazır! Çeviri modeli kontrol ediliyor...", 18)
+            self.translator.load(
+                progress_callback=lambda msg, pct: self.progress.emit(
+                    msg, max(18, int(18 + pct * 0.82))
+                )
+            )
             self.finished_ok.emit()
         except Exception as exc:
             self.failed.emit(str(exc))
@@ -124,18 +160,25 @@ class ModelLoaderThread(QThread):
 
 class BenchmarkWorker(QThread):
     """
-    Arayüzü dondurmadan gerçek OCR + CTranslate2 INT8 + Önbellek + Frame Diff Lock
+    Arayüzü dondurmadan gerçek OCR + CTranslate2 + Önbellek + Frame Diff Lock
     performans testini çalıştıran iş parçacığı.
     """
 
     finished_report = pyqtSignal(dict)
 
-    def __init__(self, ocr_engine: SubtitleOCREngine, translator: LocalEnTrTranslator):
+    def __init__(
+        self,
+        ocr_engine: SubtitleOCREngine,
+        translator: LocalEnTrTranslator,
+        hw_profile: HardwareProfile,
+    ):
         super().__init__()
         self.ocr_engine = ocr_engine
         self.translator = translator
+        self.hw_profile = hw_profile
 
     def run(self) -> None:
+        self.ocr_engine.ensure_initialized()
         canvas = np.zeros((100, 960, 3), dtype=np.uint8)
         canvas[:] = (35, 30, 25)
         text_sample = "We have to find another way out before the storm hits!"
@@ -195,6 +238,9 @@ class BenchmarkWorker(QThread):
         cache_ms = ((time.perf_counter() - t_c) * 1000.0) / 100.0
 
         report = {
+            "cpu_name": self.hw_profile.short_cpu_label,
+            "cores": f"{self.hw_profile.physical_cores}C/{self.hw_profile.logical_cores}T",
+            "compute_type": self.translator.active_compute_type.upper(),
             "pixel_lock_ms": pixel_lock_ms,
             "avg_ocr_ms": avg_ocr_ms,
             "avg_nmt_ms": avg_nmt_ms,
@@ -211,23 +257,30 @@ class CaptureTranslateWorker(QThread):
     subtitle_cleared = pyqtSignal()
     status_tick = pyqtSignal(str)
 
-    FIXED_SCAN_INTERVAL_SEC = 0.033  # 30 FPS (33 ms)
-
     def __init__(
         self,
         ocr_engine: SubtitleOCREngine,
         translator: LocalEnTrTranslator,
         roi: Dict[str, int],
+        scan_interval_sec: float = 0.0417,
+        idle_scan_interval_sec: float = 0.0714,
     ):
         super().__init__()
         self.ocr_engine = ocr_engine
         self.translator = translator
         self.roi = roi
+        self.scan_interval_sec = max(0.025, float(scan_interval_sec))
+        self.idle_scan_interval_sec = max(self.scan_interval_sec, float(idle_scan_interval_sec))
         self.running = False
+
+    def update_timing(self, scan_interval_sec: float, idle_scan_interval_sec: float) -> None:
+        self.scan_interval_sec = max(0.025, float(scan_interval_sec))
+        self.idle_scan_interval_sec = max(self.scan_interval_sec, float(idle_scan_interval_sec))
 
     def run(self) -> None:
         self.running = True
         self.ocr_engine.reset_state()
+        idle_streak_sec = 0.0
 
         with mss.mss() as sct:
             while self.running:
@@ -243,15 +296,25 @@ class CaptureTranslateWorker(QThread):
 
                     if status == "EMPTY":
                         self.subtitle_cleared.emit()
+                        idle_streak_sec += self.scan_interval_sec
                     elif status == "NEW_TEXT" and en_text:
+                        idle_streak_sec = 0.0
                         tr_text, tr_ms, is_cached = self.translator.translate_with_metrics(en_text)
                         if tr_text:
                             self.subtitle_updated.emit(en_text, tr_text, ocr_ms, tr_ms, is_cached)
+                    else:
+                        idle_streak_sec += self.scan_interval_sec
                 except Exception as exc:
                     self.status_tick.emit(f"Yakalama hatası: {exc}")
 
                 elapsed = time.perf_counter() - loop_start
-                sleep_time = max(0.008, self.FIXED_SCAN_INTERVAL_SEC - elapsed)
+                # 2 saniye boyunca altyazı değişmediyse işlemciyi dinlendirmek için akıllı bekleme moduna geç
+                target_interval = (
+                    self.idle_scan_interval_sec
+                    if idle_streak_sec >= 2.0
+                    else self.scan_interval_sec
+                )
+                sleep_time = max(0.012, target_interval - elapsed)
                 time.sleep(sleep_time)
 
     def stop(self) -> None:
@@ -370,20 +433,38 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle(APP_TITLE)
         self.setWindowIcon(create_app_icon())
-        self.setMinimumSize(1020, 810)
-        self.resize(1080, 850)
+
+        # Küçük ekranlar (1366x768 veya 1080p @ %150 DPI) dahil her ekrana sığan pencere boyutlandırması
+        screen = QGuiApplication.primaryScreen()
+        avail = screen.availableGeometry() if screen else QRect(0, 0, 1920, 1080)
+        min_w = min(920, max(760, avail.width() - 40))
+        min_h = min(640, max(540, avail.height() - 40))
+        init_w = min(1080, max(min_w, avail.width() - 40))
+        init_h = min(850, max(min_h, avail.height() - 40))
+        self.setMinimumSize(min_w, min_h)
+        self.resize(init_w, init_h)
 
         self.settings = self._load_settings()
         self.roi: Dict[str, int] = self.settings.get("roi", self._default_roi())
         self._resume_after_roi = False
 
-        optimal_threads = max(2, min(6, (os.cpu_count() or 4) // 2))
-        self.translator = LocalEnTrTranslator(cpu_threads=optimal_threads)
+        # Evrensel Donanım & İşlemci (CPU / ISA) Algılama + Uyarlanabilir Çalışma Profili
+        self.hw_profile: HardwareProfile = detect_hardware_profile(query_ct2=True)
+        saved_perf_profile = self.settings.get("performance_profile", PROFILE_AUTO)
+        self.tuning: RuntimeTuning = compute_runtime_tuning(self.hw_profile, saved_perf_profile)
+        apply_thread_env_defaults(self.tuning)
 
-        saved_ocr_mode = self.settings.get("ocr_mode", "hybrid")
+        self.translator = LocalEnTrTranslator(
+            cpu_threads=self.tuning.nmt_threads,
+            compute_type_candidates=self.tuning.compute_type_candidates,
+        )
+
+        saved_ocr_mode = self.settings.get("ocr_mode", self.tuning.default_ocr_mode)
         self.ocr_engine = SubtitleOCREngine(
             use_color_mask=(saved_ocr_mode != "full_ocr"),
             ocr_mode=saved_ocr_mode,
+            tuning=self.tuning,
+            lazy_init=True,  # Arayüzün eski/düşük CPU'larda anında açılması için arka planda ısıt
         )
         self.worker: Optional[CaptureTranslateWorker] = None
         self.bench_worker: Optional[BenchmarkWorker] = None
@@ -391,9 +472,10 @@ class MainWindow(QMainWindow):
         self.overlay = SubtitleOverlayWindow()
         self.roi_selector = ROISelectorOverlay(on_selected=self._on_roi_selected)
 
-        # Seçili görünüm durumları
+        # Seçili görünüm durumları (WDA_EXCLUDEFROMCAPTURE desteklenmeyen OS'lerde 'above' güvenli varsayılan)
+        default_overlay_mode = "cover" if self.hw_profile.capture_exclude_supported else "above"
         self._selected_color = self.settings.get("text_color", "#FACC15")
-        self._selected_overlay_mode = self.settings.get("overlay_mode", "cover")
+        self._selected_overlay_mode = self.settings.get("overlay_mode", default_overlay_mode)
 
         # Oyun, Dizi, Film ve Belgesellerden Gerçekçi Test Diyalogları
         self._sample_idx = 0
@@ -471,6 +553,7 @@ class MainWindow(QMainWindow):
             "text_color": self._selected_color,
             "overlay_mode": self._selected_overlay_mode,
             "ocr_mode": self.combo_ocr_mode.currentData(),
+            "performance_profile": self.combo_perf_profile.currentData(),
             "show_bilingual": self.chk_bilingual.isChecked(),
         }
         try:
@@ -479,25 +562,33 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
 
+    def _format_hw_badge_text(self) -> str:
+        ctype = self.translator.active_compute_type.upper()
+        return (
+            f"🖥️ {self.hw_profile.short_cpu_label} ({self.hw_profile.physical_cores}C/{self.hw_profile.logical_cores}T)   •   "
+            f"🧠 {ctype} ({self.translator.cpu_threads}T)   •   ⚡ {self.tuning.scan_fps} FPS   •   🛡️ 0 MB VRAM"
+        )
+
     def _build_ui(self) -> None:
+        ui_font = get_ui_font_family()
         self.setStyleSheet(
-            """
-            QMainWindow, QWidget#centralWidget {
+            f"""
+            QMainWindow, QWidget#centralWidget, QScrollArea {{
                 background-color: #070B14;
                 color: #F8FAFC;
-                font-family: 'Segoe UI', -apple-system, sans-serif;
-            }
-            QLabel {
+                font-family: '{ui_font}', 'Segoe UI', 'DejaVu Sans', -apple-system, sans-serif;
+            }}
+            QLabel {{
                 background-color: transparent;
                 color: #E2E8F0;
-                font-family: 'Segoe UI', -apple-system, sans-serif;
-            }
-            QFrame#studioPanel {
+                font-family: '{ui_font}', 'Segoe UI', 'DejaVu Sans', -apple-system, sans-serif;
+            }}
+            QFrame#studioPanel {{
                 background-color: #0F1626;
                 border: 1px solid #1E293B;
                 border-radius: 14px;
-            }
-            QPushButton {
+            }}
+            QPushButton {{
                 background-color: #1E293B;
                 color: #F8FAFC;
                 border: 1px solid #334155;
@@ -505,17 +596,17 @@ class MainWindow(QMainWindow):
                 padding: 9px 14px;
                 font-size: 9.8pt;
                 font-weight: 700;
-            }
-            QPushButton:hover {
+            }}
+            QPushButton:hover {{
                 background-color: #334155;
                 border-color: #475569;
-            }
-            QPushButton:disabled {
+            }}
+            QPushButton:disabled {{
                 background-color: #0F172A;
                 color: #475569;
                 border-color: #1E293B;
-            }
-            QComboBox {
+            }}
+            QComboBox {{
                 background-color: #090D16;
                 border: 1px solid #334155;
                 border-radius: 8px;
@@ -524,55 +615,55 @@ class MainWindow(QMainWindow):
                 color: #F8FAFC;
                 font-size: 9.3pt;
                 font-weight: 600;
-            }
-            QComboBox:hover {
+            }}
+            QComboBox:hover {{
                 border-color: #38BDF8;
-            }
-            QComboBox QAbstractItemView {
+            }}
+            QComboBox QAbstractItemView {{
                 background-color: #0F1626;
                 color: #F8FAFC;
                 selection-background-color: #2563EB;
                 border: 1px solid #334155;
-            }
-            QSlider {
+            }}
+            QSlider {{
                 background-color: transparent;
-            }
-            QSlider::groove:horizontal {
+            }}
+            QSlider::groove:horizontal {{
                 border: 1px solid #1E293B;
                 height: 6px;
                 background: #090D16;
                 border-radius: 3px;
-            }
-            QSlider::sub-page:horizontal {
+            }}
+            QSlider::sub-page:horizontal {{
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #3B82F6, stop:1 #06B6D4);
                 border-radius: 3px;
-            }
-            QSlider::handle:horizontal {
+            }}
+            QSlider::handle:horizontal {{
                 background: #F8FAFC;
                 border: 2px solid #0284C7;
                 width: 16px;
                 margin: -6px 0;
                 border-radius: 9px;
-            }
-            QCheckBox {
+            }}
+            QCheckBox {{
                 background-color: transparent;
                 color: #CBD5E1;
                 font-size: 9.2pt;
                 font-weight: 600;
                 spacing: 8px;
-            }
-            QCheckBox::indicator {
+            }}
+            QCheckBox::indicator {{
                 width: 18px;
                 height: 18px;
                 border-radius: 5px;
                 border: 1px solid #475569;
                 background-color: #090D16;
-            }
-            QCheckBox::indicator:checked {
+            }}
+            QCheckBox::indicator:checked {{
                 background-color: #2563EB;
                 border-color: #60A5FA;
-            }
-            QListWidget {
+            }}
+            QListWidget {{
                 background-color: #090D16;
                 border: 1px solid #1E293B;
                 border-radius: 10px;
@@ -580,23 +671,28 @@ class MainWindow(QMainWindow):
                 font-size: 9pt;
                 padding: 6px;
                 outline: none;
-            }
-            QListWidget::item {
+            }}
+            QListWidget::item {{
                 padding: 7px 10px;
                 border-bottom: 1px solid #111827;
                 border-radius: 6px;
                 margin-bottom: 2px;
-            }
-            QListWidget::item:selected {
+            }}
+            QListWidget::item:selected {{
                 background-color: #1E293B;
                 color: #FACC15;
-            }
+            }}
             """
         )
 
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
         central = QWidget()
         central.setObjectName("centralWidget")
-        self.setCentralWidget(central)
+        scroll_area.setWidget(central)
+        self.setCentralWidget(scroll_area)
+
         main_layout = QVBoxLayout(central)
         main_layout.setSpacing(12)
         main_layout.setContentsMargins(18, 16, 18, 14)
@@ -635,11 +731,11 @@ class MainWindow(QMainWindow):
         title_row = QHBoxLayout()
         title_row.setSpacing(10)
         title_lbl = QLabel("SubVision AI")
-        title_lbl.setFont(QFont("Segoe UI", 16, QFont.Weight.Black))
+        title_lbl.setFont(QFont(ui_font, 16, QFont.Weight.Black))
         title_lbl.setStyleSheet("color: #FFFFFF; border: none; background: transparent;")
         title_row.addWidget(title_lbl)
 
-        ver_pill = QLabel("STUDIO v1.1")
+        ver_pill = QLabel("STUDIO v1.2")
         ver_pill.setStyleSheet(
             "color: #38BDF8; background-color: #090D16; border: 1px solid #0284C7; border-radius: 6px; padding: 2px 8px; font-size: 8pt; font-weight: 800;"
         )
@@ -648,7 +744,7 @@ class MainWindow(QMainWindow):
         title_col.addLayout(title_row)
 
         sub_lbl = QLabel(
-            "Oyun, Dizi, Film ve Yayınlar İçin Ultra Düşük Gecikmeli Lokal AI Altyazı Motoru (EN ➔ TR)"
+            "Oyun, Dizi, Film ve Yayınlar İçin Evrensel & Uyarlanabilir Lokal AI Altyazı Motoru (EN ➔ TR)"
         )
         sub_lbl.setStyleSheet(
             "color: #94A3B8; font-size: 9pt; font-weight: 500; border: none; background: transparent;"
@@ -661,15 +757,14 @@ class MainWindow(QMainWindow):
         badge_col.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         badge_col.setSpacing(5)
 
-        hw_badge = QLabel(
-            f"🧠 CTranslate2 INT8 ({self.translator.cpu_threads} Thread)   •   ⚡ RapidOCR ONNX   •   🛡️ 0 MB VRAM"
+        self.hw_badge = QLabel(self._format_hw_badge_text())
+        self.hw_badge.setToolTip(format_hardware_summary(self.hw_profile, self.tuning))
+        self.hw_badge.setStyleSheet(
+            "color: #CBD5E1; background-color: #090D16; border: 1px solid #1E293B; border-radius: 7px; padding: 4px 11px; font-size: 8.1pt; font-weight: 700;"
         )
-        hw_badge.setStyleSheet(
-            "color: #CBD5E1; background-color: #090D16; border: 1px solid #1E293B; border-radius: 7px; padding: 4px 11px; font-size: 8.3pt; font-weight: 700;"
-        )
-        badge_col.addWidget(hw_badge, alignment=Qt.AlignmentFlag.AlignRight)
+        badge_col.addWidget(self.hw_badge, alignment=Qt.AlignmentFlag.AlignRight)
 
-        self.lbl_model_status = QLabel("⏳ Lokal Yapay Zeka Modeli Kontrol Ediliyor...")
+        self.lbl_model_status = QLabel("⏳ Donanım profili hazırlandı, motorlar yükleniyor...")
         self.lbl_model_status.setStyleSheet(
             "color: #FACC15; font-size: 9pt; font-weight: 800; border: none; background: transparent;"
         )
@@ -712,12 +807,12 @@ class MainWindow(QMainWindow):
             "OCR YAKALAMA",
             "FAST MASK",
             "— ms",
-            "0.18 ms Frame Diff Lock Aktif",
+            f"2 Aşamalı Frame Lock • {self.tuning.ocr_intra_threads} Thread",
             "#38BDF8",
             22,
         )
         self.card_nmt = TelemetryCard(
-            "NMT ÇEVİRİ (INT8)",
+            f"NMT ÇEVİRİ ({self.translator.active_compute_type.upper()})",
             f"{self.translator.cpu_threads} THREAD",
             "— ms",
             "Opus-MT Big EN ➔ TR",
@@ -734,7 +829,7 @@ class MainWindow(QMainWindow):
         )
         self.card_stats = TelemetryCard(
             "OTURUM & ÖNBELLEK",
-            "30 FPS TARAMA",
+            f"{self.tuning.scan_fps} FPS TARAMA",
             "0 Çeviri",
             f"ROI: {self.roi['width']}×{self.roi['height']} px  |  Hit: %0",
             "#A78BFA",
@@ -849,7 +944,7 @@ class MainWindow(QMainWindow):
         lbl_left_title.setStyleSheet("color: #38BDF8; font-size: 9.5pt; font-weight: 800;")
         left_hdr.addWidget(lbl_left_title)
 
-        self.lbl_scene_tag = QLabel("Mod: Canlı Ekran Yakalama (30 FPS)")
+        self.lbl_scene_tag = QLabel(f"Mod: Canlı Ekran Yakalama ({self.tuning.scan_fps} FPS)")
         self.lbl_scene_tag.setStyleSheet(
             "color: #A78BFA; background-color: #090D16; border: 1px solid #1E293B; border-radius: 6px; padding: 3px 9px; font-size: 8.2pt; font-weight: 700;"
         )
@@ -940,32 +1035,58 @@ class MainWindow(QMainWindow):
         right_panel.setObjectName("studioPanel")
         right_lay = QVBoxLayout(right_panel)
         right_lay.setContentsMargins(16, 14, 16, 14)
-        right_lay.setSpacing(11)
+        right_lay.setSpacing(10)
 
         lbl_right_title = QLabel("🎨  SAHNE PROFİLİ & OVERLAY TASARIMCISI")
         lbl_right_title.setStyleSheet("color: #38BDF8; font-size: 9.5pt; font-weight: 800;")
         right_lay.addWidget(lbl_right_title)
 
-        # 1. İçerik & OCR Algılama Profili
-        lbl_ocr_prof = QLabel("1. İçerik & Sahne Algılama Profili:")
+        # 1. İşlemci & Performans Profili (Her Bilgisayara Otomatik Uyum)
+        lbl_perf_prof = QLabel("1. İşlemci & Performans Profili:")
+        lbl_perf_prof.setStyleSheet("color: #CBD5E1; font-size: 8.8pt; font-weight: 700;")
+        right_lay.addWidget(lbl_perf_prof)
+
+        self.combo_perf_profile = QComboBox()
+        self.combo_perf_profile.addItem(
+            "🤖  Otomatik — İşlemciye Göre En İyi Ayar (Önerilen)", PROFILE_AUTO
+        )
+        self.combo_perf_profile.addItem(
+            "🔋  Eko / Eski & Düşük CPU (15 FPS • Hafif Kaynak)", PROFILE_ECO
+        )
+        self.combo_perf_profile.addItem(
+            "⚖️  Dengeli (24 FPS • Orta Seviye CPU)", PROFILE_BALANCED
+        )
+        self.combo_perf_profile.addItem(
+            "🚀  Maksimum Performans (30 FPS • Çok Çekirdekli CPU)", PROFILE_PERFORMANCE
+        )
+        self.combo_perf_profile.currentIndexChanged.connect(self._on_perf_profile_changed)
+        right_lay.addWidget(self.combo_perf_profile)
+
+        # 2. İçerik & OCR Algılama Profili
+        lbl_ocr_prof = QLabel("2. İçerik & Sahne Algılama Profili:")
         lbl_ocr_prof.setStyleSheet("color: #CBD5E1; font-size: 8.8pt; font-weight: 700;")
         right_lay.addWidget(lbl_ocr_prof)
 
         self.combo_ocr_mode = QComboBox()
-        self.combo_ocr_mode.addItem("🎬  Oyun, Dizi & Film (Akıllı Hibrit Filtre - Önerilen)", "hybrid")
-        self.combo_ocr_mode.addItem("⚡  Sadece Kontürlü Altyazı (Maksimum Hız / 19.8 ms)", "fast_mask")
+        self.combo_ocr_mode.addItem("🎬  Oyun, Dizi & Film (Akıllı Hibrit Filtre)", "hybrid")
+        self.combo_ocr_mode.addItem("⚡  Sadece Kontürlü Altyazı (En Hızlı / En Hafif CPU)", "fast_mask")
         self.combo_ocr_mode.addItem("🖥️  Genel Ekran & Video (Tam Kare OCR / Tüm Fontlar)", "full_ocr")
         self.combo_ocr_mode.currentIndexChanged.connect(self._on_ocr_mode_changed)
         right_lay.addWidget(self.combo_ocr_mode)
 
-        # 2. Altyazı Konumu (Segmented Toggle Buttons)
-        lbl_pos_title = QLabel("2. Ekranda Türkçe Altyazı Konumu:")
+        # 3. Altyazı Konumu (Segmented Toggle Buttons)
+        lbl_pos_title = QLabel("3. Ekranda Türkçe Altyazı Konumu:")
         lbl_pos_title.setStyleSheet("color: #CBD5E1; font-size: 8.8pt; font-weight: 700;")
         right_lay.addWidget(lbl_pos_title)
 
         pos_row = QHBoxLayout()
         pos_row.setSpacing(8)
         self.btn_mode_cover = QPushButton("⬛  Orijinalin Üstünü Kapat")
+        if not self.hw_profile.capture_exclude_supported:
+            self.btn_mode_cover.setToolTip(
+                "Bu işletim sistemi sürümünde ekran yakalamadan gizleme (WDA_EXCLUDEFROMCAPTURE) "
+                "desteklenmediği için OCR döngüsünü önlemek adına 'Hemen Üstünde' modu otomatik uygulanır."
+            )
         self.btn_mode_above = QPushButton("⬆️  Hemen Üstünde Göster")
         self.btn_mode_cover.clicked.connect(lambda: self._select_overlay_mode("cover"))
         self.btn_mode_above.clicked.connect(lambda: self._select_overlay_mode("above"))
@@ -973,8 +1094,8 @@ class MainWindow(QMainWindow):
         pos_row.addWidget(self.btn_mode_above)
         right_lay.addLayout(pos_row)
 
-        # 3. Altyazı Renk Paleti (Interactive Color Swatch Pills)
-        lbl_col_title = QLabel("3. Altyazı Renk Paleti:")
+        # 4. Altyazı Renk Paleti (Interactive Color Swatch Pills)
+        lbl_col_title = QLabel("4. Altyazı Renk Paleti:")
         lbl_col_title.setStyleSheet("color: #CBD5E1; font-size: 8.8pt; font-weight: 700;")
         right_lay.addWidget(lbl_col_title)
 
@@ -1111,17 +1232,77 @@ class MainWindow(QMainWindow):
         if self._selected_color not in self._color_buttons:
             self._selected_color = "#FACC15"
 
-        self._selected_overlay_mode = self.settings.get("overlay_mode", "cover")
+        default_overlay = "cover" if self.hw_profile.capture_exclude_supported else "above"
+        self._selected_overlay_mode = self.settings.get("overlay_mode", default_overlay)
 
-        saved_ocr = self.settings.get("ocr_mode", "hybrid")
+        saved_perf = self.settings.get("performance_profile", PROFILE_AUTO)
+        self.combo_perf_profile.blockSignals(True)
+        idx_p = self.combo_perf_profile.findData(saved_perf)
+        if idx_p >= 0:
+            self.combo_perf_profile.setCurrentIndex(idx_p)
+        self.combo_perf_profile.blockSignals(False)
+
+        saved_ocr = self.settings.get("ocr_mode", self.tuning.default_ocr_mode)
+        self.combo_ocr_mode.blockSignals(True)
         idx_o = self.combo_ocr_mode.findData(saved_ocr)
         if idx_o >= 0:
             self.combo_ocr_mode.setCurrentIndex(idx_o)
+        self.combo_ocr_mode.blockSignals(False)
+        self._sync_ocr_badge(saved_ocr)
 
         self._on_appearance_changed()
 
+    def _sync_ocr_badge(self, mode: str) -> None:
+        badge_map = {
+            "hybrid": "HYBRID OCR",
+            "fast_mask": "FAST MASK",
+            "full_ocr": "FULL DBNET",
+        }
+        self.card_ocr.set_metric(
+            self.card_ocr.lbl_val.text(),
+            badge_text=badge_map.get(mode, "HYBRID"),
+        )
+
+    def _on_perf_profile_changed(self) -> None:
+        selected_profile = self.combo_perf_profile.currentData() or PROFILE_AUTO
+        self.tuning = compute_runtime_tuning(self.hw_profile, selected_profile)
+        self.ocr_engine.apply_tuning(self.tuning)
+
+        if self.translator.is_ready and self.translator.cpu_threads != self.tuning.nmt_threads:
+            try:
+                self.translator.reconfigure_threads(self.tuning.nmt_threads)
+            except Exception:
+                pass
+        else:
+            self.translator.cpu_threads = self.tuning.nmt_threads
+
+        if self.worker and self.worker.running:
+            self.worker.update_timing(
+                self.tuning.scan_interval_sec, self.tuning.idle_scan_interval_sec
+            )
+            ms_interval = int(round(self.tuning.scan_interval_sec * 1000))
+            self.lbl_model_status.setText(
+                f"🟢 CANLI TARAMA AKTİF ({self.tuning.scan_fps} FPS / {ms_interval} ms)"
+            )
+
+        self.hw_badge.setText(self._format_hw_badge_text())
+        self.hw_badge.setToolTip(format_hardware_summary(self.hw_profile, self.tuning))
+        self.lbl_scene_tag.setText(f"Mod: Canlı Ekran Yakalama ({self.tuning.scan_fps} FPS)")
+        self.card_ocr.set_metric(
+            self.card_ocr.lbl_val.text(),
+            sub_text=f"2 Aşamalı Frame Lock • {self.tuning.ocr_intra_threads} Thread",
+        )
+        ctype = self.translator.active_compute_type.upper()
+        self.card_nmt.lbl_title.setText(f"NMT ÇEVİRİ ({ctype})")
+        self.card_nmt.set_metric(
+            self.card_nmt.lbl_val.text(),
+            badge_text=f"{self.translator.cpu_threads} THREAD",
+        )
+        self._update_session_kpi()
+        self._save_settings()
+
     def _start_model_loading(self) -> None:
-        self.loader_thread = ModelLoaderThread(self.translator)
+        self.loader_thread = ModelLoaderThread(self.translator, self.ocr_engine)
         self.loader_thread.progress.connect(self._on_model_progress)
         self.loader_thread.finished_ok.connect(self._on_model_ready)
         self.loader_thread.failed.connect(self._on_model_failed)
@@ -1132,7 +1313,13 @@ class MainWindow(QMainWindow):
         self.progress_bar.setValue(pct)
 
     def _on_model_ready(self) -> None:
-        self.lbl_model_status.setText("🟢 ENGINE READY  •  Opus-MT Big INT8 (CPU)")
+        ctype = self.translator.active_compute_type.upper()
+        self.hw_badge.setText(self._format_hw_badge_text())
+        self.hw_badge.setToolTip(format_hardware_summary(self.hw_profile, self.tuning))
+        self.card_nmt.lbl_title.setText(f"NMT ÇEVİRİ ({ctype})")
+        self.lbl_model_status.setText(
+            f"🟢 ENGINE READY  •  Opus-MT Big {ctype} ({self.translator.cpu_threads}T CPU)"
+        )
         self.lbl_model_status.setStyleSheet(
             "color: #4ADE80; font-weight: 800; font-size: 9pt; border: none; background: transparent;"
         )
@@ -1209,15 +1396,7 @@ class MainWindow(QMainWindow):
     def _on_ocr_mode_changed(self) -> None:
         mode = self.combo_ocr_mode.currentData()
         self.ocr_engine.set_mode(mode)
-        badge_map = {
-            "hybrid": "HYBRID OCR",
-            "fast_mask": "FAST MASK",
-            "full_ocr": "FULL DBNET",
-        }
-        self.card_ocr.set_metric(
-            self.card_ocr.lbl_val.text(),
-            badge_text=badge_map.get(mode, "HYBRID"),
-        )
+        self._sync_ocr_badge(mode)
         self._save_settings()
 
     def _copy_current_translation(self) -> None:
@@ -1232,7 +1411,7 @@ class MainWindow(QMainWindow):
         self.card_stats.set_metric(
             f"{req} Çeviri",
             sub_text=f"ROI: {self.roi['width']}×{self.roi['height']} px  |  Hit: %{hit_pct}",
-            badge_text=f"%{hit_pct} CACHE HIT" if req > 0 else "30 FPS TARAMA",
+            badge_text=f"%{hit_pct} CACHE HIT" if req > 0 else f"{self.tuning.scan_fps} FPS TARAMA",
             bar_pct=max(12, hit_pct),
         )
 
@@ -1257,16 +1436,21 @@ class MainWindow(QMainWindow):
                 }
                 """
             )
-            self.lbl_model_status.setText("🟢 ENGINE READY  •  Opus-MT Big INT8 (CPU)")
+            ctype = self.translator.active_compute_type.upper()
+            self.lbl_model_status.setText(
+                f"🟢 ENGINE READY  •  Opus-MT Big {ctype} ({self.translator.cpu_threads}T CPU)"
+            )
             self.overlay.set_subtitle("")
         else:
             self.overlay.align_to_roi(self.roi)
             self.overlay.set_subtitle("")
-            self.lbl_scene_tag.setText("Mod: Canlı Ekran Yakalama (30 FPS)")
+            self.lbl_scene_tag.setText(f"Mod: Canlı Ekran Yakalama ({self.tuning.scan_fps} FPS)")
             self.worker = CaptureTranslateWorker(
                 ocr_engine=self.ocr_engine,
                 translator=self.translator,
                 roi=self.roi,
+                scan_interval_sec=self.tuning.scan_interval_sec,
+                idle_scan_interval_sec=self.tuning.idle_scan_interval_sec,
             )
             self.worker.subtitle_updated.connect(self._on_subtitle_updated)
             self.worker.subtitle_cleared.connect(self._on_subtitle_cleared)
@@ -1275,7 +1459,10 @@ class MainWindow(QMainWindow):
             )
             self.worker.start()
 
-            self.lbl_model_status.setText("🟢 CANLI TARAMA AKTİF (30 FPS / 33 ms)")
+            ms_interval = int(round(self.tuning.scan_interval_sec * 1000))
+            self.lbl_model_status.setText(
+                f"🟢 CANLI TARAMA AKTİF ({self.tuning.scan_fps} FPS / {ms_interval} ms)"
+            )
             self.btn_toggle.setText("⏹️  Canlı Çeviriyi Durdur (F8)")
             self.btn_toggle.setStyleSheet(
                 """
@@ -1304,6 +1491,7 @@ class MainWindow(QMainWindow):
         ocr_pct = int(min(100, (ocr_ms / 80.0) * 100)) if ocr_ms > 0 else 8
         nmt_pct = 5 if is_cached else int(min(100, (tr_ms / 140.0) * 100))
         tot_pct = int(min(100, (total_ms / 150.0) * 100))
+        ctype = self.translator.active_compute_type.upper()
 
         self.card_ocr.set_metric(
             f"{ocr_ms:.1f} ms",
@@ -1314,8 +1502,8 @@ class MainWindow(QMainWindow):
             f"{tr_ms:.3f} ms" if is_cached else f"{tr_ms:.1f} ms",
             sub_text="⚡ RAM LRU Cache / Glossary Hit"
             if is_cached
-            else f"🧠 CTranslate2 INT8 ({self.translator.cpu_threads} Thread)",
-            badge_text="CACHE HIT" if is_cached else "INT8 CPU",
+            else f"🧠 CTranslate2 {ctype} ({self.translator.cpu_threads} Thread)",
+            badge_text="CACHE HIT" if is_cached else f"{ctype} CPU",
             bar_pct=nmt_pct,
         )
         self.card_total.set_metric(
@@ -1329,7 +1517,7 @@ class MainWindow(QMainWindow):
         self._update_session_kpi()
 
         stamp = datetime.now().strftime("%H:%M:%S")
-        tag = "⚡ CACHE" if is_cached else "🧠 INT8"
+        tag = "⚡ CACHE" if is_cached else f"🧠 {ctype}"
         entry = f"[{stamp}]  •  {total_ms:.1f} ms ({tag})\nEN: {en_text}\nTR: {tr_text}"
         item = QListWidgetItem(entry)
         self.list_history.insertItem(0, item)
@@ -1357,7 +1545,7 @@ class MainWindow(QMainWindow):
 
         self.btn_benchmark.setEnabled(False)
         self.btn_benchmark.setText("⏳  Ölçülüyor...")
-        self.bench_worker = BenchmarkWorker(self.ocr_engine, self.translator)
+        self.bench_worker = BenchmarkWorker(self.ocr_engine, self.translator, self.hw_profile)
         self.bench_worker.finished_report.connect(self._on_benchmark_finished)
         self.bench_worker.start()
 
@@ -1383,10 +1571,12 @@ class MainWindow(QMainWindow):
 
         msg = (
             f"⚡ SubVision AI Studio — Donanım Performans Testi Raporu\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"🖥️ İşlemci:  {rep['cpu_name']} ({rep['cores']})\n"
+            f"⚙️ Profil / Mod:  {self.tuning.effective_profile.upper()} • CTranslate2 {rep['compute_type']}\n\n"
             f"1. Frame Diff Lock (Sabit Kare Atlama):  {rep['pixel_lock_ms']:.3f} ms\n"
             f"2. Fast Line Projection OCR (RapidOCR ONNX):  {rep['avg_ocr_ms']:.1f} ms\n"
-            f"3. CTranslate2 INT8 NMT ({rep['threads']} CPU Thread):  {rep['avg_nmt_ms']:.1f} ms\n"
+            f"3. CTranslate2 {rep['compute_type']} NMT ({rep['threads']} CPU Thread):  {rep['avg_nmt_ms']:.1f} ms\n"
             f"4. Thread-Safe LRU Cache / Glossary Hit:  {rep['cache_ms']:.4f} ms\n\n"
             f"🚀 Uçtan Uca Gecikme (Yeni Altyazı - Cold):  {rep['total_cold_ms']:.1f} ms\n"
             f"⚡ Uçtan Uca Gecikme (Tekrar Eden - Warm Cache):  {rep['total_cached_ms']:.1f} ms\n"
@@ -1395,13 +1585,24 @@ class MainWindow(QMainWindow):
         QMessageBox.information(self, "Donanım Performans Benchmark Raporu", msg)
 
     def _register_global_hotkeys(self) -> None:
-        self._key_states = {VK_F7: False, VK_F8: False, VK_F9: False}
-        self._hotkey_timer = QTimer(self)
-        self._hotkey_timer.setInterval(45)
-        self._hotkey_timer.timeout.connect(self._poll_global_hotkeys)
-        self._hotkey_timer.start()
+        # Tüm işletim sistemlerinde (Windows / macOS / Linux) çalışan pencere kısayolları
+        self._shortcuts = [
+            QShortcut(QKeySequence("F7"), self, activated=self.open_roi_selector),
+            QShortcut(QKeySequence("F8"), self, activated=self.toggle_translation),
+            QShortcut(QKeySequence("F9"), self, activated=self.run_sample_test),
+        ]
+
+        # Windows'ta oyun/video penceresi odaktayken de çalışan global kısayol taraması
+        if sys.platform == "win32":
+            self._key_states = {VK_F7: False, VK_F8: False, VK_F9: False}
+            self._hotkey_timer = QTimer(self)
+            self._hotkey_timer.setInterval(45)
+            self._hotkey_timer.timeout.connect(self._poll_global_hotkeys)
+            self._hotkey_timer.start()
 
     def _poll_global_hotkeys(self) -> None:
+        if sys.platform != "win32":
+            return
         try:
             for vk, callback in (
                 (VK_F7, self.open_roi_selector),
@@ -1431,22 +1632,95 @@ class MainWindow(QMainWindow):
         super().closeEvent(event)
 
 
+def _install_crash_logger() -> None:
+    def _handle_exception(exc_type, exc_value, exc_tb) -> None:
+        if issubclass(exc_type, KeyboardInterrupt):
+            sys.__excepthook__(exc_type, exc_value, exc_tb)
+            return
+        tb_text = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+        try:
+            with open(CRASH_LOG_PATH, "a", encoding="utf-8") as f:
+                f.write(f"\n[{datetime.now().isoformat()}]\n{tb_text}\n")
+        except Exception:
+            pass
+        try:
+            app = QApplication.instance()
+            if app is not None:
+                QMessageBox.critical(
+                    None,
+                    "SubVision AI — Beklenmeyen Hata",
+                    f"Uygulama çalışırken beklenmeyen bir hata oluştu:\n\n{exc_value}\n\n"
+                    f"Detaylı hata kaydı şuraya yazıldı:\n{CRASH_LOG_PATH}",
+                )
+        except Exception:
+            pass
+        sys.__excepthook__(exc_type, exc_value, exc_tb)
+
+    sys.excepthook = _handle_exception
+
+
+def _acquire_single_instance() -> Tuple[bool, object]:
+    """
+    Windows'ta Win32 Mutex, Linux/macOS'ta QLocalServer ile tek örnek (single-instance) kilidi sağlar.
+    """
+    if sys.platform == "win32":
+        try:
+            mutex_name = "SubVisionAI_TR_Subtitle_SingleInstance_Mutex_v2"
+            mutex = ctypes.windll.kernel32.CreateMutexW(None, False, mutex_name)
+            if ctypes.windll.kernel32.GetLastError() == 183:
+                hwnd = ctypes.windll.user32.FindWindowW(None, APP_TITLE)
+                if hwnd:
+                    ctypes.windll.user32.ShowWindow(hwnd, 9)
+                    ctypes.windll.user32.SetForegroundWindow(hwnd)
+                return False, None
+            return True, ("win32", mutex)
+        except Exception:
+            return True, None
+
+    try:
+        from PyQt6.QtNetwork import QLocalServer, QLocalSocket
+
+        server_name = "SubVisionAI_SingleInstance_IPC_v2"
+        probe = QLocalSocket()
+        probe.connectToServer(server_name)
+        if probe.waitForConnected(150):
+            probe.disconnectFromServer()
+            return False, None
+
+        QLocalServer.removeServer(server_name)
+        server = QLocalServer()
+        if server.listen(server_name):
+            return True, ("qt_ipc", server)
+    except Exception:
+        pass
+    return True, None
+
+
+def _release_single_instance(handle: object) -> None:
+    if not handle or not isinstance(handle, tuple):
+        return
+    kind, obj = handle
+    try:
+        if kind == "win32" and obj:
+            ctypes.windll.kernel32.CloseHandle(obj)
+        elif kind == "qt_ipc" and obj:
+            obj.close()
+    except Exception:
+        pass
+
+
 def main():
-    mutex_name = "SubVisionAI_TR_Subtitle_SingleInstance_Mutex_v2"
-    mutex = ctypes.windll.kernel32.CreateMutexW(None, False, mutex_name)
-    if ctypes.windll.kernel32.GetLastError() == 183:
-        hwnd = ctypes.windll.user32.FindWindowW(None, APP_TITLE)
-        if hwnd:
-            ctypes.windll.user32.ShowWindow(hwnd, 9)
-            ctypes.windll.user32.SetForegroundWindow(hwnd)
-        sys.exit(0)
+    _install_crash_logger()
 
     app = QApplication(sys.argv)
+    acquired, lock_handle = _acquire_single_instance()
+    if not acquired:
+        sys.exit(0)
+
     window = MainWindow()
     window.show()
     ret = app.exec()
-    if mutex:
-        ctypes.windll.kernel32.CloseHandle(mutex)
+    _release_single_instance(lock_handle)
     sys.exit(ret)
 
 

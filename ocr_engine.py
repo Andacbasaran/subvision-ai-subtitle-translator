@@ -26,12 +26,12 @@ import numpy as np
 from rapidocr_onnxruntime import RapidOCR
 
 from glossary import clean_ocr_text
-
-# OpenCV'nin gereksiz CPU thread açıp oyun veya videoyu yavaşlatmasını engelle
-try:
-    cv2.setNumThreads(2)
-except Exception:
-    pass
+from hardware import (
+    RuntimeTuning,
+    apply_thread_env_defaults,
+    compute_runtime_tuning,
+    detect_hardware_profile,
+)
 
 _KERNEL_DARK_NEIGHBOR = cv2.getStructuringElement(cv2.MORPH_RECT, (9, 9))
 _KERNEL_HORIZ_CONNECT = cv2.getStructuringElement(cv2.MORPH_RECT, (14, 2))
@@ -46,29 +46,95 @@ class SubtitleOCREngine:
         use_color_mask: bool = True,
         similarity_threshold: float = 0.85,
         ocr_mode: str = "fast_mask",
+        tuning: Optional[RuntimeTuning] = None,
+        lazy_init: bool = False,
     ):
-        self.ocr = RapidOCR(
-            use_angle_cls=False,
-            det_limit_side_len=480,
-            det_limit_type="max",
-        )
+        if tuning is None:
+            hw = detect_hardware_profile(query_ct2=False)
+            tuning = compute_runtime_tuning(hw)
+        self.tuning = tuning
+        apply_thread_env_defaults(tuning)
+
+        self.cv_threads = tuning.cv_threads
+        self.ocr_intra_threads = tuning.ocr_intra_threads
+        self.ocr_inter_threads = tuning.ocr_inter_threads
+        self.max_capture_width = tuning.max_capture_width
+        self.det_limit_side_len = tuning.det_limit_side_len
+        self.warmup_buckets = tuning.warmup_buckets
+        self.warmup_double_line = tuning.warmup_double_line
+
+        self._apply_cv_threads(self.cv_threads)
+
+        self.ocr: Optional[RapidOCR] = None
+        self.is_initialized = False
         self.use_color_mask = use_color_mask
         self.ocr_mode = ocr_mode if use_color_mask else "full_ocr"
         self.similarity_threshold = similarity_threshold
 
+        self._prev_raw_thumb: Optional[np.ndarray] = None
         self._prev_thumb: Optional[np.ndarray] = None
         self._last_clean_text: str = ""
         self._empty_frames_count: int = 0
 
-        # ONNX Runtime CRNN motorunu sabit en/boy oranı kovaları (Shape Buckets) için ısıt (Warm-up)
-        # Böylece farklı uzunluktaki yeni altyazılarda ~80 ms'lik ONNX kernel re-planning gecikmesi sıfırlanır!
+        if not lazy_init:
+            self.ensure_initialized()
+
+    @staticmethod
+    def _apply_cv_threads(num_threads: int) -> None:
+        # OpenCV'nin gereksiz CPU thread açıp oyun veya videoyu yavaşlatmasını engelle
         try:
-            for r in _BUCKET_RATIOS:
-                dummy = np.full((32, 32 * r, 3), 255, dtype=np.uint8)
-                self.ocr.text_rec([dummy])
-                self.ocr.text_rec([dummy, dummy])
+            cv2.setNumThreads(max(1, int(num_threads)))
         except Exception:
             pass
+
+    def apply_tuning(self, tuning: RuntimeTuning) -> None:
+        """
+        Performans profili değiştirildiğinde tarama çözünürlüğü ve OpenCV thread ayarını günceller.
+        """
+        self.tuning = tuning
+        self.cv_threads = tuning.cv_threads
+        self.max_capture_width = tuning.max_capture_width
+        self.det_limit_side_len = tuning.det_limit_side_len
+        self._apply_cv_threads(self.cv_threads)
+        self.reset_state()
+
+    def ensure_initialized(self) -> None:
+        """
+        RapidOCR (ONNX Runtime) motorunu işlemciye uygun thread limitleriyle yükler ve
+        sabit en/boy oranı kovaları (Shape Buckets) için ısıtır.
+        """
+        if self.is_initialized and self.ocr is not None:
+            return
+
+        ocr_kwargs = {
+            "use_cls": False,
+            "det_limit_side_len": self.det_limit_side_len,
+            "det_limit_type": "max",
+            "intra_op_num_threads": self.ocr_intra_threads,
+            "inter_op_num_threads": self.ocr_inter_threads,
+        }
+        try:
+            self.ocr = RapidOCR(**ocr_kwargs)
+        except Exception:
+            # Farklı RapidOCR sürümleri için güvenli yedek başlatma
+            self.ocr = RapidOCR(
+                use_cls=False,
+                det_limit_side_len=self.det_limit_side_len,
+                det_limit_type="max",
+            )
+
+        # ONNX Runtime CRNN motorunu sabit en/boy oranı kovaları (Shape Buckets) için ısıt (Warm-up)
+        # Böylece farklı uzunluktaki yeni altyazılarda ~80 ms'lik ONNX kernel re-planning gecikmesi sıfırlanır.
+        try:
+            for r in self.warmup_buckets:
+                dummy = np.full((32, 32 * r, 3), 255, dtype=np.uint8)
+                self.ocr.text_rec([dummy])
+                if self.warmup_double_line:
+                    self.ocr.text_rec([dummy, dummy])
+        except Exception:
+            pass
+
+        self.is_initialized = True
 
     def set_mode(self, mode: str) -> None:
         """
@@ -82,16 +148,16 @@ class SubtitleOCREngine:
         self.reset_state()
 
     def reset_state(self) -> None:
+        self._prev_raw_thumb = None
         self._prev_thumb = None
         self._last_clean_text = ""
         self._empty_frames_count = 0
 
     @staticmethod
-    def apply_subtitle_color_mask(bgr_img: np.ndarray) -> Tuple[np.ndarray, np.ndarray, float]:
+    def compute_subtitle_binary_mask(bgr_img: np.ndarray) -> Tuple[np.ndarray, float]:
         """
-        Oyunlar, diziler ve medya oynatıcılardaki Beyaz, Sarı ve Turkuaz altyazı piksellerini ayıklar.
-        Etrafında koyu kontür/gölge veya koyu altyazı şeridi olmayan büyük parlak arka planları siler.
-        Dönüş: (ocr_ready_bgr, binary_mask_u8, parlak_piksel_orani)
+        Yalnızca ikili (binary) altyazı maskesini ve parlak piksel oranını üretir.
+        Değişmeyen karelerde gereksiz GRAY2BGR dönüşümünü atlayarak düşük CPU'larda ek tasarruf sağlar.
         """
         b = bgr_img[:, :, 0]
         g = bgr_img[:, :, 1]
@@ -119,10 +185,23 @@ class SubtitleOCREngine:
         combined_mask = bright_mask & has_dark_neighbor
         mask_u8 = (combined_mask.astype(np.uint8)) * 255
         bright_ratio = float(np.mean(combined_mask))
+        return mask_u8, bright_ratio
 
-        # OCR için en yüksek kontrastlı format: Beyaz zemin (255) üzerine siyah harfler (0)
+    @staticmethod
+    def mask_to_ocr_bgr(mask_u8: np.ndarray) -> np.ndarray:
+        """OCR için en yüksek kontrastlı format: Beyaz zemin (255) üzerine siyah harfler (0)."""
         ocr_ready = 255 - mask_u8
-        ocr_ready_bgr = cv2.cvtColor(ocr_ready, cv2.COLOR_GRAY2BGR)
+        return cv2.cvtColor(ocr_ready, cv2.COLOR_GRAY2BGR)
+
+    @classmethod
+    def apply_subtitle_color_mask(cls, bgr_img: np.ndarray) -> Tuple[np.ndarray, np.ndarray, float]:
+        """
+        Oyunlar, diziler ve medya oynatıcılardaki Beyaz, Sarı ve Turkuaz altyazı piksellerini ayıklar.
+        Etrafında koyu kontür/gölge veya koyu altyazı şeridi olmayan büyük parlak arka planları siler.
+        Dönüş: (ocr_ready_bgr, binary_mask_u8, parlak_piksel_orani)
+        """
+        mask_u8, bright_ratio = cls.compute_subtitle_binary_mask(bgr_img)
+        ocr_ready_bgr = cls.mask_to_ocr_bgr(mask_u8)
         return ocr_ready_bgr, mask_u8, bright_ratio
 
     @staticmethod
@@ -203,6 +282,24 @@ class SubtitleOCREngine:
 
         return crops
 
+    def _has_raw_frame_changed(self, frame_bgr: np.ndarray) -> bool:
+        """
+        1. Aşama Ultra Hafif Ham Kare Kilidi (~0.04 ms):
+        Duraklatılmış video, menü veya sabit sahnelerde ağır renk maskesi ve
+        morfoloji (dilate) işlemlerini tamamen atlayarak düşük güçlü işlemcileri rahatlatır.
+        """
+        thumb = cv2.resize(frame_bgr, (64, 16), interpolation=cv2.INTER_AREA).astype(np.float32)
+        if self._prev_raw_thumb is None:
+            self._prev_raw_thumb = thumb
+            return True
+
+        diff = float(np.mean(np.abs(thumb - self._prev_raw_thumb))) / 255.0
+        if diff < 0.0020:
+            return False
+
+        self._prev_raw_thumb = thumb
+        return True
+
     def _has_frame_changed(self, gray_or_mask: np.ndarray) -> bool:
         thumb = cv2.resize(gray_or_mask, (64, 16), interpolation=cv2.INTER_AREA).astype(np.float32)
         if self._prev_thumb is None:
@@ -231,6 +328,9 @@ class SubtitleOCREngine:
         frame_bgr: np.ndarray,
         precomputed_mask: Optional[Tuple[np.ndarray, np.ndarray]] = None,
     ) -> Tuple[str, float]:
+        self.ensure_initialized()
+        assert self.ocr is not None
+
         t0 = time.perf_counter()
         valid_lines: List[str] = []
 
@@ -294,30 +394,38 @@ class SubtitleOCREngine:
         Seçili ROI alanını yakalar ve değişiklik varsa OCR çalıştırır.
         Dönüş: (status, english_text, ocr_ms)
         """
+        self.ensure_initialized()
         t0 = time.perf_counter()
 
         safe_roi = self._clamp_roi(roi, sct)
         sct_img = sct.grab(safe_roi)
-        frame_bgra = np.array(sct_img)
+        frame_bgra = np.asarray(sct_img)
         frame_bgr = frame_bgra[:, :, :3]
 
+        # 1. Aşama: Ham ekran karesi hiç değişmediyse maskeleme ve morfoloji işlemlerini tamamen atla
+        if not self._has_raw_frame_changed(frame_bgr):
+            elapsed = (time.perf_counter() - t0) * 1000.0
+            return "UNCHANGED", self._last_clean_text, elapsed
+
         h, w = frame_bgr.shape[:2]
-        if w > 960:
-            scale = 960.0 / w
+        if w > self.max_capture_width:
+            scale = float(self.max_capture_width) / w
             frame_bgr = cv2.resize(
-                frame_bgr, (960, max(24, int(h * scale))), interpolation=cv2.INTER_LINEAR
+                frame_bgr,
+                (self.max_capture_width, max(24, int(h * scale))),
+                interpolation=cv2.INTER_LINEAR,
             )
 
-        precomputed: Optional[Tuple[np.ndarray, np.ndarray]] = None
+        mask_u8_cached: Optional[np.ndarray] = None
         if self.use_color_mask:
-            ocr_ready_bgr, mask_u8, bright_ratio = self.apply_subtitle_color_mask(frame_bgr)
-            precomputed = (ocr_ready_bgr, mask_u8)
+            mask_u8, bright_ratio = self.compute_subtitle_binary_mask(frame_bgr)
+            mask_u8_cached = mask_u8
             # Ekran parlaması / flaş durumunda mevcut altyazıyı koru
             if bright_ratio > 0.55:
                 elapsed = (time.perf_counter() - t0) * 1000.0
                 return "UNCHANGED", self._last_clean_text, elapsed
 
-            # Ekranda hiç parlak altyazı harfi kalmadıysa (5 kare / ~165ms sonra temizle)
+            # Ekranda hiç parlak altyazı harfi kalmadıysa (5 kare sonra temizle)
             if bright_ratio < 0.0012 and self.ocr_mode == "fast_mask":
                 self._empty_frames_count += 1
                 if self._empty_frames_count >= 5:
@@ -327,13 +435,21 @@ class SubtitleOCREngine:
                     return "EMPTY", "", elapsed
                 elapsed = (time.perf_counter() - t0) * 1000.0
                 return "UNCHANGED", self._last_clean_text, elapsed
-            check_plane = mask_u8 if (self.ocr_mode == "fast_mask" or bright_ratio >= 0.0012) else cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
+            check_plane = (
+                mask_u8
+                if (self.ocr_mode == "fast_mask" or bright_ratio >= 0.0012)
+                else cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
+            )
         else:
             check_plane = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
 
         if not self._has_frame_changed(check_plane):
             elapsed = (time.perf_counter() - t0) * 1000.0
             return "UNCHANGED", self._last_clean_text, elapsed
+
+        precomputed: Optional[Tuple[np.ndarray, np.ndarray]] = None
+        if mask_u8_cached is not None:
+            precomputed = (self.mask_to_ocr_bgr(mask_u8_cached), mask_u8_cached)
 
         cleaned, _ = self.read_image_fast(frame_bgr, precomputed_mask=precomputed)
         elapsed = (time.perf_counter() - t0) * 1000.0

@@ -119,14 +119,34 @@ flowchart TD
 
 ---
 
+## 🧩 Evrensel İşlemci & Bilgisayar Uyumluluğu
+
+**SubVision AI**, farklı işlemci mimarilerine ve eski/yeni tüm bilgisayarlara (`Intel`, `AMD`, `Apple Silicon / ARM64`; 2 çekirdekli ofis laptoplarından çok çekirdekli oyun bilgisayarlarına) otomatik olarak uyum sağlar:
+
+- **Otomatik CPU & Komut Seti (ISA) Algılama (`hardware.py`):** Fiziksel/mantıksal çekirdek sayısı, mimari (`x86_64` / `ARM64`) ve SIMD özellikleri (`SSE4.2`, `AVX`, `AVX2`, `AVX-512`, `VNNI`, `NEON`) açılışta otomatik taranır.
+- **Akıllı Hesaplama Tipi Yedeklemesi (Fallback):** İşlemci `INT8` hızlandırmasını desteklemiyorsa uygulama çökmeden otomatik olarak `INT8_FLOAT32` ➔ `INT16` ➔ `FLOAT32` modlarından çalışan en hızlı seçeneğe geçer.
+- **3 Uyarlanabilir Performans Profili:** Arayüzden **Otomatik**, **Eko / Eski CPU (15 FPS)**, **Dengeli (24 FPS)** ve **Maksimum Performans (30 FPS)** profilleri seçilebilir; NMT, ONNX Runtime (`RapidOCR`) ve OpenCV iş parçacıkları (`thread`) otomatik sınırlandırılır.
+- **2 Aşamalı Ultra Hafif Kare Kilidi & Akıllı Bekleme:** Sabit ekranlarda maskeleme/morfoloji işlemleri tamamen atlanır ve hareketsiz sahnelerde tarama hızı otomatik düşürülerek düşük güçlü işlemciler yorulmaz.
+- **Platform, Ekran ve Klasör Yolu Koruması:** Windows 10/11, macOS ve Linux'ta çalışır; `WDA_EXCLUDEFROMCAPTURE` desteklemeyen eski Windows/Linux/macOS sistemlerde kendi yazısını okuma döngüsünü önlemek için overlay otomatik ROI dışına konumlanır. Türkçe karakterli klasör yolları (`Masaüstü` vb.), salt-okunur dizinler ve küçük laptop ekranları (`1366×768` / `%150 DPI`) sorunsuz desteklenir.
+
+---
+
 ## 🚀 İndirme ve Kurulum (30 Saniyede Başlayın)
 
-### Seçenek 1: Hazır `.exe` İle Tek Tıkla Çalıştırma *(Önerilen)*
-1. [**📦 GitHub Releases (v1.0.0)**](https://github.com/Andacbasaran/subvision-ai-subtitle-translator/releases/latest) sayfasından **`SubVisionAI.exe`** (veya `SubVisionAI-v1.0.0-Windows-x64.zip`) dosyasını indirin.
+### Seçenek 1: Hazır `.exe` İle Tek Tıkla Çalıştırma *(Windows — Önerilen)*
+1. [**📦 GitHub Releases**](https://github.com/Andacbasaran/subvision-ai-subtitle-translator/releases/latest) sayfasından **`SubVisionAI.exe`** dosyasını indirin *(veya güncel kaynak koddan Windows üzerinde `python build_exe.py` ile yeniden derleyin)*.
 2. **`SubVisionAI.exe`** dosyasına çift tıklayın.
-   *(Bilgisayarınızda Python kurulu olmasa bile gömülü `Bootstrapper`, taşınabilir çalışma ortamını ve `227 MB` boyutundaki `INT8` çeviri modelini ilk açılışta otomatik olarak indirip kurar).*
+   *(Bilgisayarınızda Python kurulu olmasa bile gömülü `Bootstrapper`, taşınabilir çalışma ortamını ve `227 MB` boyutundaki çeviri modelini ilk açılışta otomatik olarak indirip kurar).*
 
-### Seçenek 2: Kaynak Koddan Çalıştırma *(Developer Setup)*
+### Seçenek 2: Linux & macOS (Intel / Apple Silicon M1–M4) Tek Komutla Başlatma
+
+```bash
+git clone https://github.com/Andacbasaran/subvision-ai-subtitle-translator.git
+cd subvision-ai-subtitle-translator
+./start.sh
+```
+
+### Seçenek 3: Kaynak Koddan Manuel Çalıştırma *(Developer Setup)*
 
 ```powershell
 # 1. Repository'yi klonlayın
@@ -153,7 +173,7 @@ python main.py
 | Global Kısayol | Buton | Açıklama |
 | :---: | :--- | :--- |
 | **`F7`** | 🎯 **Altyazı Alanını Seç** | Oyun veya video içindeyken fare ile altyazı yakalama bölgesini (`ROI`) seçme ekranını açar. |
-| **`F8`** | ▶️ **Başlat / Durdur** | 30 FPS gerçek zamanlı yakalama ve çeviri motorunu başlatır veya durdurur. |
+| **`F8`** | ▶️ **Başlat / Durdur** | İşlemci profiline göre gerçek zamanlı yakalama ve çeviri motorunu başlatır veya durdurur. |
 | **`F9`** | 🧪 **Örnek Sahne Simülasyonu** | Dizi, film ve oyunlardan örnek repliklerle hız ve overlay görünüm testi yapar. |
 | **`ESC`** | ❌ **Seçimi İptal Et** | Alan seçici (`ROI`) açıkken mevcut seçimi iptal eder. |
 
@@ -164,15 +184,17 @@ python main.py
 ```text
 ├── SubVisionAI.exe          # Özel ikonlu, kendi kendini kurabilen (self-bootstrapping) Windows executable
 ├── main.py                  # PyQt6 Studio arayüzü, KPI telemetri kartları, canlı önizleme ve QThread yönetimi
-├── ocr_engine.py            # MSS regional capture, frame diff lock, outline color mask ve RapidOCR ONNX
-├── translator.py            # CTranslate2 INT8 (Opus-MT EN->TR) NMT motoru, model downloader ve Thread-Safe LRU Cache
-├── overlay_ui.py            # WDA_EXCLUDEFROMCAPTURE destekli click-through overlay ve multi-monitor 4K DPI ROI selector
+├── hardware.py              # Evrensel CPU/ISA algılama, uyarlanabilir thread/FPS profili ve platform yardımcıları
+├── ocr_engine.py            # MSS regional capture, 2 aşamalı frame diff lock, outline color mask ve RapidOCR ONNX
+├── translator.py            # Uyarlanabilir CTranslate2 (INT8/FP32) NMT motoru, model downloader ve LRU Cache
+├── overlay_ui.py            # Platforma duyarlı click-through overlay ve multi-monitor 4K DPI ROI selector
 ├── glossary.py              # OCR noise cleanup, SDH sound filter, ALL-CAPS normalizer, speaker parser ve sözlük
 ├── benchmark.py             # End-to-end latency benchmark suite ve infografik üretim aracı
-├── test_pipeline.py         # Otomatik birim ve entegrasyon test paketi (unittest)
+├── test_pipeline.py         # Otomatik donanım uyumluluğu, birim ve entegrasyon test paketi (unittest)
 ├── build_exe.py             # SubVisionAI.exe (C# Win32) ve PyInstaller standalone paket build script'i
-├── setup_bootstrap.ps1      # Zero-dependency otomatik Portable Python & paket kurulum script'i
-├── baslat.bat               # Hızlı başlatma script'i
+├── setup_bootstrap.ps1      # Zero-dependency otomatik Portable Python & paket kurulum script'i (Windows)
+├── baslat.bat               # Windows hızlı başlatma script'i
+├── start.sh                 # Linux & macOS (Intel / Apple Silicon) otomatik kurulum ve başlatma script'i
 ├── requirements.txt         # Python bağımlılıkları
 └── assets/                  # Uygulama ikonu (.ico/.png), Studio UI preview ve benchmark infografiği
 ```

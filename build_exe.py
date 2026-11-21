@@ -17,6 +17,7 @@ import sys
 
 EMBEDDED_FILES = [
     ("main.py", "main.py"),
+    ("hardware.py", "hardware.py"),
     ("ocr_engine.py", "ocr_engine.py"),
     ("translator.py", "translator.py"),
     ("overlay_ui.py", "overlay_ui.py"),
@@ -43,11 +44,13 @@ namespace SubVisionAI
         private static readonly string[,] EmbeddedMap = new string[,]
         {
             { "res_main.py", "main.py" },
+            { "res_hardware.py", "hardware.py" },
             { "res_ocr_engine.py", "ocr_engine.py" },
             { "res_translator.py", "translator.py" },
             { "res_overlay_ui.py", "overlay_ui.py" },
             { "res_glossary.py", "glossary.py" },
             { "res_benchmark.py", "benchmark.py" },
+            { "res_test_pipeline.py", "test_pipeline.py" },
             { "res_requirements.txt", "requirements.txt" },
             { "res_setup_bootstrap.ps1", "setup_bootstrap.ps1" },
             { "res_baslat.bat", "baslat.bat" },

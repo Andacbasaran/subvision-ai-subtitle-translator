@@ -17,7 +17,7 @@ import threading
 import time
 import urllib.request
 from collections import OrderedDict
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 import ctranslate2
 import sentencepiece as spm
@@ -26,6 +26,15 @@ from glossary import (
     extract_speaker_and_body,
     lookup_exact_phrase,
     normalize_slang_for_nmt,
+)
+from hardware import (
+    compute_runtime_tuning,
+    detect_hardware_profile,
+    get_app_base_dir,
+    get_ct2_safe_path,
+    get_writable_data_dir,
+    query_ct2_supported_compute_types,
+    select_compute_type_candidates,
 )
 
 MODEL_REPO = "VoragoStudios/gct-opus-mt-tc-big-en-tr-ct2"
@@ -40,25 +49,37 @@ MODEL_FILES_MIN_SIZE: Dict[str, int] = {
 }
 
 
-def get_app_base_dir() -> str:
-    """
-    Hem Python betiği olarak hem de derlenmiş (.exe) olarak çalışırken
-    uygulamanın kök dizinini doğru şekilde döndürür.
-    """
-    if getattr(sys, "frozen", False):
-        return os.path.dirname(os.path.abspath(sys.executable))
-    return os.path.dirname(os.path.abspath(__file__))
-
-
 class LocalEnTrTranslator:
     """
-    CTranslate2 + SentencePiece tabanlı ultra hızlı ve kararlı EN -> TR çeviri motoru.
+    CTranslate2 + SentencePiece tabanlı, tüm işlemci mimarilerine (AVX2/AVX-512/SSE/ARM64)
+    otomatik uyum sağlayan ultra hızlı ve kararlı EN -> TR çeviri motoru.
     """
 
-    def __init__(self, model_dir: Optional[str] = None, cpu_threads: int = 4):
-        base_dir = get_app_base_dir()
-        self.model_dir = model_dir or os.path.join(base_dir, "models", "opus-en-tr-ct2")
-        self.cpu_threads = cpu_threads
+    def __init__(
+        self,
+        model_dir: Optional[str] = None,
+        cpu_threads: Optional[int] = None,
+        compute_type_candidates: Optional[Sequence[str]] = None,
+    ):
+        data_dir = get_writable_data_dir()
+        self.model_dir = model_dir or os.path.join(data_dir, "models", "opus-en-tr-ct2")
+
+        if cpu_threads is None:
+            hw = detect_hardware_profile(query_ct2=False)
+            tuning = compute_runtime_tuning(hw)
+            self.cpu_threads = tuning.nmt_threads
+        else:
+            self.cpu_threads = max(1, int(cpu_threads))
+
+        self.compute_type_candidates: Tuple[str, ...] = (
+            tuple(compute_type_candidates)
+            if compute_type_candidates
+            else select_compute_type_candidates(query_ct2_supported_compute_types())
+        )
+        self.active_compute_type: str = (
+            self.compute_type_candidates[0] if self.compute_type_candidates else "default"
+        )
+
         self.translator: Optional[ctranslate2.Translator] = None
         self.source_sp: Optional[spm.SentencePieceProcessor] = None
         self.target_sp: Optional[spm.SentencePieceProcessor] = None
@@ -154,6 +175,48 @@ class LocalEnTrTranslator:
             if last_err is not None:
                 raise RuntimeError(f"Model indirilemedi ({fname}): {last_err}")
 
+    def _create_ct2_translator(self, ct2_model_path: str) -> Tuple[ctranslate2.Translator, str]:
+        """
+        İşlemcinin desteklediği en hızlı hesaplama tipini (int8 -> int8_float32 -> int16 -> float32 -> default)
+        sırayla dener ve ilk çalışan + doğrulanan motoru döndürür.
+        """
+        candidates = list(self.compute_type_candidates)
+        for fallback in ("int8", "int8_float32", "int16", "float32", "default", "auto"):
+            if fallback not in candidates:
+                candidates.append(fallback)
+
+        errors: List[str] = []
+        probe_tokens = (
+            self.source_sp.encode("Hello.", out_type=str) + ["</s>"]
+            if self.source_sp is not None
+            else None
+        )
+
+        for ctype in candidates:
+            try:
+                tr = ctranslate2.Translator(
+                    ct2_model_path,
+                    device="cpu",
+                    compute_type=ctype,
+                    intra_threads=self.cpu_threads,
+                    inter_threads=1,
+                )
+                if probe_tokens:
+                    tr.translate_batch(
+                        [probe_tokens],
+                        beam_size=1,
+                        max_decoding_length=16,
+                    )
+                return tr, ctype
+            except Exception as exc:
+                errors.append(f"{ctype}: {exc}")
+
+        raise RuntimeError(
+            "CTranslate2 hiçbir CPU hesaplama tipiyle başlatılamadı ("
+            + " | ".join(errors[-3:])
+            + ")"
+        )
+
     def _init_engines(self) -> None:
         source_spm_path = os.path.join(self.model_dir, "source.spm")
         target_spm_path = os.path.join(self.model_dir, "target.spm")
@@ -163,37 +226,49 @@ class LocalEnTrTranslator:
         with open(target_spm_path, "rb") as f_tgt:
             self.target_sp = spm.SentencePieceProcessor(model_proto=f_tgt.read())
 
-        try:
-            ct2_model_path = os.path.relpath(self.model_dir)
-        except ValueError:
-            ct2_model_path = self.model_dir
+        ct2_model_path = get_ct2_safe_path(self.model_dir)
+        self.translator, self.active_compute_type = self._create_ct2_translator(ct2_model_path)
 
-        self.translator = ctranslate2.Translator(
-            ct2_model_path,
-            device="cpu",
-            compute_type="int8",
-            intra_threads=self.cpu_threads,
-            inter_threads=1,
-        )
+    def reconfigure_threads(self, cpu_threads: int) -> None:
+        """
+        Kullanıcı performans profilini değiştirdiğinde çeviri motorunu yeni thread sayısıyla günceller.
+        """
+        new_threads = max(1, int(cpu_threads))
+        if new_threads == self.cpu_threads and self.translator is not None:
+            return
+        with self._lock:
+            self.cpu_threads = new_threads
+            if self.is_ready and self.is_model_downloaded():
+                ct2_model_path = get_ct2_safe_path(self.model_dir)
+                self.translator, self.active_compute_type = self._create_ct2_translator(
+                    ct2_model_path
+                )
 
     def load(self, progress_callback: Optional[Callable[[str, int], None]] = None) -> None:
         """
-        Modeli indirir (gerekirse), bozuk dosya varsa onarır ve CTranslate2 INT8 motorunu RAM'e yükler.
+        Modeli indirir (gerekirse), bozuk dosya varsa onarır ve işlemciye en uygun
+        CTranslate2 hesaplama tipiyle (INT8 / INT8_FLOAT32 / FLOAT32) RAM'e yükler.
         """
         if not self.is_model_downloaded():
             self.download_model(progress_callback=progress_callback)
 
         if progress_callback:
-            progress_callback("EN -> TR INT8 Model RAM'e yükleniyor...", 95)
+            progress_callback("EN ➔ TR Model işlemcinize uygun modda RAM'e yükleniyor...", 92)
 
         try:
             self._init_engines()
-        except Exception:
+        except Exception as first_err:
+            # Yalnızca model dosyalarının bozuk olabileceği durumlarda onarım/yeniden indirme dene
             if progress_callback:
-                progress_callback("Model dosyası onarılıyor ve yeniden indiriliyor...", 0)
+                progress_callback("Model dosyası doğrulanıyor ve onarılıyor...", 5)
             shutil.rmtree(self.model_dir, ignore_errors=True)
             self.download_model(progress_callback=progress_callback)
-            self._init_engines()
+            try:
+                self._init_engines()
+            except Exception as second_err:
+                raise RuntimeError(
+                    f"Çeviri motoru başlatılamadı: {second_err} (İlk hata: {first_err})"
+                ) from second_err
 
         # Isınma (Warm-up) çevirisi (İstatistikleri sıfırla)
         self.translate_with_metrics("Welcome back, everything is ready.")
@@ -202,7 +277,10 @@ class LocalEnTrTranslator:
         self.is_ready = True
 
         if progress_callback:
-            progress_callback("Model hazır! (EN ➔ TR | CTranslate2 INT8 CPU)", 100)
+            progress_callback(
+                f"Model hazır! (EN ➔ TR | CTranslate2 {self.active_compute_type.upper()} • {self.cpu_threads} Thread)",
+                100,
+            )
 
     def _cache_get(self, key: str) -> Optional[str]:
         val = self._cache.get(key)

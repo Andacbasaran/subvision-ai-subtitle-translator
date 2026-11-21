@@ -6,6 +6,7 @@ Oyunlar, Diziler, Filmler ve Yayınlar ile %100 uyumludur.
 """
 
 import ctypes
+import sys
 from typing import Callable, Dict, Optional
 
 from PyQt6.QtCore import QPoint, QRect, Qt
@@ -19,24 +20,31 @@ from PyQt6.QtGui import (
 )
 from PyQt6.QtWidgets import QGraphicsDropShadowEffect, QLabel, QVBoxLayout, QWidget
 
+from hardware import get_ui_font_family, get_windows_build
+
 WDA_NONE = 0x00000000
 WDA_EXCLUDEFROMCAPTURE = 0x00000011
 
 
 def set_window_exclude_from_capture(widget: QWidget, exclude: bool = True) -> bool:
     """
-    Windows 10 (2004+) / Windows 11 API:
+    Windows 10 (2004 / Build 19041+) / Windows 11 API:
     Pencereyi kullanıcının gözüne görünür tutar ancak ekran yakalama (MSS/OCR) için
     %100 görünmez yapar. Böylece Türkçe altyazı, İngilizce altyazının tam üzerine
     yerleştirilse bile OCR kendi yazdığı Türkçe metni okumaz.
+    Eski Windows sürümlerinde, Linux veya macOS'ta desteklenmiyorsa False döner.
     """
-    try:
-        hwnd = int(widget.winId())
-        flag = WDA_EXCLUDEFROMCAPTURE if exclude else WDA_NONE
-        res = ctypes.windll.user32.SetWindowDisplayAffinity(hwnd, flag)
-        return bool(res)
-    except Exception:
-        return False
+    if sys.platform == "win32":
+        if exclude and get_windows_build() < 19041:
+            return False
+        try:
+            hwnd = int(widget.winId())
+            flag = WDA_EXCLUDEFROMCAPTURE if exclude else WDA_NONE
+            res = ctypes.windll.user32.SetWindowDisplayAffinity(hwnd, flag)
+            return bool(res)
+        except Exception:
+            return False
+    return False
 
 
 class ROISelectorOverlay(QWidget):
@@ -93,7 +101,8 @@ class ROISelectorOverlay(QWidget):
         painter.drawRoundedRect(banner_rect, 14, 14)
 
         painter.setPen(QColor(248, 250, 252))
-        font = QFont("Segoe UI", 12, QFont.Weight.Bold)
+        ui_font = get_ui_font_family()
+        font = QFont(ui_font, 12, QFont.Weight.Bold)
         painter.setFont(font)
         painter.drawText(
             banner_rect,
@@ -144,7 +153,7 @@ class ROISelectorOverlay(QWidget):
             painter.setPen(QPen(QColor(34, 197, 94, 200), 1))
             painter.drawRoundedRect(badge_rect, 6, 6)
 
-            painter.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+            painter.setFont(QFont(ui_font, 9, QFont.Weight.Bold))
             painter.setPen(QColor(74, 222, 128))
             painter.drawText(badge_rect, Qt.AlignmentFlag.AlignCenter, dim_text)
 
@@ -213,6 +222,7 @@ class SubtitleOverlayWindow(QWidget):
         self.overlay_mode = "cover"  # 'cover' (Orijinalin Tam Üstünü Kapat) veya 'above' (Hemen Üstünde)
         self.show_guide_border = False
         self.show_bilingual = False
+        self.capture_excluded = False
         self._current_tr = ""
         self._current_en = ""
 
@@ -261,15 +271,16 @@ class SubtitleOverlayWindow(QWidget):
 
     def showEvent(self, event) -> None:
         super().showEvent(event)
-        set_window_exclude_from_capture(self, True)
+        self.capture_excluded = set_window_exclude_from_capture(self, True)
 
     def _apply_text_style(self) -> None:
         en_size = max(10, int(self.font_size * 0.58))
+        ui_font = get_ui_font_family()
         self.en_label.setStyleSheet(
             f"""
             QLabel {{
                 color: #CBD5E1;
-                font-family: 'Segoe UI', 'Arial', sans-serif;
+                font-family: '{ui_font}', 'Segoe UI', 'DejaVu Sans', 'Arial', sans-serif;
                 font-size: {en_size}pt;
                 font-weight: 600;
                 background: transparent;
@@ -280,7 +291,7 @@ class SubtitleOverlayWindow(QWidget):
             f"""
             QLabel {{
                 color: {self.text_color};
-                font-family: 'Segoe UI', 'Arial', sans-serif;
+                font-family: '{ui_font}', 'Segoe UI', 'DejaVu Sans', 'Arial', sans-serif;
                 font-size: {self.font_size}pt;
                 font-weight: 700;
                 background: transparent;
@@ -313,20 +324,36 @@ class SubtitleOverlayWindow(QWidget):
     def align_to_roi(self, roi: Dict[str, int]) -> None:
         """
         Seçilen İngilizce altyazı bölgesine göre Türkçe altyazı kutusunu hizalar.
+        WDA_EXCLUDEFROMCAPTURE desteklenmeyen sistemlerde (eski Windows, Linux, macOS)
+        OCR'ın kendi Türkçe çıktısını okumasını engellemek için otomatik olarak
+        ROI dışına (hemen üstüne veya altına) yerleştirir.
         """
         x = roi.get("qt_left", roi["left"])
         y = roi.get("qt_top", roi["top"])
         w = roi.get("qt_width", roi["width"])
         h = roi.get("qt_height", roi["height"])
 
+        self.capture_excluded = set_window_exclude_from_capture(self, True)
+        effective_mode = self.overlay_mode
+        if effective_mode == "cover" and not self.capture_excluded:
+            effective_mode = "above"
+
         min_h = 84 if self.show_bilingual else 64
-        if self.overlay_mode == "cover":
+        if effective_mode == "cover":
             self.setGeometry(x, y, w, max(h, min_h))
         else:
             box_h = max(h, min_h + 12)
-            self.setGeometry(x, max(10, y - box_h - 6), w, box_h)
+            screen = QGuiApplication.screenAt(QPoint(x + w // 2, y + h // 2)) or QGuiApplication.primaryScreen()
+            s_top = screen.geometry().top() if screen else 0
+            s_bottom = (screen.geometry().top() + screen.geometry().height()) if screen else 1080
+            above_y = y - box_h - 6
+            if above_y >= s_top + 6:
+                target_y = above_y
+            else:
+                # ROI ekranın en üstündeyse kutuyu ROI'nin hemen altına yerleştir
+                target_y = min(s_bottom - box_h - 6, y + h + 6)
+            self.setGeometry(x, target_y, w, box_h)
 
-        set_window_exclude_from_capture(self, True)
         self.update()
 
     def _refresh_labels(self) -> None:
