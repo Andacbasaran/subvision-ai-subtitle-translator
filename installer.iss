@@ -1,4 +1,4 @@
-; SubVision AI — Inno Setup 6 Windows Kurulum Betiği (v1.3)
+﻿; SubVision AI — Inno Setup 6 Windows Kurulum Betiği (v1.3)
 ; PyInstaller --onedir çıktısını (dist\SubVisionAI\*) tek bir profesyonel,
 ; terminalsiz ve Windows Defender dostu Windows kurulum paketine dönüştürür.
 ;

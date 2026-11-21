@@ -19,6 +19,13 @@ import os
 import subprocess
 import sys
 
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
 APP_VERSION = "1.3.0.0"
 
 EMBEDDED_FILES = [
