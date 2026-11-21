@@ -1,0 +1,26 @@
+{
+  "name": "Cyberpunk 2077",
+  "description": "Night City özel isimleri ve siberpunk jargon sözlüğü.",
+  "exact_phrases": {
+    "wake the fuck up, samurai": "Uyan artık, Samuray",
+    "preem": "Harika",
+    "delta out": "Hemen tüydük"
+  },
+  "do_not_translate": [
+    "Night City",
+    "Arasaka",
+    "Militech",
+    "Johnny Silverhand",
+    "Afterlife",
+    "Braindance",
+    "Relic",
+    "V"
+  ],
+  "term_replacements": {
+    "Netrunner": "Netrunner",
+    "Ripperdoc": "Siberdoktor",
+    "Choom": "Dostum",
+    "Eddies": "Eurodolar",
+    "Cyberware": "Siber donanım"
+  }
+}

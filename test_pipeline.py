@@ -425,5 +425,199 @@ class TestSubVisionPipeline(unittest.TestCase):
         self.assertIn("DeleteUserSettings", iss_text)
 
 
+class TestSubVisionV14Features(unittest.TestCase):
+    """v1.4 modüler mimari, bağlamlı çeviri, Whisper VAD, i18n ve güncelleme denetleyici testleri."""
+
+    def test_01_modular_package_backwards_compatibility(self) -> None:
+        import main as app_main
+        from subvision import __version__
+        from subvision.workers import LatestTextSlot
+
+        self.assertTrue(__version__.startswith("1.4"))
+        self.assertIs(app_main.LatestTextSlot, LatestTextSlot)
+
+    def test_02_i18n_tr_and_en_switching(self) -> None:
+        from subvision.i18n import LanguageManager
+
+        lm = LanguageManager("tr")
+        self.assertEqual(lm.t("tab_home"), "Ana Ekran")
+        lm.set_language("en")
+        self.assertEqual(lm.t("tab_home"), "Home")
+        self.assertIn("1.5.0", lm.t("updates_available", latest="1.5.0", current="1.4.0"))
+
+    def test_03_updater_semver_and_mocked_release_check(self) -> None:
+        import io
+        import json
+        from subvision.updater import check_for_updates, is_newer_version, parse_semver
+
+        self.assertTrue(is_newer_version("v1.5.0", "1.4.0"))
+        self.assertFalse(is_newer_version("v1.4.0", "1.4.0"))
+        self.assertFalse(is_newer_version("1.3.9", "1.4.0"))
+        self.assertGreater(parse_semver("1.4.0"), parse_semver("1.4.0-beta.1"))
+
+        fake_payload = json.dumps(
+            {
+                "tag_name": "v1.5.0",
+                "html_url": "https://github.com/Andacbasaran/subvision-ai-subtitle-translator/releases/tag/v1.5.0",
+                "body": "Release notes",
+            }
+        ).encode("utf-8")
+
+        class _FakeResp(io.BytesIO):
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+        with patch("urllib.request.urlopen", return_value=_FakeResp(fake_payload)):
+            info = check_for_updates(current_version="1.4.0")
+        self.assertTrue(info.is_update_available)
+        self.assertEqual(info.latest_version, "1.5.0")
+        self.assertIsNone(info.error)
+
+    def test_04_context_aware_translator_and_safe_fallback(self) -> None:
+        from subvision.context_translator import (
+            BACKEND_OLLAMA,
+            ContextAwareTranslator,
+            ContextBackendConfig,
+        )
+
+        class _DummyLocal:
+            is_ready = True
+            active_compute_type = "int8"
+            cpu_threads = 4
+            model_dir = "."
+            cache_size = 0
+            total_requests = 0
+            cache_hits = 0
+
+            def try_fast_lookup(self, text: str):
+                return None
+
+            def translate_with_metrics(self, text: str):
+                return f"LOCAL:{text}", 5.0, False
+
+            def clear_cache(self):
+                pass
+
+        ctx_tr = ContextAwareTranslator(
+            local_translator=_DummyLocal(),
+            config=ContextBackendConfig(backend=BACKEND_OLLAMA, context_window=3),
+        )
+
+        # 1) Mock successful Ollama response & speaker preservation
+        with patch.object(
+            ctx_tr,
+            "_http_post_json",
+            return_value={"message": {"content": "Beni takip et, hemen gidiyoruz."}},
+        ):
+            tr_text, ms, cached = ctx_tr.translate_with_metrics("Arthur: Follow me, we leave now.")
+        self.assertEqual(tr_text, "Arthur: Beni takip et, hemen gidiyoruz.")
+        self.assertFalse(cached)
+        self.assertEqual(ctx_tr.last_provider_used, BACKEND_OLLAMA)
+        self.assertEqual(len(ctx_tr.get_context_snapshot()), 1)
+
+        # 2) Mock network error -> must fall back seamlessly to local CT2
+        with patch.object(ctx_tr, "_http_post_json", side_effect=TimeoutError("timed out")):
+            fb_text, _, _ = ctx_tr.translate_with_metrics("Stay quiet.")
+        self.assertEqual(fb_text, "LOCAL:Stay quiet.")
+        self.assertEqual(ctx_tr.last_provider_used, "local_ct2_fallback")
+
+    def test_05_whisper_speech_segmenter_vad(self) -> None:
+        from subvision.audio_whisper import SpeechSegmenter, detect_audio_capabilities
+
+        caps = detect_audio_capabilities()
+        self.assertIsInstance(caps.is_ready, bool)
+
+        seg = SpeechSegmenter(
+            sample_rate=16000,
+            energy_threshold=0.02,
+            silence_duration_sec=0.2,
+            min_speech_sec=0.2,
+            max_speech_sec=2.0,
+        )
+        # Silence alone should emit nothing
+        quiet = np.zeros(1600, dtype=np.float32)
+        self.assertIsNone(seg.push_frame(quiet))
+
+        # Speech frames followed by trailing silence should emit a segment
+        loud = np.full(1600, 0.25, dtype=np.float32)
+        for _ in range(4):
+            self.assertIsNone(seg.push_frame(loud))
+        emitted = None
+        for _ in range(3):
+            res = seg.push_frame(quiet)
+            if res is not None:
+                emitted = res
+                break
+        self.assertIsNotNone(emitted)
+        self.assertGreaterEqual(emitted.size, 3200)
+
+    def test_06_custom_json_glossary_and_term_protection(self) -> None:
+        from subvision.custom_glossary import CustomGlossaryManager
+
+        mgr = CustomGlossaryManager()
+        self.assertIn("cyberpunk2077", mgr.packs)
+        self.assertIn("spiderman2", mgr.packs)
+        self.assertIn("baldurs_gate3", mgr.packs)
+
+        mgr.set_active_pack("cyberpunk2077")
+        self.assertEqual(mgr.lookup_exact("preem"), "Harika")
+
+        protected, placeholders = mgr.protect_terms("Welcome to Night City, Choom!")
+        self.assertNotIn("Night City", protected)
+        self.assertNotIn("Choom", protected)
+        restored = mgr.restore_terms(protected, placeholders)
+        self.assertIn("Night City", restored)
+        self.assertIn("Dostum", restored)
+
+    def test_07_profile_manager_and_process_matching(self) -> None:
+        from subvision.profiles import ProfileManager
+
+        pm = ProfileManager()
+        pm.save_profile(
+            name="Spider-Man 2",
+            roi={"left": 100, "top": 800, "width": 900, "height": 110},
+            ocr_mode="fast_mask",
+            overlay_mode="cover",
+            text_color="#FACC15",
+            glossary_pack="spiderman2",
+            process_name="Spider-Man2.exe",
+        )
+        self.assertEqual(pm.match_process("spider-man2.exe"), "Spider-Man 2")
+        self.assertIsNone(pm.match_process("notepad.exe"))
+        self.assertFalse(pm.delete_profile(pm.DEFAULT_PROFILE_NAME))
+        self.assertTrue(pm.delete_profile("Spider-Man 2"))
+
+    def test_08_srt_and_anki_csv_exporters(self) -> None:
+        import tempfile
+        from subvision.exporters import (
+            HistoryEntry,
+            export_history_to_anki_csv,
+            export_history_to_srt,
+        )
+
+        entries = [
+            HistoryEntry("12:00:01", "Stay with me!", "Benimle kal!", 1.0),
+            HistoryEntry("12:00:05", "We are almost there.", "Neredeyse vardık.", 5.0),
+        ]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            srt_path = os.path.join(tmpdir, "out.srt")
+            csv_path = os.path.join(tmpdir, "out.csv")
+            self.assertEqual(export_history_to_srt(entries, srt_path, bilingual=True), 2)
+            self.assertEqual(export_history_to_anki_csv(entries, csv_path), 2)
+
+            with open(srt_path, "r", encoding="utf-8") as f:
+                srt_txt = f.read()
+            self.assertIn("00:00:01,000 --> 00:00:04,200", srt_txt)
+            self.assertIn("Benimle kal!", srt_txt)
+
+            with open(csv_path, "r", encoding="utf-8-sig") as f:
+                csv_txt = f.read()
+            self.assertIn("English;Turkish;Timestamp", csv_txt)
+            self.assertIn("Stay with me!;Benimle kal!;12:00:01", csv_txt)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

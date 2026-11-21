@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Official Website & Downloads
+    url: https://subvisionai.andacbasaran.com/
+    about: Download signed Windows installers and check documentation.
+  - name: Game & Platform Compatibility Matrix
+    url: https://github.com/Andacbasaran/subvision-ai-subtitle-translator/blob/main/COMPATIBILITY.md
+    about: Check recommended settings for popular games and players.

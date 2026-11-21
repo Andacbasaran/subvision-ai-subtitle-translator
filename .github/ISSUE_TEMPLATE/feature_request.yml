@@ -1,0 +1,25 @@
+name: Feature Request
+description: Suggest an improvement, new translation backend, or workflow enhancement.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or Use Case
+      description: What problem does this feature solve?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe how you envision this feature working.
+    validations:
+      required: true
+  - type: checkboxes
+    id: offline
+    attributes:
+      label: Offline-First Compatibility
+      options:
+        - label: This feature preserves 100% offline default behavior (or is strictly opt-in).

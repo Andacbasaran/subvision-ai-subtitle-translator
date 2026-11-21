@@ -1,0 +1,22 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.6.0.schema.json
+# After publishing a GitHub Release, replace InstallerSha256 with the hash from SHA256SUMS.txt
+# and submit via `wingetcreate submit` or PR to microsoft/winget-pkgs.
+PackageIdentifier: Andacbasaran.SubVisionAI
+PackageVersion: 1.4.0
+InstallerLocale: en-US
+Platform:
+  - Windows.Desktop
+MinimumOSVersion: 10.0.19041.0
+InstallerType: inno
+Scope: user
+InstallModes:
+  - interactive
+  - silent
+  - silentWithProgress
+UpgradeBehavior: install
+Installers:
+  - Architecture: x64
+    InstallerUrl: https://github.com/Andacbasaran/subvision-ai-subtitle-translator/releases/download/v1.4.0/SubVisionAI-Setup-v1.4.0-Windows-x64.exe
+    InstallerSha256: REPLACE_WITH_SHA256_FROM_RELEASE_SHA256SUMS_TXT
+ManifestType: installer
+ManifestVersion: 1.6.0

@@ -6,11 +6,11 @@
 ;
 ; Derleme komutu:
 ;   python build_exe.py --only-pyinstaller
-;   iscc /DMyAppVersion=1.3.0 installer.iss
-;   python build_exe.py --sign dist\SubVisionAI-Setup-v1.3.0-Windows-x64.exe
+;   iscc /DMyAppVersion=1.4.0 installer.iss
+;   python build_exe.py --sign dist\SubVisionAI-Setup-v1.4.0-Windows-x64.exe
 
 #ifndef MyAppVersion
-  #define MyAppVersion "1.3.0"
+  #define MyAppVersion "1.4.0"
 #endif
 
 #define MyAppName "SubVision AI"

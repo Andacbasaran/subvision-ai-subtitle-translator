@@ -1,0 +1,19 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.locale.1.6.0.schema.json
+PackageIdentifier: Andacbasaran.SubVisionAI
+PackageVersion: 1.4.0
+PackageLocale: tr-TR
+Publisher: Andac Basaran
+PublisherUrl: https://subvisionai.andacbasaran.com/
+PublisherSupportUrl: https://github.com/Andacbasaran/subvision-ai-subtitle-translator/issues
+PackageName: SubVision AI
+PackageUrl: https://subvisionai.andacbasaran.com/
+License: MIT
+LicenseUrl: https://github.com/Andacbasaran/subvision-ai-subtitle-translator/blob/main/LICENSE
+ShortDescription: Oyunlar, diziler, filmler ve yayınlar için %100 çevrimdışı anlık İngilizce-Türkçe altyazı çevirici.
+Description: >-
+  SubVision AI, PC oyunları, Netflix, YouTube, Twitch ve VLC üzerindeki İngilizce altyazıları
+  RapidOCR (ONNX CPU) ile okur, CTranslate2 INT8 ile tamamen çevrimdışı (~88 ms, 0 MB VRAM)
+  Türkçeye çevirir ve tıklama geçiren şeffaf katmanla orijinalin üzerine yansıtır.
+ReleaseNotesUrl: https://github.com/Andacbasaran/subvision-ai-subtitle-translator/releases/tag/v1.4.0
+ManifestType: locale
+ManifestVersion: 1.6.0

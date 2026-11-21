@@ -1,0 +1,29 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.6.0.schema.json
+PackageIdentifier: Andacbasaran.SubVisionAI
+PackageVersion: 1.4.0
+PackageLocale: en-US
+Publisher: Andac Basaran
+PublisherUrl: https://subvisionai.andacbasaran.com/
+PublisherSupportUrl: https://github.com/Andacbasaran/subvision-ai-subtitle-translator/issues
+PackageName: SubVision AI
+PackageUrl: https://subvisionai.andacbasaran.com/
+License: MIT
+LicenseUrl: https://github.com/Andacbasaran/subvision-ai-subtitle-translator/blob/main/LICENSE
+ShortDescription: Real-time, 100% offline English-to-Turkish on-screen & live-audio subtitle translator studio.
+Description: >-
+  SubVision AI reads English subtitles in real time from PC games, movies, TV shows,
+  and live streams using RapidOCR (ONNX CPU) and translates them into Turkish completely
+  offline via CTranslate2 INT8 (~88 ms latency, 0 MB VRAM) onto a click-through overlay.
+  Includes optional context-aware translation backends and live audio (Whisper) support.
+Tags:
+  - subtitle
+  - translator
+  - ocr
+  - turkish
+  - gaming
+  - overlay
+  - offline
+  - ai
+ReleaseNotesUrl: https://github.com/Andacbasaran/subvision-ai-subtitle-translator/releases/tag/v1.4.0
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0

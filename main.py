@@ -1,53 +1,41 @@
 """
 SubVision AI Studio — Oyunlar, Diziler, Filmler ve Yayınlar İçin Evrensel Lokal (EN -> TR) Anlık Altyazı Çevirici
-Mimari: Uyarlanabilir CTranslate2 (INT8/FP32) + RapidOCR (ONNX CPU) + Platforma Duyarlı Şeffaf Overlay
+Mimari: Uyarlanabilir CTranslate2 (INT8/FP32) + RapidOCR (ONNX CPU) + Opsiyonel Bağlam/Ses Katmanı + Şeffaf Overlay
 """
 
 import ctypes
 import json
 import os
 import sys
-import threading
 import time
 import traceback
+import webbrowser
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
-import cv2
-import mss
-import numpy as np
-from PyQt6.QtCore import QPointF, QRect, QSize, QThread, QTimer, Qt, pyqtSignal
-from PyQt6.QtGui import (
-    QColor,
-    QFont,
-    QGuiApplication,
-    QIcon,
-    QKeySequence,
-    QPainter,
-    QPainterPath,
-    QPen,
-    QPixmap,
-    QPolygonF,
-    QShortcut,
-)
+from PyQt6.QtCore import QRect, QSize, QTimer, Qt
+from PyQt6.QtGui import QAction, QFont, QGuiApplication, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QApplication,
-    QCheckBox,
-    QComboBox,
     QDialog,
+    QFileDialog,
     QFrame,
     QGridLayout,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
+    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QProgressBar,
     QPushButton,
     QScrollArea,
     QSlider,
     QStackedWidget,
+    QSystemTrayIcon,
     QVBoxLayout,
     QWidget,
 )
@@ -69,9 +57,45 @@ from hardware import (
 )
 from ocr_engine import SubtitleOCREngine
 from overlay_ui import ROISelectorOverlay, SubtitleOverlayWindow
+from subvision import __version__
+from subvision.audio_whisper import AudioCaptureTranslateWorker, detect_audio_capabilities
+from subvision.context_translator import (
+    BACKEND_DEEPL,
+    BACKEND_GEMINI,
+    BACKEND_LOCAL_CT2,
+    BACKEND_OLLAMA,
+    BACKEND_OPENAI_COMPAT,
+    ContextAwareTranslator,
+    ContextBackendConfig,
+    DEFAULT_ENDPOINTS,
+    DEFAULT_MODELS,
+)
+from subvision.custom_glossary import CustomGlossaryManager
+from subvision.exporters import (
+    HistoryEntry,
+    export_history_to_anki_csv,
+    export_history_to_srt,
+)
+from subvision.i18n import LanguageManager
+from subvision.profiles import ProfileManager, get_foreground_process_name
+from subvision.ui_widgets import (
+    FlatComboBox,
+    FlatSwitch,
+    TelemetryCard,
+    create_app_icon,
+    create_app_pixmap,
+    make_flat_icon,
+)
+from subvision.updater import UpdateCheckerThread, UpdateInfo
+from subvision.workers import (
+    BenchmarkWorker,
+    CaptureTranslateWorker,
+    LatestTextSlot,
+    ModelLoaderThread,
+)
 from translator import LocalEnTrTranslator
 
-APP_TITLE = "SubVision AI — Real-Time Subtitle Studio (EN -> TR)"
+APP_TITLE = f"SubVision AI v{__version__} — Real-Time Subtitle Studio (EN -> TR)"
 DATA_DIR = get_writable_data_dir()
 CONFIG_PATH = os.path.join(DATA_DIR, "user_settings.json")
 CRASH_LOG_PATH = os.path.join(DATA_DIR, "crash.log")
@@ -80,643 +104,7 @@ CRASH_LOG_PATH = os.path.join(DATA_DIR, "crash.log")
 VK_F7 = 0x76
 VK_F8 = 0x77
 VK_F9 = 0x78
-
-
-def make_flat_icon(kind: str, color_hex: str = "#FAFAFA", size: int = 14) -> QIcon:
-    """
-    Emoji bağımlılığı olmadan tüm işletim sistemlerinde net görünen
-    vektörel (2x HiDPI) minimalist arayüz ikonları üretir.
-    """
-    px = size * 2
-    pix = QPixmap(px, px)
-    pix.fill(Qt.GlobalColor.transparent)
-    p = QPainter(pix)
-    p.setRenderHint(QPainter.RenderHint.Antialiasing)
-    col = QColor(color_hex)
-
-    if kind == "dot":
-        p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(col)
-        r = px * 0.34
-        p.drawEllipse(QPointF(px / 2.0, px / 2.0), r, r)
-    elif kind == "play":
-        p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(col)
-        poly = QPolygonF(
-            [
-                QPointF(px * 0.28, px * 0.18),
-                QPointF(px * 0.84, px * 0.50),
-                QPointF(px * 0.28, px * 0.82),
-            ]
-        )
-        p.drawPolygon(poly)
-    elif kind == "stop":
-        p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(col)
-        p.drawRoundedRect(int(px * 0.22), int(px * 0.22), int(px * 0.56), int(px * 0.56), 4, 4)
-    elif kind == "target":
-        pen = QPen(col, 2.4, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
-        p.setPen(pen)
-        m = int(px * 0.16)
-        e = px - m
-        l = int(px * 0.24)
-        p.drawLine(m, m, m + l, m)
-        p.drawLine(m, m, m, m + l)
-        p.drawLine(e, m, e - l, m)
-        p.drawLine(e, m, e, m + l)
-        p.drawLine(m, e, m + l, e)
-        p.drawLine(m, e, m, e - l)
-        p.drawLine(e, e, e - l, e)
-        p.drawLine(e, e, e, e - l)
-        p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(col)
-        p.drawEllipse(QPointF(px / 2.0, px / 2.0), 2.4, 2.4)
-    elif kind == "preview":
-        pen = QPen(col, 2.2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
-        p.setPen(pen)
-        p.setBrush(Qt.BrushStyle.NoBrush)
-        p.drawRoundedRect(int(px * 0.14), int(px * 0.22), int(px * 0.72), int(px * 0.56), 4, 4)
-        p.drawLine(int(px * 0.28), int(px * 0.54), int(px * 0.72), int(px * 0.54))
-        p.drawLine(int(px * 0.36), int(px * 0.66), int(px * 0.64), int(px * 0.66))
-    elif kind == "gauge":
-        p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(col)
-        bw = int(px * 0.17)
-        p.drawRoundedRect(int(px * 0.16), int(px * 0.52), bw, int(px * 0.34), 2, 2)
-        p.drawRoundedRect(int(px * 0.42), int(px * 0.32), bw, int(px * 0.54), 2, 2)
-        p.drawRoundedRect(int(px * 0.68), int(px * 0.16), bw, int(px * 0.70), 2, 2)
-    elif kind == "copy":
-        pen = QPen(col, 2.0, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
-        p.setPen(pen)
-        p.setBrush(Qt.BrushStyle.NoBrush)
-        p.drawRoundedRect(int(px * 0.34), int(px * 0.30), int(px * 0.50), int(px * 0.54), 3, 3)
-        p.drawLine(int(px * 0.22), int(px * 0.68), int(px * 0.22), int(px * 0.20))
-        p.drawLine(int(px * 0.22), int(px * 0.20), int(px * 0.64), int(px * 0.20))
-    elif kind == "manage":
-        pen = QPen(col, 2.2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
-        p.setPen(pen)
-        p.setBrush(Qt.BrushStyle.NoBrush)
-        p.drawRoundedRect(int(px * 0.18), int(px * 0.22), int(px * 0.64), int(px * 0.60), 4, 4)
-        p.drawLine(int(px * 0.32), int(px * 0.42), int(px * 0.68), int(px * 0.42))
-        p.drawLine(int(px * 0.32), int(px * 0.60), int(px * 0.56), int(px * 0.60))
-
-    p.end()
-    pix.setDevicePixelRatio(2.0)
-    return QIcon(pix)
-
-
-def create_app_pixmap(size: int = 64) -> QPixmap:
-    """
-    Yeni SubVision AI logosunu (assets/app_icon.png) HiDPI (2x) yumuşak köşeli olarak yükler.
-    """
-    search_roots = [get_app_base_dir()]
-    meipass = getattr(sys, "_MEIPASS", None)
-    if meipass and meipass not in search_roots:
-        search_roots.append(meipass)
-    for root in search_roots:
-        for fname in ("app_icon.png", "app_icon.ico"):
-            icon_path = os.path.join(root, "assets", fname)
-            if os.path.exists(icon_path):
-                src_pix = QPixmap(icon_path)
-                if not src_pix.isNull():
-                    target_px = size * 2
-                    scaled = src_pix.scaled(
-                        target_px,
-                        target_px,
-                        Qt.AspectRatioMode.KeepAspectRatio,
-                        Qt.TransformationMode.SmoothTransformation,
-                    )
-                    rounded = QPixmap(target_px, target_px)
-                    rounded.fill(Qt.GlobalColor.transparent)
-                    p = QPainter(rounded)
-                    p.setRenderHint(QPainter.RenderHint.Antialiasing)
-                    p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-                    path = QPainterPath()
-                    rad = target_px * 0.22
-                    path.addRoundedRect(0.0, 0.0, float(target_px), float(target_px), rad, rad)
-                    p.setClipPath(path)
-                    p.drawPixmap(0, 0, scaled)
-                    p.end()
-                    rounded.setDevicePixelRatio(2.0)
-                    return rounded
-
-    pix = QPixmap(size, size)
-    pix.fill(Qt.GlobalColor.transparent)
-    painter = QPainter(pix)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-
-    pad = max(1, size // 24)
-    radius = max(7, int(size * 0.22))
-    painter.setBrush(QColor("#2563EB"))
-    painter.setPen(Qt.PenStyle.NoPen)
-    painter.drawRoundedRect(pad, pad, size - 2 * pad, size - 2 * pad, radius, radius)
-
-    painter.setPen(QColor("#FFFFFF"))
-    font_sz = max(9, int(size * 0.26))
-    painter.setFont(QFont(get_ui_font_family(), font_sz, QFont.Weight.Bold))
-    painter.drawText(
-        QRect(pad, int(size * 0.12), size - 2 * pad, int(size * 0.44)),
-        Qt.AlignmentFlag.AlignCenter,
-        "TR",
-    )
-
-    y1 = int(size * 0.67)
-    y2 = int(size * 0.80)
-    painter.setPen(
-        QPen(QColor("#38BDF8"), max(2, size // 16), Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
-    )
-    painter.drawLine(int(size * 0.23), y1, int(size * 0.77), y1)
-    painter.setPen(
-        QPen(
-            QColor("#FACC15"),
-            max(2, size // 20),
-            Qt.PenStyle.SolidLine,
-            Qt.PenCapStyle.RoundCap,
-        )
-    )
-    painter.drawLine(int(size * 0.32), y2, int(size * 0.68), y2)
-
-    painter.end()
-    return pix
-
-
-def create_app_icon() -> QIcon:
-    search_roots = [get_app_base_dir()]
-    meipass = getattr(sys, "_MEIPASS", None)
-    if meipass and meipass not in search_roots:
-        search_roots.append(meipass)
-    for root in search_roots:
-        for fname in ("app_icon.ico", "app_icon.png"):
-            ico_path = os.path.join(root, "assets", fname)
-            if os.path.exists(ico_path):
-                return QIcon(ico_path)
-    return QIcon(create_app_pixmap(64))
-
-
-class ModelLoaderThread(QThread):
-    """
-    Arayüzü dondurmadan arka planda önce RapidOCR (ONNX) motorunu,
-    ardından CTranslate2 çeviri modelini işlemciye uygun modda yükler.
-    """
-
-    progress = pyqtSignal(str, int)
-    finished_ok = pyqtSignal()
-    failed = pyqtSignal(str)
-
-    def __init__(self, translator: LocalEnTrTranslator, ocr_engine: SubtitleOCREngine):
-        super().__init__()
-        self.translator = translator
-        self.ocr_engine = ocr_engine
-
-    def run(self) -> None:
-        try:
-            self.progress.emit("Yapay zeka görüntü okuma motoru hazırlanıyor...", 10)
-            self.ocr_engine.ensure_initialized()
-            self.progress.emit("Çeviri motoru hazırlanıyor...", 22)
-            self.translator.load(
-                progress_callback=lambda msg, pct: self.progress.emit(
-                    msg, max(22, int(22 + pct * 0.78))
-                )
-            )
-            self.finished_ok.emit()
-        except Exception as exc:
-            self.failed.emit(str(exc))
-
-
-class BenchmarkWorker(QThread):
-    """
-    Arayüzü dondurmadan gerçek OCR + CTranslate2 + Önbellek + Frame Diff Lock
-    performans testini çalıştıran iş parçacığı.
-    """
-
-    finished_report = pyqtSignal(dict)
-
-    def __init__(
-        self,
-        ocr_engine: SubtitleOCREngine,
-        translator: LocalEnTrTranslator,
-        hw_profile: HardwareProfile,
-    ):
-        super().__init__()
-        self.ocr_engine = ocr_engine
-        self.translator = translator
-        self.hw_profile = hw_profile
-
-    def run(self) -> None:
-        self.ocr_engine.ensure_initialized()
-        canvas = np.zeros((100, 960, 3), dtype=np.uint8)
-        canvas[:] = (35, 30, 25)
-        text_sample = "We have to find another way out before the storm hits!"
-        cv2.putText(
-            canvas,
-            text_sample,
-            (32, 62),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.88,
-            (0, 0, 0),
-            5,
-            cv2.LINE_AA,
-        )
-        cv2.putText(
-            canvas,
-            text_sample,
-            (32, 62),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.88,
-            (255, 255, 255),
-            2,
-            cv2.LINE_AA,
-        )
-
-        t0 = time.perf_counter()
-        gray = cv2.cvtColor(canvas, cv2.COLOR_BGR2GRAY)
-        for _ in range(100):
-            _ = self.ocr_engine._has_frame_changed(gray)
-        pixel_lock_ms = ((time.perf_counter() - t0) * 1000.0) / 100.0
-
-        prev_mode = self.ocr_engine.ocr_mode
-        self.ocr_engine.set_mode("fast_mask")
-        ocr_times: List[float] = []
-        for _ in range(5):
-            _, ms = self.ocr_engine.read_image_fast(canvas)
-            ocr_times.append(ms)
-        self.ocr_engine.set_mode(prev_mode)
-        avg_ocr_ms = sum(ocr_times) / max(1, len(ocr_times))
-
-        test_sentences = [
-            "Detective: The signal is coming from inside the abandoned station.",
-            "If we don't make a choice right now, everything we built will collapse.",
-            "Stay behind me and keep your eyes on the horizon.",
-            "Previously on this series, the truth was hidden beneath the city.",
-        ]
-        nmt_times: List[float] = []
-        for s in test_sentences:
-            with self.translator._lock:
-                self.translator._cache.pop(s.lower(), None)
-            _, ms, _ = self.translator.translate_with_metrics(s)
-            nmt_times.append(ms)
-        avg_nmt_ms = sum(nmt_times) / max(1, len(nmt_times))
-
-        t_c = time.perf_counter()
-        for _ in range(100):
-            self.translator.translate_with_metrics(test_sentences[0])
-        cache_ms = ((time.perf_counter() - t_c) * 1000.0) / 100.0
-
-        report = {
-            "cpu_name": self.hw_profile.short_cpu_label,
-            "cores": f"{self.hw_profile.physical_cores}C/{self.hw_profile.logical_cores}T",
-            "compute_type": self.translator.active_compute_type.upper(),
-            "pixel_lock_ms": pixel_lock_ms,
-            "avg_ocr_ms": avg_ocr_ms,
-            "avg_nmt_ms": avg_nmt_ms,
-            "cache_ms": cache_ms,
-            "total_cold_ms": avg_ocr_ms + avg_nmt_ms,
-            "total_cached_ms": avg_ocr_ms + cache_ms,
-            "threads": self.translator.cpu_threads,
-        }
-        self.finished_report.emit(report)
-
-
-class LatestTextSlot:
-    """
-    1 elemanlı 'en güncel cümle kazanır' (Latest-Frame-Wins) iş parçacığı güvenli kanal.
-    NMT bir cümleyi çevirirken yeni altyazı gelirse arada biriken eski cümleleri anında düşürür;
-    EMPTY geldiğinde nesil (generation) sayacını artırarak bayat çevirilerin ekrana yanmasını önler.
-    """
-
-    def __init__(self) -> None:
-        self._cond = threading.Condition()
-        self._generation: int = 0
-        self._pending: Optional[Tuple[int, str, float, int]] = None
-        self._closed: bool = False
-        self.dropped_count: int = 0
-
-    @property
-    def generation(self) -> int:
-        with self._cond:
-            return self._generation
-
-    def submit(self, en_text: str, ocr_ms: float, orig_line_h: int = 0) -> int:
-        with self._cond:
-            if self._pending is not None:
-                self.dropped_count += 1
-            self._generation += 1
-            gen = self._generation
-            self._pending = (gen, en_text, ocr_ms, orig_line_h)
-            self._cond.notify()
-            return gen
-
-    def invalidate(self) -> int:
-        with self._cond:
-            self._generation += 1
-            self._pending = None
-            return self._generation
-
-    def close(self) -> None:
-        with self._cond:
-            self._closed = True
-            self._pending = None
-            self._generation += 1
-            self._cond.notify_all()
-
-    def take(self, timeout: float = 0.25) -> Optional[Tuple[int, str, float, int]]:
-        with self._cond:
-            if self._pending is None and not self._closed:
-                self._cond.wait(timeout=timeout)
-            if self._closed or self._pending is None:
-                return None
-            item = self._pending
-            self._pending = None
-            return item
-
-    def is_current(self, generation: int) -> bool:
-        with self._cond:
-            return (not self._closed) and (generation == self._generation)
-
-
-class CaptureTranslateWorker(QThread):
-    subtitle_updated = pyqtSignal(str, str, float, float, bool, int)
-    subtitle_cleared = pyqtSignal()
-    status_tick = pyqtSignal(str)
-
-    def __init__(
-        self,
-        ocr_engine: SubtitleOCREngine,
-        translator: LocalEnTrTranslator,
-        roi: Dict[str, int],
-        scan_interval_sec: float = 0.0417,
-        idle_scan_interval_sec: float = 0.0714,
-    ):
-        super().__init__()
-        self.ocr_engine = ocr_engine
-        self.translator = translator
-        self.roi = roi
-        self.scan_interval_sec = max(0.025, float(scan_interval_sec))
-        self.idle_scan_interval_sec = max(self.scan_interval_sec, float(idle_scan_interval_sec))
-        self.running = False
-        self._slot = LatestTextSlot()
-        self._nmt_thread: Optional[threading.Thread] = None
-
-    def update_timing(self, scan_interval_sec: float, idle_scan_interval_sec: float) -> None:
-        self.scan_interval_sec = max(0.025, float(scan_interval_sec))
-        self.idle_scan_interval_sec = max(self.scan_interval_sec, float(idle_scan_interval_sec))
-
-    def _translation_loop(self) -> None:
-        while self.running:
-            item = self._slot.take(timeout=0.25)
-            if item is None:
-                continue
-            gen, en_text, ocr_ms, orig_line_h = item
-            if not self._slot.is_current(gen):
-                continue
-            try:
-                tr_text, tr_ms, is_cached = self.translator.translate_with_metrics(en_text)
-                if tr_text and self.running and self._slot.is_current(gen):
-                    self.subtitle_updated.emit(
-                        en_text, tr_text, ocr_ms, tr_ms, is_cached, orig_line_h
-                    )
-            except Exception as exc:
-                self.status_tick.emit(f"Çeviri hatası: {exc}")
-
-    def run(self) -> None:
-        self.running = True
-        self.ocr_engine.reset_state()
-        self._slot = LatestTextSlot()
-        self._nmt_thread = threading.Thread(
-            target=self._translation_loop,
-            name="SubVision-NMT-Worker",
-            daemon=True,
-        )
-        self._nmt_thread.start()
-
-        idle_streak_sec = 0.0
-
-        with mss.mss() as sct:
-            while self.running:
-                loop_start = time.perf_counter()
-                try:
-                    capture_box = {
-                        "left": self.roi["left"],
-                        "top": self.roi["top"],
-                        "width": self.roi["width"],
-                        "height": self.roi["height"],
-                    }
-                    status, en_text, ocr_ms = self.ocr_engine.capture_and_read(capture_box, sct)
-
-                    if status == "EMPTY":
-                        self._slot.invalidate()
-                        self.subtitle_cleared.emit()
-                        idle_streak_sec += self.scan_interval_sec
-                    elif status == "NEW_TEXT" and en_text:
-                        idle_streak_sec = 0.0
-                        orig_line_h = self.ocr_engine.last_line_height_px
-                        fast_hit = self.translator.try_fast_lookup(en_text)
-                        if fast_hit is not None:
-                            self._slot.invalidate()
-                            tr_text, tr_ms, is_cached = fast_hit
-                            self.subtitle_updated.emit(
-                                en_text, tr_text, ocr_ms, tr_ms, is_cached, orig_line_h
-                            )
-                        else:
-                            self._slot.submit(en_text, ocr_ms, orig_line_h)
-                    else:
-                        idle_streak_sec += self.scan_interval_sec
-                except Exception as exc:
-                    self.status_tick.emit(f"Yakalama hatası: {exc}")
-
-                elapsed = time.perf_counter() - loop_start
-                target_interval = (
-                    self.idle_scan_interval_sec
-                    if idle_streak_sec >= 2.0
-                    else self.scan_interval_sec
-                )
-                sleep_time = max(0.012, target_interval - elapsed)
-                time.sleep(sleep_time)
-
-        self._slot.close()
-        if self._nmt_thread and self._nmt_thread.is_alive():
-            self._nmt_thread.join(timeout=1.5)
-
-    def stop(self) -> None:
-        self.running = False
-        self._slot.close()
-        self.wait(1800)
-
-
-class FlatSwitch(QCheckBox):
-    """
-    Modern flat toggle switch (QCheckBox uyumlu).
-    Standart checkbox yerine tüm işletim sistemlerinde net görünen vektörel anahtar çizer.
-    """
-
-    def __init__(self, text: str = "", parent: Optional[QWidget] = None):
-        super().__init__(text, parent)
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setMinimumHeight(26)
-
-    def sizeHint(self) -> QSize:
-        fm = self.fontMetrics()
-        text_w = fm.horizontalAdvance(self.text()) if self.text() else 0
-        return QSize(36 + 12 + text_w + 10, max(26, fm.height() + 6))
-
-    def minimumSizeHint(self) -> QSize:
-        return self.sizeHint()
-
-    def hitButton(self, pos) -> bool:
-        return self.rect().contains(pos)
-
-    def paintEvent(self, event) -> None:
-        p = QPainter(self)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing)
-
-        track_w, track_h = 36, 19
-        y = (self.height() - track_h) // 2
-        checked = self.isChecked()
-
-        track_col = QColor("#0284C7") if checked else QColor("#162033")
-        border_col = QColor("#38BDF8") if checked else QColor("#293852")
-        p.setBrush(track_col)
-        p.setPen(QPen(border_col, 1))
-        p.drawRoundedRect(1, y, track_w, track_h, track_h / 2.0, track_h / 2.0)
-
-        knob_d = 13
-        knob_x = (track_w - knob_d - 2) if checked else 4
-        knob_y = y + (track_h - knob_d) // 2
-        p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QColor("#FFFFFF") if checked else QColor("#94A3B8"))
-        p.drawEllipse(knob_x, knob_y, knob_d, knob_d)
-
-        p.setPen(QColor("#E2E8F0") if self.isEnabled() else QColor("#475569"))
-        p.setFont(self.font())
-        text_rect = QRect(track_w + 10, 0, self.width() - track_w - 10, self.height())
-        p.drawText(
-            text_rect,
-            Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
-            self.text(),
-        )
-        p.end()
-
-
-class FlatComboBox(QComboBox):
-    """
-    Sağ kenarında tüm platformlarda tutarlı, ince vektörel aşağı ok (chevron) çizen flat QComboBox.
-    """
-
-    def paintEvent(self, event) -> None:
-        super().paintEvent(event)
-        p = QPainter(self)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        pen = QPen(
-            QColor("#38BDF8"),
-            1.7,
-            Qt.PenStyle.SolidLine,
-            Qt.PenCapStyle.RoundCap,
-            Qt.PenJoinStyle.RoundJoin,
-        )
-        p.setPen(pen)
-        cx = self.width() - 16
-        cy = self.height() // 2
-        p.drawLine(QPointF(cx - 4.0, cy - 2.0), QPointF(cx, cy + 2.2))
-        p.drawLine(QPointF(cx, cy + 2.2), QPointF(cx + 4.0, cy - 2.0))
-        p.end()
-
-
-class TelemetryCard(QFrame):
-    """
-    Sade Performans Özeti Kartı (Gelişmiş Ayarlar sekmesinde yer alır).
-    """
-
-    def __init__(
-        self,
-        title: str,
-        badge_text: str,
-        initial_val: str,
-        sub_text: str,
-        accent_hex: str,
-        initial_pct: int = 25,
-    ):
-        super().__init__()
-        self.accent_hex = accent_hex
-        self.setObjectName("telemetryCard")
-        self.setStyleSheet(
-            """
-            QFrame#telemetryCard {
-                background-color: #090E1A;
-                border: 1px solid #1C283E;
-                border-radius: 10px;
-            }
-            """
-        )
-
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(12, 10, 12, 10)
-        lay.setSpacing(4)
-
-        top_row = QHBoxLayout()
-        top_row.setSpacing(6)
-        self.lbl_title = QLabel(title)
-        self.lbl_title.setStyleSheet(
-            "color: #94A3B8; font-size: 7.6pt; font-weight: 700; letter-spacing: 0.5px;"
-        )
-        top_row.addWidget(self.lbl_title)
-
-        self.lbl_badge = QLabel(badge_text)
-        self.lbl_badge.setStyleSheet(
-            """
-            color: #38BDF8;
-            background-color: #0F1D33;
-            border: 1px solid #1E3A5F;
-            border-radius: 4px;
-            padding: 1px 6px;
-            font-size: 7pt;
-            font-weight: 700;
-            """
-        )
-        top_row.addWidget(self.lbl_badge, alignment=Qt.AlignmentFlag.AlignRight)
-        lay.addLayout(top_row)
-
-        self.lbl_val = QLabel(initial_val)
-        self.lbl_val.setStyleSheet("color: #F8FAFC; font-size: 14pt; font-weight: 700;")
-        lay.addWidget(self.lbl_val)
-
-        self.bar = QProgressBar()
-        self.bar.setRange(0, 100)
-        self.bar.setValue(initial_pct)
-        self.bar.setTextVisible(False)
-        self.bar.setFixedHeight(3)
-        self.bar.setStyleSheet(
-            f"""
-            QProgressBar {{
-                background-color: #162033;
-                border: none;
-                border-radius: 1px;
-            }}
-            QProgressBar::chunk {{
-                background-color: {accent_hex};
-                border-radius: 1px;
-            }}
-            """
-        )
-        lay.addWidget(self.bar)
-
-        self.lbl_sub = QLabel(sub_text)
-        self.lbl_sub.setStyleSheet("color: #64748B; font-size: 7.8pt; font-weight: 500;")
-        lay.addWidget(self.lbl_sub)
-
-    def set_metric(
-        self,
-        val_text: str,
-        sub_text: Optional[str] = None,
-        badge_text: Optional[str] = None,
-        bar_pct: Optional[int] = None,
-    ) -> None:
-        self.lbl_val.setText(val_text)
-        if sub_text is not None:
-            self.lbl_sub.setText(sub_text)
-        if badge_text is not None:
-            self.lbl_badge.setText(badge_text)
-        if bar_pct is not None:
-            self.bar.setValue(max(4, min(100, bar_pct)))
+VK_FUNCTION_KEYS: Dict[str, int] = {f"F{i}": 0x6F + i for i in range(1, 13)}
 
 
 class MainWindow(QMainWindow):
@@ -736,6 +124,21 @@ class MainWindow(QMainWindow):
         self.resize(init_w, init_h)
 
         self.settings = self._load_settings()
+        self.i18n = LanguageManager(self.settings.get("ui_language", "tr"))
+        self.profile_manager = ProfileManager(self.settings.get("profiles"))
+        self.custom_glossary = CustomGlossaryManager()
+        self.custom_glossary.set_active_pack(str(self.settings.get("glossary_pack", "none")))
+        self._hotkeys: Dict[str, str] = {
+            "roi": str((self.settings.get("hotkeys") or {}).get("roi", "F7")),
+            "toggle": str((self.settings.get("hotkeys") or {}).get("toggle", "F8")),
+            "sample": str((self.settings.get("hotkeys") or {}).get("sample", "F9")),
+        }
+        self._history_entries: List[HistoryEntry] = []
+        self._session_start_ts: float = time.monotonic()
+        self._force_quit: bool = False
+        self._last_auto_proc: str = ""
+        self.tray_icon: Optional[QSystemTrayIcon] = None
+
         self.roi: Dict[str, int] = self.settings.get("roi", self._default_roi())
         self._resume_after_roi = False
         self._restore_window_after_roi = False
@@ -746,9 +149,14 @@ class MainWindow(QMainWindow):
         self.tuning: RuntimeTuning = compute_runtime_tuning(self.hw_profile, saved_perf_profile)
         apply_thread_env_defaults(self.tuning)
 
-        self.translator = LocalEnTrTranslator(
+        self._local_translator = LocalEnTrTranslator(
             cpu_threads=self.tuning.nmt_threads,
             compute_type_candidates=self.tuning.compute_type_candidates,
+        )
+        self.translator = ContextAwareTranslator(
+            local_translator=self._local_translator,
+            config=self._build_context_config_from_settings(),
+            custom_glossary=self.custom_glossary,
         )
 
         saved_ocr_mode = self.settings.get("ocr_mode", self.tuning.default_ocr_mode)
@@ -759,7 +167,10 @@ class MainWindow(QMainWindow):
             lazy_init=True,
         )
         self.worker: Optional[CaptureTranslateWorker] = None
+        self.audio_worker: Optional[AudioCaptureTranslateWorker] = None
         self.bench_worker: Optional[BenchmarkWorker] = None
+        self.update_thread: Optional[UpdateCheckerThread] = None
+        self._latest_release_url: str = ""
 
         self.overlay = SubtitleOverlayWindow()
         self.roi_selector = ROISelectorOverlay(
@@ -806,7 +217,26 @@ class MainWindow(QMainWindow):
         self.overlay.align_to_roi(self.roi)
 
         self._register_global_hotkeys()
+        self._setup_system_tray()
+        self._auto_profile_timer = QTimer(self)
+        self._auto_profile_timer.setInterval(2000)
+        self._auto_profile_timer.timeout.connect(self._check_foreground_profile)
+        if self.settings.get("auto_switch_profiles", False):
+            self._auto_profile_timer.start()
+
         self._start_model_loading()
+        if self.settings.get("check_updates_on_startup", True):
+            QTimer.singleShot(2500, lambda: self.check_for_updates_async(silent=True))
+
+    def _build_context_config_from_settings(self) -> ContextBackendConfig:
+        return ContextBackendConfig(
+            backend=str(self.settings.get("translation_backend", BACKEND_LOCAL_CT2)),
+            endpoint=str(self.settings.get("translation_endpoint", "")),
+            model=str(self.settings.get("translation_model", "")),
+            api_key=str(self.settings.get("translation_api_key", "")),
+            context_window=int(self.settings.get("context_window", 3)),
+            timeout_sec=float(self.settings.get("context_timeout_sec", 3.0)),
+        )
 
     def _default_roi(self) -> Dict[str, int]:
         screen = QGuiApplication.primaryScreen()
@@ -850,6 +280,19 @@ class MainWindow(QMainWindow):
             "performance_profile": self.combo_perf_profile.currentData(),
             "show_bilingual": self.chk_bilingual.isChecked(),
             "auto_fit_font": self.chk_autofit.isChecked(),
+            "ui_language": self.combo_ui_lang.currentData() if hasattr(self, "combo_ui_lang") else self.i18n.lang,
+            "translation_backend": self.combo_tr_backend.currentData() if hasattr(self, "combo_tr_backend") else BACKEND_LOCAL_CT2,
+            "translation_endpoint": self.edit_tr_endpoint.text().strip() if hasattr(self, "edit_tr_endpoint") else "",
+            "translation_model": self.edit_tr_model.text().strip() if hasattr(self, "edit_tr_model") else "",
+            "translation_api_key": self.edit_tr_apikey.text().strip() if hasattr(self, "edit_tr_apikey") else "",
+            "input_source": self.combo_input_source.currentData() if hasattr(self, "combo_input_source") else "ocr",
+            "whisper_model": self.combo_whisper_model.currentData() if hasattr(self, "combo_whisper_model") else "tiny.en",
+            "check_updates_on_startup": self.chk_auto_update.isChecked() if hasattr(self, "chk_auto_update") else True,
+            "glossary_pack": self.combo_glossary_pack.currentData() if hasattr(self, "combo_glossary_pack") else self.custom_glossary.active_pack_id,
+            "profiles": self.profile_manager.to_dict(),
+            "auto_switch_profiles": self.chk_auto_profile.isChecked() if hasattr(self, "chk_auto_profile") else False,
+            "hotkeys": dict(self._hotkeys),
+            "minimize_to_tray": self.chk_minimize_tray.isChecked() if hasattr(self, "chk_minimize_tray") else False,
         }
         try:
             with open(CONFIG_PATH, "w", encoding="utf-8") as f:
@@ -1495,11 +938,30 @@ class MainWindow(QMainWindow):
         hist_lay.setSpacing(10)
 
         hist_hdr = QHBoxLayout()
+        hist_hdr.setSpacing(8)
         lbl_hist = QLabel("ÇEVRİLEN DİYALOG GEÇMİŞİ")
         lbl_hist.setStyleSheet(
             "color: #94A3B8; font-size: 8.2pt; font-weight: 700; letter-spacing: 0.8px;"
         )
         hist_hdr.addWidget(lbl_hist)
+        hist_hdr.addStretch(1)
+
+        export_btn_css = (
+            "QPushButton { background-color: #0F1D33; color: #38BDF8; border: 1px solid #1E3A5F; "
+            "padding: 4px 10px; font-size: 8pt; font-weight: 600; border-radius: 7px; }"
+            "QPushButton:hover { background-color: #162B4D; color: #FFFFFF; border-color: #38BDF8; }"
+        )
+        btn_export_srt = QPushButton("SRT Dışa Aktar")
+        btn_export_srt.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_export_srt.setStyleSheet(export_btn_css)
+        btn_export_srt.clicked.connect(self._export_history_srt)
+        hist_hdr.addWidget(btn_export_srt)
+
+        btn_export_anki = QPushButton("Anki CSV")
+        btn_export_anki.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_export_anki.setStyleSheet(export_btn_css)
+        btn_export_anki.clicked.connect(self._export_history_anki)
+        hist_hdr.addWidget(btn_export_anki)
 
         btn_clear_hist = QPushButton("Geçmişi Temizle")
         btn_clear_hist.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -1535,11 +997,16 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(page_hist)
 
         # ─────────────────────────────────────────────────────────────────────
-        # SEKME 2: GELİŞMİŞ AYARLAR & SİSTEM
+        # SEKME 2: GELİŞMİŞ AYARLAR & SİSTEM (Kaydırılabilir)
         # ─────────────────────────────────────────────────────────────────────
+        page_settings_scroll = QScrollArea()
+        page_settings_scroll.setWidgetResizable(True)
+        page_settings_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        page_settings_scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
         page_settings = QWidget()
+        page_settings.setStyleSheet("background: transparent;")
         settings_lay = QVBoxLayout(page_settings)
-        settings_lay.setContentsMargins(0, 0, 0, 0)
+        settings_lay.setContentsMargins(0, 0, 4, 0)
         settings_lay.setSpacing(12)
 
         # Motor & Algılama Ayarları Kartı
@@ -1674,9 +1141,270 @@ class MainWindow(QMainWindow):
 
         sys_lay.addLayout(tools_row)
         settings_lay.addWidget(sys_card)
-        settings_lay.addStretch(1)
 
-        self.stack.addWidget(page_settings)
+        # ── BAĞLAM FARKINDALIKLI ÇEVİRİ KATMANI & CANLI SES (WHISPER) KARTI ──
+        ai_card = QFrame()
+        ai_card.setObjectName("studioPanel")
+        ai_lay = QVBoxLayout(ai_card)
+        ai_lay.setContentsMargins(16, 14, 16, 14)
+        ai_lay.setSpacing(10)
+
+        lbl_ai_title = QLabel(self.i18n.t("translation_backend_title").upper())
+        lbl_ai_title.setStyleSheet(
+            "color: #94A3B8; font-size: 8.2pt; font-weight: 700; letter-spacing: 0.8px;"
+        )
+        ai_lay.addWidget(lbl_ai_title)
+
+        lbl_ai_desc = QLabel(self.i18n.t("translation_backend_desc"))
+        lbl_ai_desc.setWordWrap(True)
+        lbl_ai_desc.setStyleSheet("color: #64748B; font-size: 8.2pt;")
+        ai_lay.addWidget(lbl_ai_desc)
+
+        ai_grid = QGridLayout()
+        ai_grid.setHorizontalSpacing(14)
+        ai_grid.setVerticalSpacing(6)
+
+        self.combo_tr_backend = FlatComboBox()
+        self.combo_tr_backend.addItem(self.i18n.t("backend_local"), BACKEND_LOCAL_CT2)
+        self.combo_tr_backend.addItem(self.i18n.t("backend_ollama"), BACKEND_OLLAMA)
+        self.combo_tr_backend.addItem(self.i18n.t("backend_gemini"), BACKEND_GEMINI)
+        self.combo_tr_backend.addItem(self.i18n.t("backend_deepl"), BACKEND_DEEPL)
+        self.combo_tr_backend.addItem(self.i18n.t("backend_openai"), BACKEND_OPENAI_COMPAT)
+        saved_backend = self.settings.get("translation_backend", BACKEND_LOCAL_CT2)
+        for i in range(self.combo_tr_backend.count()):
+            if self.combo_tr_backend.itemData(i) == saved_backend:
+                self.combo_tr_backend.setCurrentIndex(i)
+                break
+        self.combo_tr_backend.currentIndexChanged.connect(self._on_translation_backend_changed)
+        ai_grid.addWidget(self.combo_tr_backend, 0, 0, 1, 2)
+
+        input_css = (
+            "QLineEdit { background-color: #090E1A; border: 1px solid #1E2D47; "
+            "border-radius: 7px; padding: 6px 10px; color: #E2E8F0; font-size: 8.5pt; }"
+            "QLineEdit:focus { border: 1px solid #38BDF8; }"
+        )
+        self.edit_tr_endpoint = QLineEdit(self.settings.get("translation_endpoint", ""))
+        self.edit_tr_endpoint.setPlaceholderText(self.i18n.t("backend_endpoint"))
+        self.edit_tr_endpoint.setStyleSheet(input_css)
+        self.edit_tr_endpoint.editingFinished.connect(self._on_translation_backend_changed)
+        ai_grid.addWidget(self.edit_tr_endpoint, 1, 0)
+
+        self.edit_tr_model = QLineEdit(self.settings.get("translation_model", ""))
+        self.edit_tr_model.setPlaceholderText(self.i18n.t("backend_model"))
+        self.edit_tr_model.setStyleSheet(input_css)
+        self.edit_tr_model.editingFinished.connect(self._on_translation_backend_changed)
+        ai_grid.addWidget(self.edit_tr_model, 1, 1)
+
+        self.edit_tr_apikey = QLineEdit(self.settings.get("translation_api_key", ""))
+        self.edit_tr_apikey.setPlaceholderText(self.i18n.t("backend_apikey"))
+        self.edit_tr_apikey.setEchoMode(QLineEdit.EchoMode.Password)
+        self.edit_tr_apikey.setStyleSheet(input_css)
+        self.edit_tr_apikey.editingFinished.connect(self._on_translation_backend_changed)
+        ai_grid.addWidget(self.edit_tr_apikey, 2, 0)
+
+        self.btn_test_backend = QPushButton(self.i18n.t("backend_test_btn"))
+        self.btn_test_backend.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_test_backend.setMinimumHeight(32)
+        self.btn_test_backend.clicked.connect(self._on_test_translation_backend)
+        ai_grid.addWidget(self.btn_test_backend, 2, 1)
+
+        ai_lay.addLayout(ai_grid)
+
+        # Giriş Kaynağı (Ekran OCR vs Opsiyonel Canlı Ses Whisper)
+        sep_audio = QFrame()
+        sep_audio.setFrameShape(QFrame.Shape.HLine)
+        sep_audio.setStyleSheet("color: #1C283E;")
+        ai_lay.addWidget(sep_audio)
+
+        lbl_src_title = QLabel(self.i18n.t("input_source_title").upper())
+        lbl_src_title.setStyleSheet(
+            "color: #94A3B8; font-size: 8.2pt; font-weight: 700; letter-spacing: 0.8px;"
+        )
+        ai_lay.addWidget(lbl_src_title)
+
+        src_row = QHBoxLayout()
+        src_row.setSpacing(12)
+        self.combo_input_source = FlatComboBox()
+        self.combo_input_source.addItem(self.i18n.t("source_ocr"), "ocr")
+        self.combo_input_source.addItem(self.i18n.t("source_audio"), "audio")
+        saved_src = self.settings.get("input_source", "ocr")
+        for i in range(self.combo_input_source.count()):
+            if self.combo_input_source.itemData(i) == saved_src:
+                self.combo_input_source.setCurrentIndex(i)
+                break
+        self.combo_input_source.currentIndexChanged.connect(lambda _: self._save_settings())
+        src_row.addWidget(self.combo_input_source, stretch=2)
+
+        self.combo_whisper_model = FlatComboBox()
+        for wm in ("tiny.en", "base.en", "small.en"):
+            self.combo_whisper_model.addItem(f"Whisper {wm} (INT8 CPU)", wm)
+        saved_wm = self.settings.get("whisper_model", "tiny.en")
+        for i in range(self.combo_whisper_model.count()):
+            if self.combo_whisper_model.itemData(i) == saved_wm:
+                self.combo_whisper_model.setCurrentIndex(i)
+                break
+        self.combo_whisper_model.currentIndexChanged.connect(lambda _: self._save_settings())
+        src_row.addWidget(self.combo_whisper_model, stretch=1)
+        ai_lay.addLayout(src_row)
+
+        audio_caps = detect_audio_capabilities()
+        lbl_audio_status = QLabel(
+            self.i18n.t("audio_ready") if audio_caps.is_ready else self.i18n.t("audio_missing")
+        )
+        lbl_audio_status.setWordWrap(True)
+        lbl_audio_status.setStyleSheet(
+            f"color: {'#34D399' if audio_caps.is_ready else '#94A3B8'}; font-size: 8pt;"
+        )
+        ai_lay.addWidget(lbl_audio_status)
+
+        settings_lay.addWidget(ai_card)
+
+        # ── ARAYÜZ DİLİ (TR/EN) & GÜNCELLEME DENETLEYİCİ KARTI ──
+        meta_card = QFrame()
+        meta_card.setObjectName("studioPanel")
+        meta_lay = QVBoxLayout(meta_card)
+        meta_lay.setContentsMargins(16, 14, 16, 14)
+        meta_lay.setSpacing(10)
+
+        meta_grid = QGridLayout()
+        meta_grid.setHorizontalSpacing(14)
+        meta_grid.setVerticalSpacing(8)
+
+        lbl_lang = QLabel(self.i18n.t("ui_language"))
+        lbl_lang.setStyleSheet("color: #CBD5E1; font-size: 8.8pt; font-weight: 600;")
+        meta_grid.addWidget(lbl_lang, 0, 0)
+
+        self.combo_ui_lang = FlatComboBox()
+        self.combo_ui_lang.addItem("Türkçe (TR)", "tr")
+        self.combo_ui_lang.addItem("English (EN)", "en")
+        for i in range(self.combo_ui_lang.count()):
+            if self.combo_ui_lang.itemData(i) == self.i18n.lang:
+                self.combo_ui_lang.setCurrentIndex(i)
+                break
+        self.combo_ui_lang.currentIndexChanged.connect(self._on_ui_language_changed)
+        meta_grid.addWidget(self.combo_ui_lang, 0, 1)
+
+        self.chk_auto_update = FlatSwitch(self.i18n.t("updates_auto"))
+        self.chk_auto_update.setChecked(bool(self.settings.get("check_updates_on_startup", True)))
+        self.chk_auto_update.toggled.connect(lambda _: self._save_settings())
+        meta_grid.addWidget(self.chk_auto_update, 1, 0)
+
+        upd_row = QHBoxLayout()
+        upd_row.setSpacing(8)
+        self.btn_check_update = QPushButton(self.i18n.t("updates_check_btn"))
+        self.btn_check_update.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_check_update.setMinimumHeight(32)
+        self.btn_check_update.clicked.connect(lambda: self.check_for_updates_async(silent=False))
+        upd_row.addWidget(self.btn_check_update)
+
+        self.btn_open_release = QPushButton(self.i18n.t("updates_download"))
+        self.btn_open_release.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_open_release.setMinimumHeight(32)
+        self.btn_open_release.setVisible(False)
+        self.btn_open_release.clicked.connect(self._open_latest_release_page)
+        upd_row.addWidget(self.btn_open_release)
+        meta_grid.addLayout(upd_row, 1, 1)
+
+        self.lbl_update_status = QLabel(f"SubVision AI v{__version__}")
+        self.lbl_update_status.setStyleSheet("color: #64748B; font-size: 8.2pt;")
+        meta_grid.addWidget(self.lbl_update_status, 2, 0, 1, 2)
+
+        meta_grid.setColumnStretch(0, 1)
+        meta_grid.setColumnStretch(1, 1)
+        meta_lay.addLayout(meta_grid)
+        settings_lay.addWidget(meta_card)
+
+        # ── OYUN / UYGULAMA PROFİLLERİ, ÖZEL SÖZLÜK & KISAYOLLAR KARTI ──
+        prof_card = QFrame()
+        prof_card.setObjectName("studioPanel")
+        prof_lay = QVBoxLayout(prof_card)
+        prof_lay.setContentsMargins(16, 14, 16, 14)
+        prof_lay.setSpacing(10)
+
+        lbl_prof_title = QLabel("PROFİLLER, ÖZEL SÖZLÜK & KISAYOLLAR")
+        lbl_prof_title.setStyleSheet(
+            "color: #94A3B8; font-size: 8.2pt; font-weight: 700; letter-spacing: 0.8px;"
+        )
+        prof_lay.addWidget(lbl_prof_title)
+
+        # Profil satırı
+        prof_row = QHBoxLayout()
+        prof_row.setSpacing(8)
+        self.combo_profile = FlatComboBox()
+        self._refresh_profile_combo()
+        self.combo_profile.currentIndexChanged.connect(self._on_profile_selected)
+        prof_row.addWidget(self.combo_profile, stretch=2)
+
+        btn_save_prof = QPushButton("Profil Kaydet")
+        btn_save_prof.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_save_prof.setMinimumHeight(32)
+        btn_save_prof.clicked.connect(self._on_save_profile_clicked)
+        prof_row.addWidget(btn_save_prof)
+
+        btn_del_prof = QPushButton("Sil")
+        btn_del_prof.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_del_prof.setMinimumHeight(32)
+        btn_del_prof.clicked.connect(self._on_delete_profile_clicked)
+        prof_row.addWidget(btn_del_prof)
+        prof_lay.addLayout(prof_row)
+
+        # Özel JSON Sözlük satırı
+        glos_row = QHBoxLayout()
+        glos_row.setSpacing(10)
+        lbl_glos = QLabel("Özel Oyun/Dizi Sözlüğü (JSON)")
+        lbl_glos.setStyleSheet("color: #CBD5E1; font-size: 8.6pt; font-weight: 600;")
+        glos_row.addWidget(lbl_glos)
+
+        self.combo_glossary_pack = FlatComboBox()
+        self._refresh_glossary_combo()
+        self.combo_glossary_pack.currentIndexChanged.connect(self._on_glossary_pack_changed)
+        glos_row.addWidget(self.combo_glossary_pack, stretch=1)
+        prof_lay.addLayout(glos_row)
+
+        # Özelleştirilebilir Kısayollar (F1-F12)
+        hk_grid = QGridLayout()
+        hk_grid.setHorizontalSpacing(10)
+        hk_grid.setVerticalSpacing(4)
+        hk_labels = [("Alan Seç", "roi"), ("Başlat / Durdur", "toggle"), ("Örnek Sahne", "sample")]
+        self._hk_combos: Dict[str, FlatComboBox] = {}
+        for col_idx, (lbl_txt, hk_key) in enumerate(hk_labels):
+            lbl_hk = QLabel(lbl_txt)
+            lbl_hk.setStyleSheet("color: #94A3B8; font-size: 8pt; font-weight: 600;")
+            hk_grid.addWidget(lbl_hk, 0, col_idx)
+            cb = FlatComboBox()
+            for fn_key in VK_FUNCTION_KEYS:
+                cb.addItem(fn_key, fn_key)
+            cur_val = self._hotkeys.get(hk_key, "F7")
+            idx_val = cb.findData(cur_val)
+            if idx_val >= 0:
+                cb.setCurrentIndex(idx_val)
+            cb.currentIndexChanged.connect(self._on_hotkeys_changed)
+            self._hk_combos[hk_key] = cb
+            hk_grid.addWidget(cb, 1, col_idx)
+        prof_lay.addLayout(hk_grid)
+
+        # Otomatik profil & Sistem tepsisi anahtarları
+        extra_toggles = QHBoxLayout()
+        extra_toggles.setSpacing(16)
+        self.chk_auto_profile = FlatSwitch("Aktif oyuna/uygulamaya göre profil değiştir")
+        self.chk_auto_profile.setChecked(bool(self.settings.get("auto_switch_profiles", False)))
+        self.chk_auto_profile.toggled.connect(self._on_auto_profile_toggled)
+        extra_toggles.addWidget(self.chk_auto_profile)
+
+        self.chk_minimize_tray = FlatSwitch("Kapatınca sistem tepsisine küçült")
+        self.chk_minimize_tray.setChecked(bool(self.settings.get("minimize_to_tray", False)))
+        self.chk_minimize_tray.toggled.connect(lambda _: self._save_settings())
+        extra_toggles.addWidget(self.chk_minimize_tray)
+        extra_toggles.addStretch(1)
+        prof_lay.addLayout(extra_toggles)
+
+        settings_lay.addWidget(prof_card)
+
+        self._sync_backend_inputs_visibility()
+
+        settings_lay.addStretch(1)
+        page_settings_scroll.setWidget(page_settings)
+        self.stack.addWidget(page_settings_scroll)
 
         # ═════════════════════════════════════════════════════════════════════
         # 3. SADE KISAYOL ALT BİLGİ ÇUBUĞU
@@ -1709,7 +1437,37 @@ class MainWindow(QMainWindow):
 
     def _clear_history(self) -> None:
         self.list_history.clear()
+        self._history_entries.clear()
+        self._session_start_ts = time.monotonic()
         self.btn_tab_history.setText("Geçmiş")
+
+    def _export_history_srt(self) -> None:
+        if not self._history_entries:
+            QMessageBox.information(self, "SRT Dışa Aktar", "Dışa aktarılacak çeviri geçmişi henüz yok.")
+            return
+        path, _ = QFileDialog.getSaveFileName(
+            self, "SRT Altyazı Olarak Kaydet", "subvision_subtitles.srt", "SubRip (*.srt)"
+        )
+        if not path:
+            return
+        count = export_history_to_srt(
+            self._history_entries,
+            path,
+            bilingual=self.chk_bilingual.isChecked(),
+        )
+        QMessageBox.information(self, "SRT Dışa Aktar", f"{count} altyazı satırı kaydedildi:\n{path}")
+
+    def _export_history_anki(self) -> None:
+        if not self._history_entries:
+            QMessageBox.information(self, "Anki CSV", "Dışa aktarılacak çeviri geçmişi henüz yok.")
+            return
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Anki Flashcard CSV Olarak Kaydet", "subvision_anki.csv", "CSV (*.csv)"
+        )
+        if not path:
+            return
+        count = export_history_to_anki_csv(self._history_entries, path)
+        QMessageBox.information(self, "Anki CSV", f"{count} kart kaydedildi:\n{path}")
 
     def _set_toggle_button_style(self, active: bool) -> None:
         if active:
@@ -2005,6 +1763,265 @@ class MainWindow(QMainWindow):
         self._sync_ocr_badge(mode)
         self._save_settings()
 
+    def _sync_backend_inputs_visibility(self) -> None:
+        backend = self.combo_tr_backend.currentData() if hasattr(self, "combo_tr_backend") else BACKEND_LOCAL_CT2
+        is_local = backend == BACKEND_LOCAL_CT2
+        needs_key = backend in (BACKEND_GEMINI, BACKEND_DEEPL, BACKEND_OPENAI_COMPAT)
+        self.edit_tr_endpoint.setVisible(not is_local)
+        self.edit_tr_model.setVisible(not is_local and backend != BACKEND_DEEPL)
+        self.edit_tr_apikey.setVisible(needs_key)
+        self.btn_test_backend.setVisible(not is_local)
+        if not is_local:
+            if not self.edit_tr_endpoint.text().strip():
+                self.edit_tr_endpoint.setPlaceholderText(DEFAULT_ENDPOINTS.get(backend, ""))
+            if not self.edit_tr_model.text().strip():
+                self.edit_tr_model.setPlaceholderText(DEFAULT_MODELS.get(backend, ""))
+
+    def _on_translation_backend_changed(self) -> None:
+        self._sync_backend_inputs_visibility()
+        cfg = ContextBackendConfig(
+            backend=str(self.combo_tr_backend.currentData() or BACKEND_LOCAL_CT2),
+            endpoint=self.edit_tr_endpoint.text().strip(),
+            model=self.edit_tr_model.text().strip(),
+            api_key=self.edit_tr_apikey.text().strip(),
+        )
+        self.translator.update_config(cfg)
+        self._save_settings()
+
+    def _on_test_translation_backend(self) -> None:
+        self._on_translation_backend_changed()
+        ok, detail = self.translator.test_connection()
+        if ok:
+            QMessageBox.information(
+                self,
+                self.i18n.t("backend_test_ok"),
+                f"{self.i18n.t('backend_test_ok')}:\n{detail}",
+            )
+        else:
+            QMessageBox.warning(
+                self,
+                self.i18n.t("backend_test_fail"),
+                f"{self.i18n.t('backend_test_fail')}:\n{detail}",
+            )
+
+    def _on_ui_language_changed(self) -> None:
+        lang = str(self.combo_ui_lang.currentData() or "tr")
+        self.i18n.set_language(lang)
+        self._save_settings()
+        if hasattr(self, "btn_tab_main"):
+            self.btn_tab_main.setText(self.i18n.t("tab_home"))
+            self.btn_tab_history.setText(self.i18n.t("tab_history"))
+            self.btn_tab_settings.setText(self.i18n.t("tab_settings"))
+
+    def check_for_updates_async(self, silent: bool = False) -> None:
+        if UpdateCheckerThread is None:
+            return
+        if self.update_thread and self.update_thread.isRunning():
+            return
+        if not silent and hasattr(self, "lbl_update_status"):
+            self.lbl_update_status.setText(self.i18n.t("updates_checking"))
+        self.update_thread = UpdateCheckerThread(current_version=__version__, parent=self)
+        self.update_thread.update_checked.connect(
+            lambda info: self._on_update_checked(info, silent=silent)
+        )
+        self.update_thread.start()
+
+    def _on_update_checked(self, info: UpdateInfo, silent: bool = False) -> None:
+        if info.error:
+            if not silent and hasattr(self, "lbl_update_status"):
+                self.lbl_update_status.setText(self.i18n.t("updates_error"))
+            return
+        if info.is_update_available:
+            self._latest_release_url = info.release_url
+            msg = self.i18n.t(
+                "updates_available",
+                latest=info.latest_version,
+                current=info.current_version,
+            )
+            if hasattr(self, "lbl_update_status"):
+                self.lbl_update_status.setText(msg)
+                self.lbl_update_status.setStyleSheet("color: #FACC15; font-size: 8.2pt; font-weight: 700;")
+            if hasattr(self, "btn_open_release"):
+                self.btn_open_release.setVisible(True)
+        elif not silent and hasattr(self, "lbl_update_status"):
+            self.lbl_update_status.setText(
+                self.i18n.t("updates_up_to_date", version=info.current_version)
+            )
+            self.lbl_update_status.setStyleSheet("color: #34D399; font-size: 8.2pt;")
+
+    def _open_latest_release_page(self) -> None:
+        if self._latest_release_url:
+            webbrowser.open(self._latest_release_url)
+
+    def _refresh_profile_combo(self) -> None:
+        if not hasattr(self, "combo_profile"):
+            return
+        cur = self.combo_profile.currentText()
+        self.combo_profile.blockSignals(True)
+        self.combo_profile.clear()
+        for name in self.profile_manager.list_names():
+            cfg = self.profile_manager.get_profile(name) or {}
+            proc = cfg.get("process_name")
+            label = f"{name} ({proc})" if proc else name
+            self.combo_profile.addItem(label, name)
+        idx = self.combo_profile.findData(cur)
+        if idx >= 0:
+            self.combo_profile.setCurrentIndex(idx)
+        self.combo_profile.blockSignals(False)
+
+    def _refresh_glossary_combo(self) -> None:
+        if not hasattr(self, "combo_glossary_pack"):
+            return
+        self.combo_glossary_pack.blockSignals(True)
+        self.combo_glossary_pack.clear()
+        self.combo_glossary_pack.addItem("Kapalı (Yalnızca Dahili Sözlük)", "none")
+        if self.custom_glossary.packs:
+            self.combo_glossary_pack.addItem(
+                f"Tüm Özel Paketler ({len(self.custom_glossary.packs)} paket)", "all"
+            )
+            for pid, pack in self.custom_glossary.packs.items():
+                self.combo_glossary_pack.addItem(pack.name, pid)
+        idx = self.combo_glossary_pack.findData(self.custom_glossary.active_pack_id)
+        if idx >= 0:
+            self.combo_glossary_pack.setCurrentIndex(idx)
+        self.combo_glossary_pack.blockSignals(False)
+
+    def _on_glossary_pack_changed(self) -> None:
+        pid = str(self.combo_glossary_pack.currentData() or "none")
+        self.custom_glossary.set_active_pack(pid)
+        self.translator.clear_cache()
+        self._save_settings()
+
+    def _on_save_profile_clicked(self) -> None:
+        name, ok = QInputDialog.getText(
+            self,
+            "Profil Kaydet",
+            "Profil adı (örn. Spider-Man 2, Netflix, VLC):",
+            text=str(self.combo_profile.currentData() or "Oyun Profili"),
+        )
+        if not ok or not name.strip():
+            return
+        proc, _ = QInputDialog.getText(
+            self,
+            "Otomatik Uygulama Eşleştirme (Opsiyonel)",
+            "İsteğe bağlı .exe adı (örn. vlc.exe, Spider-Man2.exe — boş bırakılabilir):",
+        )
+        self.profile_manager.save_profile(
+            name=name.strip(),
+            roi=self.roi,
+            ocr_mode=str(self.combo_ocr_mode.currentData() or "fast_mask"),
+            overlay_mode=self._selected_overlay_mode,
+            text_color=self._selected_color,
+            glossary_pack=str(self.combo_glossary_pack.currentData() or "none"),
+            process_name=proc.strip(),
+        )
+        self._refresh_profile_combo()
+        idx = self.combo_profile.findData(name.strip())
+        if idx >= 0:
+            self.combo_profile.setCurrentIndex(idx)
+        self._save_settings()
+
+    def _on_delete_profile_clicked(self) -> None:
+        name = str(self.combo_profile.currentData() or "")
+        if self.profile_manager.delete_profile(name):
+            self._refresh_profile_combo()
+            self._save_settings()
+
+    def _apply_profile_by_name(self, name: str) -> None:
+        cfg = self.profile_manager.get_profile(name)
+        if not cfg:
+            return
+        if isinstance(cfg.get("roi"), dict):
+            self.roi = dict(cfg["roi"])
+            self.overlay.align_to_roi(self.roi)
+            if self.worker and self.worker.running:
+                self.worker.roi = self.roi
+        if cfg.get("ocr_mode"):
+            idx = self.combo_ocr_mode.findData(cfg["ocr_mode"])
+            if idx >= 0:
+                self.combo_ocr_mode.setCurrentIndex(idx)
+        if cfg.get("overlay_mode"):
+            self._selected_overlay_mode = cfg["overlay_mode"]
+        if cfg.get("text_color"):
+            self._selected_color = cfg["text_color"]
+        if cfg.get("glossary_pack"):
+            gidx = self.combo_glossary_pack.findData(cfg["glossary_pack"])
+            if gidx >= 0:
+                self.combo_glossary_pack.setCurrentIndex(gidx)
+        self._update_designer_button_styles()
+        self._on_appearance_changed()
+
+    def _on_profile_selected(self) -> None:
+        name = str(self.combo_profile.currentData() or "")
+        if name:
+            self._apply_profile_by_name(name)
+
+    def _on_auto_profile_toggled(self, checked: bool) -> None:
+        if checked:
+            self._auto_profile_timer.start()
+        else:
+            self._auto_profile_timer.stop()
+        self._save_settings()
+
+    def _check_foreground_profile(self) -> None:
+        proc = get_foreground_process_name()
+        if not proc or proc == self._last_auto_proc:
+            return
+        self._last_auto_proc = proc
+        matched = self.profile_manager.match_process(proc)
+        if matched and matched != str(self.combo_profile.currentData() or ""):
+            idx = self.combo_profile.findData(matched)
+            if idx >= 0:
+                self.combo_profile.setCurrentIndex(idx)
+
+    def _on_hotkeys_changed(self) -> None:
+        for hk_key, cb in self._hk_combos.items():
+            self._hotkeys[hk_key] = str(cb.currentData() or self._hotkeys[hk_key])
+        self._register_global_hotkeys()
+        self._save_settings()
+
+    def _setup_system_tray(self) -> None:
+        if not QSystemTrayIcon.isSystemTrayAvailable():
+            return
+        self.tray_icon = QSystemTrayIcon(create_app_icon(), self)
+        self.tray_icon.setToolTip(f"SubVision AI v{__version__}")
+        menu = QMenu(self)
+
+        act_show = QAction("Stüdyoyu Göster", self)
+        act_show.triggered.connect(self._restore_from_tray)
+        menu.addAction(act_show)
+
+        act_toggle = QAction("Çeviriyi Başlat / Durdur", self)
+        act_toggle.triggered.connect(self.toggle_translation)
+        menu.addAction(act_toggle)
+
+        act_roi = QAction("Altyazı Alanını Seç", self)
+        act_roi.triggered.connect(self.open_roi_selector)
+        menu.addAction(act_roi)
+
+        menu.addSeparator()
+
+        act_quit = QAction("Çıkış", self)
+        act_quit.triggered.connect(self._quit_from_tray)
+        menu.addAction(act_quit)
+
+        self.tray_icon.setContextMenu(menu)
+        self.tray_icon.activated.connect(
+            lambda reason: self._restore_from_tray()
+            if reason == QSystemTrayIcon.ActivationReason.DoubleClick
+            else None
+        )
+        self.tray_icon.show()
+
+    def _restore_from_tray(self) -> None:
+        self.showNormal()
+        self.activateWindow()
+        self.raise_()
+
+    def _quit_from_tray(self) -> None:
+        self._force_quit = True
+        self.close()
+
     def _copy_current_translation(self) -> None:
         tr = self.lbl_tr_preview.text().strip()
         if tr and not tr.startswith("Türkçe çeviri burada"):
@@ -2031,9 +2048,17 @@ class MainWindow(QMainWindow):
         if not self.translator.is_ready:
             return
 
-        if self.worker and self.worker.running:
-            self.worker.stop()
-            self.worker = None
+        is_ocr_active = bool(self.worker and self.worker.running)
+        is_audio_active = bool(self.audio_worker and self.audio_worker.isRunning())
+
+        if is_ocr_active or is_audio_active:
+            if self.worker and self.worker.running:
+                self.worker.stop()
+                self.worker = None
+            if self.audio_worker and self.audio_worker.isRunning():
+                self.audio_worker.stop()
+                self.audio_worker.wait(1500)
+                self.audio_worker = None
             self._set_toggle_button_style(active=False)
             self.lbl_model_status.setText("●  Çeviriye Hazır")
             self.lbl_model_status.setStyleSheet(
@@ -2051,24 +2076,54 @@ class MainWindow(QMainWindow):
             self.lbl_scene_tag.setText(f"Hazır · {self.tuning.scan_fps} FPS")
             self.overlay.set_subtitle("")
         else:
+            input_source = (
+                self.combo_input_source.currentData()
+                if hasattr(self, "combo_input_source")
+                else "ocr"
+            )
             self.overlay.align_to_roi(self.roi)
             self.overlay.set_subtitle("")
-            self.lbl_scene_tag.setText(f"Canlı Yakalama · {self.tuning.scan_fps} FPS")
-            self.worker = CaptureTranslateWorker(
-                ocr_engine=self.ocr_engine,
-                translator=self.translator,
-                roi=self.roi,
-                scan_interval_sec=self.tuning.scan_interval_sec,
-                idle_scan_interval_sec=self.tuning.idle_scan_interval_sec,
-            )
-            self.worker.subtitle_updated.connect(self._on_subtitle_updated)
-            self.worker.subtitle_cleared.connect(self._on_subtitle_cleared)
-            self.worker.status_tick.connect(
-                lambda msg: self.card_total.set_metric(self.card_total.lbl_val.text(), sub_text=msg)
-            )
-            self.worker.start()
 
-            self.lbl_model_status.setText(f"●  Canlı Çeviri Aktif ({self.tuning.scan_fps} FPS)")
+            if input_source == "audio" and AudioCaptureTranslateWorker is not None:
+                whisper_model = (
+                    str(self.combo_whisper_model.currentData() or "tiny.en")
+                    if hasattr(self, "combo_whisper_model")
+                    else "tiny.en"
+                )
+                self.lbl_scene_tag.setText(f"Canlı Ses · Whisper {whisper_model}")
+                self.audio_worker = AudioCaptureTranslateWorker(
+                    translator=self.translator,
+                    model_size=whisper_model,
+                    cpu_threads=self.tuning.nmt_threads,
+                    parent=self,
+                )
+                self.audio_worker.subtitle_updated.connect(self._on_subtitle_updated)
+                self.audio_worker.subtitle_cleared.connect(self._on_subtitle_cleared)
+                self.audio_worker.status_message.connect(
+                    lambda msg: self.lbl_toggle_desc.setText(msg)
+                )
+                self.audio_worker.error_occurred.connect(
+                    lambda err: QMessageBox.warning(self, "Canlı Ses (Whisper)", err)
+                )
+                self.audio_worker.start()
+                self.lbl_model_status.setText(f"●  Canlı Ses Aktif (Whisper {whisper_model})")
+            else:
+                self.lbl_scene_tag.setText(f"Canlı Yakalama · {self.tuning.scan_fps} FPS")
+                self.worker = CaptureTranslateWorker(
+                    ocr_engine=self.ocr_engine,
+                    translator=self.translator,
+                    roi=self.roi,
+                    scan_interval_sec=self.tuning.scan_interval_sec,
+                    idle_scan_interval_sec=self.tuning.idle_scan_interval_sec,
+                )
+                self.worker.subtitle_updated.connect(self._on_subtitle_updated)
+                self.worker.subtitle_cleared.connect(self._on_subtitle_cleared)
+                self.worker.status_tick.connect(
+                    lambda msg: self.card_total.set_metric(self.card_total.lbl_val.text(), sub_text=msg)
+                )
+                self.worker.start()
+                self.lbl_model_status.setText(f"●  Canlı Çeviri Aktif ({self.tuning.scan_fps} FPS)")
+
             self.lbl_model_status.setStyleSheet(
                 """
                 color: #38BDF8;
@@ -2126,6 +2181,14 @@ class MainWindow(QMainWindow):
         self._update_session_kpi()
 
         stamp = datetime.now().strftime("%H:%M:%S")
+        self._history_entries.append(
+            HistoryEntry(
+                timestamp=stamp,
+                en_text=en_text,
+                tr_text=tr_text,
+                elapsed_sec=max(0.0, time.monotonic() - self._session_start_ts),
+            )
+        )
         tag = "ÖNBELLEK" if is_cached else ctype
         card = self._create_history_card(stamp, total_ms, tag, en_text, tr_text)
         item = QListWidgetItem()
@@ -2437,28 +2500,38 @@ class MainWindow(QMainWindow):
         dlg.exec()
 
     def _register_global_hotkeys(self) -> None:
+        for sc in getattr(self, "_shortcuts", []):
+            sc.setEnabled(False)
+            sc.deleteLater()
+
+        roi_key = self._hotkeys.get("roi", "F7")
+        toggle_key = self._hotkeys.get("toggle", "F8")
+        sample_key = self._hotkeys.get("sample", "F9")
+
         self._shortcuts = [
-            QShortcut(QKeySequence("F7"), self, activated=self.open_roi_selector),
-            QShortcut(QKeySequence("F8"), self, activated=self.toggle_translation),
-            QShortcut(QKeySequence("F9"), self, activated=self.run_sample_test),
+            QShortcut(QKeySequence(roi_key), self, activated=self.open_roi_selector),
+            QShortcut(QKeySequence(toggle_key), self, activated=self.toggle_translation),
+            QShortcut(QKeySequence(sample_key), self, activated=self.run_sample_test),
         ]
 
         if sys.platform == "win32":
-            self._key_states = {VK_F7: False, VK_F8: False, VK_F9: False}
-            self._hotkey_timer = QTimer(self)
-            self._hotkey_timer.setInterval(45)
-            self._hotkey_timer.timeout.connect(self._poll_global_hotkeys)
-            self._hotkey_timer.start()
+            self._vk_bindings = (
+                (VK_FUNCTION_KEYS.get(roi_key, VK_F7), self.open_roi_selector),
+                (VK_FUNCTION_KEYS.get(toggle_key, VK_F8), self.toggle_translation),
+                (VK_FUNCTION_KEYS.get(sample_key, VK_F9), self.run_sample_test),
+            )
+            self._key_states = {vk: False for vk, _ in self._vk_bindings}
+            if not hasattr(self, "_hotkey_timer"):
+                self._hotkey_timer = QTimer(self)
+                self._hotkey_timer.setInterval(45)
+                self._hotkey_timer.timeout.connect(self._poll_global_hotkeys)
+                self._hotkey_timer.start()
 
     def _poll_global_hotkeys(self) -> None:
         if sys.platform != "win32":
             return
         try:
-            for vk, callback in (
-                (VK_F7, self.open_roi_selector),
-                (VK_F8, self.toggle_translation),
-                (VK_F9, self.run_sample_test),
-            ):
+            for vk, callback in getattr(self, "_vk_bindings", ()):
                 is_down = bool(ctypes.windll.user32.GetAsyncKeyState(vk) & 0x8000)
                 if is_down and not self._key_states.get(vk, False):
                     self._key_states[vk] = True
@@ -2469,14 +2542,33 @@ class MainWindow(QMainWindow):
             pass
 
     def closeEvent(self, event) -> None:
+        if (
+            not self._force_quit
+            and self.tray_icon is not None
+            and hasattr(self, "chk_minimize_tray")
+            and self.chk_minimize_tray.isChecked()
+        ):
+            event.ignore()
+            self.hide()
+            return
+
         if hasattr(self, "_hotkey_timer"):
             self._hotkey_timer.stop()
+        if hasattr(self, "_auto_profile_timer"):
+            self._auto_profile_timer.stop()
         if hasattr(self, "loader_thread") and self.loader_thread.isRunning():
             self.loader_thread.wait(2000)
         if self.bench_worker and self.bench_worker.isRunning():
             self.bench_worker.wait(2000)
         if self.worker and self.worker.running:
             self.worker.stop()
+        if self.audio_worker and self.audio_worker.isRunning():
+            self.audio_worker.stop()
+            self.audio_worker.wait(1500)
+        if self.update_thread and self.update_thread.isRunning():
+            self.update_thread.wait(1000)
+        if self.tray_icon is not None:
+            self.tray_icon.hide()
         self.overlay.close()
         self.roi_selector.close()
         super().closeEvent(event)

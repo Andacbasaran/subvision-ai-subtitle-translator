@@ -1,0 +1,34 @@
+name: Game / Platform Compatibility Report
+description: Share tested settings for a PC game, streaming platform, or video player.
+title: "[Compatibility]: "
+labels: ["compatibility"]
+body:
+  - type: input
+    id: title_name
+    attributes:
+      label: Game or Platform Name
+      placeholder: "e.g. Elden Ring / Netflix / VLC"
+    validations:
+      required: true
+  - type: dropdown
+    id: status
+    attributes:
+      label: Result
+      options:
+        - Works Great
+        - Works with Tweaks
+        - Issues / Broken
+    validations:
+      required: true
+  - type: input
+    id: settings_used
+    attributes:
+      label: Settings Used
+      placeholder: "e.g. Borderless Windowed, fast_mask, cover mode, Auto-Fit ON"
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes & Tips for Other Users
+      placeholder: Mention subtitle color, background opacity, or any quirks.

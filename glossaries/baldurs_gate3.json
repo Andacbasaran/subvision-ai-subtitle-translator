@@ -1,0 +1,27 @@
+{
+  "name": "Baldur's Gate 3",
+  "description": "Forgotten Realms özel isimleri ve RPG terimleri sözlüğü.",
+  "exact_phrases": {
+    "authority": "Otorite",
+    "long rest": "Uzun Dinlenme",
+    "short rest": "Kısa Dinlenme"
+  },
+  "do_not_translate": [
+    "Baldur's Gate",
+    "Shadowheart",
+    "Astarion",
+    "Lae'zel",
+    "Karlach",
+    "Gale",
+    "Wyll",
+    "Faerûn",
+    "Underdark",
+    "Nautiloid"
+  ],
+  "term_replacements": {
+    "Mind Flayer": "Zihin Yüzen",
+    "Tadpole": "İribaş",
+    "Tiefling": "Tiefling",
+    "Githyanki": "Githyanki"
+  }
+}

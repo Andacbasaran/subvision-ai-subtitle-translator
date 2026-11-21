@@ -1,0 +1,23 @@
+{
+  "name": "Marvel's Spider-Man 2",
+  "description": "Özel isim koruma ve örümcek ağı / karakter terimleri sözlüğü.",
+  "exact_phrases": {
+    "web up": "Ağla sar",
+    "swing by": "Uğrayacağım"
+  },
+  "do_not_translate": [
+    "Spider-Man",
+    "Miles Morales",
+    "Peter Parker",
+    "Oscorp",
+    "Kraven",
+    "Venom",
+    "Brooklyn Visions",
+    "F.E.A.S.T."
+  ],
+  "term_replacements": {
+    "Web-Shooters": "Ağ Atıcılar",
+    "Web-Wings": "Ağ Kanatları",
+    "Symbiote": "Simbiyot"
+  }
+}
