@@ -3,14 +3,19 @@
 All notable changes to **SubVision AI** are documented in this file.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
-
-### Changed
-- **Repository Reorganization:** Consolidated core modules into `subvision/`, moved build and launcher scripts into `scripts/`, moved unit tests into `tests/`, relocated the Inno Setup script to `packaging/inno/installer.iss`, and stopped tracking the compiled `SubVisionAI.exe` binary in git.
-- **Unified CI/CD & Release Pipeline:** Added `.github/workflows/ci.yml` (Ruff lint + Windows/Linux/macOS Python 3.11 test matrix), replaced split release workflows with a single `.github/workflows/release.yml` publishing Windows & macOS assets together with a unified `SHA256SUMS.txt` and download table, and added `.github/release.yml` release note categories.
+## [1.6.0] — 2026-11-23
 
 ### Added
-- **Homebrew Cask Formula:** Added `packaging/homebrew/subvision-ai.rb` for macOS Apple Silicon installation and updated Winget & Scoop manifests to `1.5.0`.
+- **Multi-Language Pack Manager (`subvision/language_packs.py`):** Added pluggable offline CTranslate2 / OPUS-MT language packs supporting `en-tr`, `en-es`, `en-de`, `en-fr`, `en-pt`, `en-ru`, `en-it`, and `ja-en` with on-demand download and switching directly from Settings.
+- **Apple Silicon MPS Acceleration with CPU Fallback:** Added optional Metal Performance Shaders (MPS) GPU acceleration on macOS Apple Silicon (M1–M4) with automatic, crash-free fallback to CPU INT8/FP32 inference.
+- **Community Glossary Hub & 6 New Game Packs (`subvision/glossary_hub.py`, `glossaries/`):** Added an in-app Community Glossary Hub to browse and sync term packs alongside 6 new bundled game glossaries (`elden_ring.json`, `rdr2.json`, `witcher3.json`, `skyrim.json`, `starfield.json`, `persona5.json`), expanding the built-in library to 9 games.
+- **Vocabulary Notebook & Rich HTML Anki `.tsv` Export (`subvision/vocab_learner.py`, `subvision/exporters.py`):** Save notable dialogue terms and idioms while playing or watching into a personal Vocabulary Notebook and export styled, rich-HTML Anki `.tsv` flashcard decks in one click.
+- **Linux & Steam Deck (SteamOS) Packaging & Guide (`scripts/build_linux.py`, `docs/STEAM_DECK_GUIDE.md`):** Added native Linux x64 `.tar.gz` bundle packaging, SteamOS / Steam Deck Gaming Mode setup guide, and a Homebrew Cask formula (`packaging/homebrew/subvision-ai.rb`) for macOS Apple Silicon.
+- **SEO & Interactive TR/EN Official Website (`website/`):** Upgraded `subvisionai.andacbasaran.com` with Cloudflare Worker SSR meta/hreflang localization (`/tr`, `/en`), interactive live subtitle simulator, Studio 2.0 hotspot tour, and automatic latest-release download routing for Windows `.exe`, macOS `.dmg`, and Linux `.tar.gz`.
+
+### Changed
+- **Modular Repository Reorganization:** Consolidated core modules into `subvision/`, moved build and launcher scripts into `scripts/`, moved unit tests into `tests/`, relocated the Inno Setup script to `packaging/inno/installer.iss`, and stopped tracking the compiled `SubVisionAI.exe` binary in git.
+- **Unified 3-Platform CI/CD & Release Pipeline:** Added `.github/workflows/ci.yml` (Ruff lint + Windows/Linux/macOS Python 3.11 test matrix), unified `.github/workflows/release.yml` to publish Windows, macOS, and Linux assets together with a single `SHA256SUMS.txt` and download table, added `.github/release.yml` release note categories, and updated Winget, Scoop, and Homebrew manifests to `1.6.0`.
 
 ## [1.5.0] — 2026-11-23
 

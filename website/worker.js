@@ -4,7 +4,7 @@ const SITE_ORIGIN = "https://subvisionai.andacbasaran.com";
 const GITHUB_REPO = "Andacbasaran/subvision-ai-subtitle-translator";
 const GITHUB_BRANCH = "main";
 const RELEASES_FALLBACK_URL = `https://github.com/${GITHUB_REPO}/releases/latest`;
-const APP_VERSION = "1.5.0";
+const APP_VERSION = "1.6.0";
 
 const SEO_META = {
   tr: {
@@ -13,10 +13,10 @@ const SEO_META = {
     ogLocaleAlt: "en_US",
     title: "SubVision AI — Ekrandaki Her Altyazı. Anında Türkçe.",
     description:
-      "Oyunlar, diziler, filmler ve canlı yayınlar için Windows ve macOS Apple Silicon destekli, ~88 ms gecikmeli, 0 MB VRAM ve %100 çevrimdışı açık kaynak Türkçe altyazı çevirici.",
+      "Oyunlar, diziler, filmler ve canlı yayınlar için Windows, macOS Apple Silicon (MPS) ve Linux / Steam Deck destekli, ~88 ms gecikmeli, 0 MB VRAM ve %100 çevrimdışı açık kaynak çok dilli altyazı çevirici.",
     ogDescription:
-      "Oyunlar ve videolar için Windows ve macOS Apple Silicon'da 0 MB VRAM ve sıfır FPS kaybıyla çalışan açık kaynak kodlu anlık Türkçe altyazı çevirici.",
-    imageAlt: "SubVision AI Studio v1.5.0 — Gerçek Zamanlı Ekran Üstü Altyazı Çevirici Arayüzü"
+      "Oyunlar ve videolar için Windows, macOS Apple Silicon ve Linux / Steam Deck'te 0 MB VRAM ve sıfır FPS kaybıyla çalışan açık kaynak kodlu anlık altyazı çevirici.",
+    imageAlt: "SubVision AI Studio v1.6.0 — Gerçek Zamanlı Ekran Üstü Altyazı Çevirici Arayüzü"
   },
   en: {
     lang: "en",
@@ -24,10 +24,10 @@ const SEO_META = {
     ogLocaleAlt: "tr_TR",
     title: "SubVision AI — Real-Time Offline Subtitle Translator (EN → TR)",
     description:
-      "Ultra-low-latency (~88 ms), 100% offline, 0 MB VRAM real-time English-to-Turkish subtitle translator for PC games, movies, and live streams on Windows and macOS Apple Silicon.",
+      "Ultra-low-latency (~88 ms), 100% offline, 0 MB VRAM real-time multi-language subtitle translator for PC games, movies, and live streams on Windows, macOS Apple Silicon (MPS), and Linux / Steam Deck.",
     ogDescription:
-      "Open-source real-time on-screen & live-audio English-to-Turkish subtitle translator with 0 MB VRAM and zero FPS drop for Windows & macOS Apple Silicon.",
-    imageAlt: "SubVision AI Studio v1.5.0 — Real-Time On-Screen Subtitle Translator Interface"
+      "Open-source real-time on-screen & live-audio subtitle translator with 0 MB VRAM and zero FPS drop for Windows, macOS Apple Silicon & Linux / Steam Deck.",
+    imageAlt: "SubVision AI Studio v1.6.0 — Real-Time On-Screen Subtitle Translator Interface"
   }
 };
 
@@ -193,7 +193,8 @@ async function getLatestReleaseAssetUrls() {
   }
   const result = {
     windowsUrl: RELEASES_FALLBACK_URL,
-    macosUrl: RELEASES_FALLBACK_URL
+    macosUrl: RELEASES_FALLBACK_URL,
+    linuxUrl: RELEASES_FALLBACK_URL
   };
   try {
     const resp = await fetch(
@@ -218,11 +219,17 @@ async function getLatestReleaseAssetUrls() {
       const macAsset =
         assets.find((a) => /SubVisionAI.*macOS.*\.dmg$/i.test(a?.name || "")) ||
         assets.find((a) => /\.dmg$/i.test(a?.name || ""));
+      const linuxAsset =
+        assets.find((a) => /SubVisionAI.*Linux.*\.tar\.gz$/i.test(a?.name || "")) ||
+        assets.find((a) => /\.tar\.gz$/i.test(a?.name || ""));
       if (winAsset?.browser_download_url) {
         result.windowsUrl = winAsset.browser_download_url;
       }
       if (macAsset?.browser_download_url) {
         result.macosUrl = macAsset.browser_download_url;
+      }
+      if (linuxAsset?.browser_download_url) {
+        result.linuxUrl = linuxAsset.browser_download_url;
       }
       cachedReleaseAssets = result;
       cachedReleaseAtMs = now;
@@ -381,6 +388,11 @@ export default {
       if (pathname === "/downloads/SubVisionAI-macOS.dmg") {
         const { macosUrl } = await getLatestReleaseAssetUrls();
         return Response.redirect(macosUrl || RELEASES_FALLBACK_URL, 302);
+      }
+
+      if (pathname === "/downloads/SubVisionAI-Linux.tar.gz") {
+        const { linuxUrl } = await getLatestReleaseAssetUrls();
+        return Response.redirect(linuxUrl || RELEASES_FALLBACK_URL, 302);
       }
 
       const route = STATIC_ROUTES[pathname];

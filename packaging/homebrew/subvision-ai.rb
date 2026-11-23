@@ -1,7 +1,7 @@
 # Homebrew Cask for SubVision AI (macOS Apple Silicon)
 #
 # After publishing a GitHub Release, replace `sha256` with the checksum for
-# `SubVisionAI-v1.5.0-macOS-arm64.dmg` from the release's `SHA256SUMS.txt`.
+# `SubVisionAI-v1.6.0-macOS-arm64.dmg` from the release's `SHA256SUMS.txt`.
 #
 # Install locally from this file:
 #   brew install --cask ./packaging/homebrew/subvision-ai.rb
@@ -14,7 +14,7 @@
 cask "subvision-ai" do
   arch arm: "arm64"
 
-  version "1.5.0"
+  version "1.6.0"
   sha256 "REPLACE_WITH_SHA256_FROM_RELEASE_SHA256SUMS_TXT"
 
   url "https://github.com/Andacbasaran/subvision-ai-subtitle-translator/releases/download/v#{version}/SubVisionAI-v#{version}-macOS-#{arch}.dmg",

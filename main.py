@@ -13,7 +13,7 @@ import webbrowser
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
-from PyQt6.QtCore import QRect, QSize, QThread, QTimer, Qt
+from PyQt6.QtCore import QRect, QSize, QThread, QTimer, Qt, pyqtSignal
 from PyQt6.QtGui import QAction, QFont, QGuiApplication, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QApplication,
@@ -61,6 +61,7 @@ from subvision.exporters import (
     export_history_to_anki_csv,
     export_history_to_srt,
 )
+from subvision.glossary_hub import CommunityGlossaryHub, RemoteGlossaryItem
 from subvision.hardware import (
     HardwareProfile,
     PROFILE_AUTO,
@@ -77,10 +78,11 @@ from subvision.hardware import (
     get_writable_data_dir,
 )
 from subvision.i18n import LanguageManager
+from subvision.language_packs import DEFAULT_LANG_PAIR, LanguagePackManager
 from subvision.ocr_engine import SubtitleOCREngine
 from subvision.overlay_ui import ROISelectorOverlay, SubtitleOverlayWindow
 from subvision.profiles import ProfileManager, get_foreground_process_name
-from subvision.translator import LocalEnTrTranslator
+from subvision.translator import LocalEnTrTranslator, detect_mps_available
 from subvision.ui_widgets import (
     ColorDotSwatch,
     FlatComboBox,
@@ -97,6 +99,7 @@ from subvision.updater import (
     UpdateInfo,
     apply_downloaded_update,
 )
+from subvision.vocab_learner import VocabNotebook, extract_study_words
 from subvision.window_tracker import (
     TargetWindowSpec,
     WindowInfo,
@@ -109,7 +112,8 @@ from subvision.workers import (
     ModelLoaderThread,
 )
 
-APP_TITLE = f"SubVision AI v{__version__} — Real-Time Subtitle Studio (EN -> TR)"
+APP_VERSION = "1.6.0"
+APP_TITLE = f"SubVision AI v{APP_VERSION} — Real-Time Subtitle Studio (EN -> TR)"
 DATA_DIR = get_writable_data_dir()
 CONFIG_PATH = os.path.join(DATA_DIR, "user_settings.json")
 CRASH_LOG_PATH = os.path.join(DATA_DIR, "crash.log")
@@ -119,6 +123,48 @@ VK_F7 = 0x76
 VK_F8 = 0x77
 VK_F9 = 0x78
 VK_FUNCTION_KEYS: Dict[str, int] = {f"F{i}": 0x6F + i for i in range(1, 13)}
+
+
+class _GlossaryHubFetchThread(QThread):
+    """Background thread that fetches community glossary catalog from GitHub."""
+
+    fetched = pyqtSignal(list)
+    failed = pyqtSignal(str)
+
+    def __init__(self, hub: CommunityGlossaryHub, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self._hub = hub
+
+    def run(self) -> None:
+        try:
+            items = self._hub.fetch_catalog()
+            self.fetched.emit(items)
+        except Exception as exc:
+            self.failed.emit(str(exc))
+
+
+class _GlossaryHubInstallThread(QThread):
+    """Background thread that downloads and installs a selected community glossary pack."""
+
+    installed = pyqtSignal(str, str)
+    failed = pyqtSignal(str)
+
+    def __init__(
+        self,
+        hub: CommunityGlossaryHub,
+        item: RemoteGlossaryItem,
+        parent: Optional[QWidget] = None,
+    ):
+        super().__init__(parent)
+        self._hub = hub
+        self._item = item
+
+    def run(self) -> None:
+        try:
+            path = self._hub.install_pack(self._item)
+            self.installed.emit(self._item.pack_id, path)
+        except Exception as exc:
+            self.failed.emit(str(exc))
 
 
 class MainWindow(QMainWindow):
@@ -142,6 +188,10 @@ class MainWindow(QMainWindow):
         self.profile_manager = ProfileManager(self.settings.get("profiles"))
         self.custom_glossary = CustomGlossaryManager()
         self.custom_glossary.set_active_pack(str(self.settings.get("glossary_pack", "none")))
+        self.lang_pack_manager = LanguagePackManager()
+        self.glossary_hub = CommunityGlossaryHub()
+        self.vocab_notebook = VocabNotebook()
+        self._glossary_hub_thread: Optional[QThread] = None
         self._hotkeys: Dict[str, str] = {
             "roi": str((self.settings.get("hotkeys") or {}).get("roi", "F7")),
             "toggle": str((self.settings.get("hotkeys") or {}).get("toggle", "F8")),
@@ -176,6 +226,8 @@ class MainWindow(QMainWindow):
         self._local_translator = LocalEnTrTranslator(
             cpu_threads=self.tuning.nmt_threads,
             compute_type_candidates=self.tuning.compute_type_candidates,
+            lang_pair=self.settings.get("lang_pair", DEFAULT_LANG_PAIR),
+            device=self.settings.get("nmt_device", "cpu"),
         )
         self.translator = ContextAwareTranslator(
             local_translator=self._local_translator,
@@ -314,13 +366,19 @@ class MainWindow(QMainWindow):
             return self._default_roi()
 
     def _load_settings(self) -> dict:
+        defaults = {
+            "lang_pair": DEFAULT_LANG_PAIR,
+            "nmt_device": "cpu",
+        }
         if os.path.exists(CONFIG_PATH):
             try:
                 with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-                    return json.load(f)
+                    loaded = json.load(f)
+                if isinstance(loaded, dict):
+                    defaults.update(loaded)
             except Exception:
                 pass
-        return {}
+        return defaults
 
     def _save_settings(self) -> None:
         data = {
@@ -331,6 +389,16 @@ class MainWindow(QMainWindow):
             "overlay_mode": self._selected_overlay_mode,
             "ocr_mode": self.combo_ocr_mode.currentData(),
             "performance_profile": self.combo_perf_profile.currentData(),
+            "lang_pair": (
+                self.lang_pair_combo.currentData()
+                if hasattr(self, "lang_pair_combo")
+                else self.settings.get("lang_pair", DEFAULT_LANG_PAIR)
+            ),
+            "nmt_device": (
+                "mps"
+                if (hasattr(self, "chk_mps_accel") and self.chk_mps_accel.isChecked())
+                else "cpu"
+            ),
             "show_bilingual": self.chk_bilingual.isChecked(),
             "auto_fit_font": self.chk_autofit.isChecked(),
             "ui_language": self.combo_ui_lang.currentData() if hasattr(self, "combo_ui_lang") else self.i18n.lang,
@@ -557,7 +625,7 @@ class MainWindow(QMainWindow):
         title_lbl.setStyleSheet("color: #FAFAFA; letter-spacing: -0.2px;")
         brand_top.addWidget(title_lbl)
 
-        ver_lbl = QLabel(f"v{__version__}")
+        ver_lbl = QLabel(f"v{APP_VERSION}")
         ver_lbl.setStyleSheet("color: #71717A; font-size: 7.5pt; font-weight: 600;")
         brand_top.addWidget(ver_lbl)
         brand_top.addStretch(1)
@@ -1158,6 +1226,21 @@ class MainWindow(QMainWindow):
             "padding: 5px 11px; font-size: 8pt; font-weight: 600; border-radius: 6px; }"
             "QPushButton:hover { background-color: #23232A; color: #FFFFFF; border-color: #3F3F4A; }"
         )
+        self.lbl_vocab_count = QLabel(
+            self.i18n.t("vocab_status_label", count=len(self.vocab_notebook.list_cards()))
+        )
+        self.lbl_vocab_count.setStyleSheet(
+            "color: #F59E0B; background-color: #19191E; border: 1px solid #2A2A32; "
+            "padding: 4px 9px; font-size: 7.8pt; font-weight: 700; border-radius: 6px;"
+        )
+        hist_hdr.addWidget(self.lbl_vocab_count)
+
+        self.btn_save_vocab = QPushButton(self.i18n.t("vocab_save_btn"))
+        self.btn_save_vocab.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_save_vocab.setStyleSheet(export_btn_css)
+        self.btn_save_vocab.clicked.connect(self._save_selected_history_words)
+        hist_hdr.addWidget(self.btn_save_vocab)
+
         btn_export_srt = QPushButton("SRT Dışa Aktar")
         btn_export_srt.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_export_srt.setStyleSheet(export_btn_css)
@@ -1169,6 +1252,12 @@ class MainWindow(QMainWindow):
         btn_export_anki.setStyleSheet(export_btn_css)
         btn_export_anki.clicked.connect(self._export_history_anki)
         hist_hdr.addWidget(btn_export_anki)
+
+        self.btn_export_vocab_tsv = QPushButton(self.i18n.t("vocab_export_tsv_btn"))
+        self.btn_export_vocab_tsv.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_export_vocab_tsv.setStyleSheet(export_btn_css)
+        self.btn_export_vocab_tsv.clicked.connect(self._export_vocab_anki_tsv)
+        hist_hdr.addWidget(self.btn_export_vocab_tsv)
 
         btn_clear_hist = QPushButton("Temizle")
         btn_clear_hist.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -1328,6 +1417,35 @@ class MainWindow(QMainWindow):
         self.combo_tr_backend.currentIndexChanged.connect(self._on_translation_backend_changed)
         eng_lay.addLayout(_make_setting_row("Çeviri Katmanı", self.combo_tr_backend))
 
+        # Çeviri Dil Çifti (Multi-Language Pack)
+        self.lang_pair_combo = FlatComboBox()
+        self._refresh_lang_pair_combo()
+        self.lang_pair_combo.currentIndexChanged.connect(self._on_lang_pair_changed)
+        eng_lay.addLayout(_make_setting_row(self.i18n.t("lang_pair_title"), self.lang_pair_combo))
+
+        self.lbl_lang_pair_hint = QLabel("")
+        self.lbl_lang_pair_hint.setWordWrap(True)
+        self.lbl_lang_pair_hint.setStyleSheet("color: #F59E0B; font-size: 7.8pt;")
+        self.lbl_lang_pair_hint.setVisible(False)
+        eng_lay.addWidget(self.lbl_lang_pair_hint)
+
+        # Apple Silicon MPS Hızlandırma (Opsiyonel — Varsayılan: CPU / 0 MB VRAM)
+        mps_supported = detect_mps_available()
+        self.chk_mps_accel = FlatSwitch(self.i18n.t("mps_accel_label"))
+        self.chk_mps_accel.setToolTip(self.i18n.t("mps_accel_tooltip"))
+        self.chk_mps_accel.setChecked(
+            mps_supported and str(self.settings.get("nmt_device", "cpu")).lower() == "mps"
+        )
+        self.chk_mps_accel.setEnabled(mps_supported)
+        self.chk_mps_accel.toggled.connect(self._on_mps_accel_toggled)
+        eng_lay.addWidget(self.chk_mps_accel)
+
+        self.lbl_mps_note = QLabel(self.i18n.t("mps_accel_unavailable_note"))
+        self.lbl_mps_note.setWordWrap(True)
+        self.lbl_mps_note.setStyleSheet("color: #71717A; font-size: 7.6pt;")
+        self.lbl_mps_note.setVisible(not mps_supported)
+        eng_lay.addWidget(self.lbl_mps_note)
+
         # Harici / Ollama Bağlam Alanları (Yalnızca yerel dışı seçilince açılır)
         ai_grid = QGridLayout()
         ai_grid.setHorizontalSpacing(10)
@@ -1438,10 +1556,21 @@ class MainWindow(QMainWindow):
         prof_row.addWidget(btn_del_prof)
         prof_lay.addLayout(_make_setting_row("Aktif Oyun Profili", prof_wrap))
 
+        glossary_wrap = QWidget()
+        glossary_row = QHBoxLayout(glossary_wrap)
+        glossary_row.setContentsMargins(0, 0, 0, 0)
+        glossary_row.setSpacing(6)
         self.combo_glossary_pack = FlatComboBox()
         self._refresh_glossary_combo()
         self.combo_glossary_pack.currentIndexChanged.connect(self._on_glossary_pack_changed)
-        prof_lay.addLayout(_make_setting_row("Özel Terim Sözlüğü (JSON)", self.combo_glossary_pack))
+        glossary_row.addWidget(self.combo_glossary_pack, stretch=1)
+
+        self.btn_glossary_hub = QPushButton(self.i18n.t("glossary_hub_btn"))
+        self.btn_glossary_hub.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_glossary_hub.setMinimumHeight(30)
+        self.btn_glossary_hub.clicked.connect(self._open_glossary_hub_dialog)
+        glossary_row.addWidget(self.btn_glossary_hub)
+        prof_lay.addLayout(_make_setting_row("Özel Terim Sözlüğü (JSON)", glossary_wrap))
 
         tools_row = QHBoxLayout()
         tools_row.setSpacing(10)
@@ -1531,7 +1660,7 @@ class MainWindow(QMainWindow):
 
         upd_row = QHBoxLayout()
         upd_row.setSpacing(8)
-        self.lbl_update_status = QLabel(f"SubVision v{__version__}")
+        self.lbl_update_status = QLabel(f"SubVision v{APP_VERSION}")
         self.lbl_update_status.setStyleSheet("color: #71717A; font-size: 8pt;")
         upd_row.addWidget(self.lbl_update_status, stretch=1)
 
@@ -1638,6 +1767,95 @@ class MainWindow(QMainWindow):
             return
         count = export_history_to_anki_csv(self._history_entries, path)
         QMessageBox.information(self, "Anki CSV", f"{count} kart kaydedildi:\n{path}")
+
+    def _refresh_vocab_status(self) -> None:
+        if hasattr(self, "lbl_vocab_count"):
+            total = len(self.vocab_notebook.list_cards())
+            self.lbl_vocab_count.setText(self.i18n.t("vocab_status_label", count=total))
+
+    def _save_selected_history_words(self, silent: bool = False) -> int:
+        entry: Optional[HistoryEntry] = None
+        if hasattr(self, "list_history"):
+            cur_item = self.list_history.currentItem()
+            if cur_item is not None:
+                data = cur_item.data(Qt.ItemDataRole.UserRole + 1)
+                if isinstance(data, HistoryEntry):
+                    entry = data
+        if entry is None and self._history_entries:
+            entry = self._history_entries[-1]
+
+        if entry is None:
+            if not silent:
+                QMessageBox.information(
+                    self,
+                    self.i18n.t("vocab_save_btn"),
+                    self.i18n.t("vocab_empty_history"),
+                )
+            return 0
+
+        words = extract_study_words(entry.en_text)
+        if not words:
+            if not silent:
+                QMessageBox.information(
+                    self,
+                    self.i18n.t("vocab_save_btn"),
+                    self.i18n.t("vocab_no_words"),
+                )
+            return 0
+
+        source_label = ""
+        if self._target_window and self._target_window.process_name:
+            source_label = self._target_window.process_name
+        elif hasattr(self, "combo_profile") and self.combo_profile.currentData():
+            source_label = str(self.combo_profile.currentData())
+
+        added = 0
+        for w in words:
+            self.vocab_notebook.add_card(
+                word=w,
+                translation=entry.tr_text,
+                context_en=entry.en_text,
+                context_tr=entry.tr_text,
+                source=source_label,
+            )
+            added += 1
+
+        self._refresh_vocab_status()
+        if not silent:
+            QMessageBox.information(
+                self,
+                self.i18n.t("vocab_save_btn"),
+                self.i18n.t(
+                    "vocab_saved_msg",
+                    added=added,
+                    total=len(self.vocab_notebook.list_cards()),
+                ),
+            )
+        return added
+
+    def _export_vocab_anki_tsv(self) -> None:
+        cards = self.vocab_notebook.list_cards()
+        if not cards:
+            QMessageBox.information(
+                self,
+                self.i18n.t("vocab_export_tsv_btn"),
+                self.i18n.t("vocab_empty_notebook"),
+            )
+            return
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            self.i18n.t("vocab_export_tsv_btn"),
+            "subvision_vocab_anki.tsv",
+            "Anki TSV (*.tsv);;All Files (*)",
+        )
+        if not path:
+            return
+        count = self.vocab_notebook.export_anki_tsv(path)
+        QMessageBox.information(
+            self,
+            self.i18n.t("vocab_export_tsv_btn"),
+            self.i18n.t("vocab_export_ok", count=count, path=path),
+        )
 
     def _set_toggle_button_style(self, active: bool) -> None:
         hk = self._hotkeys.get("toggle", "F8")
@@ -2140,7 +2358,7 @@ class MainWindow(QMainWindow):
             return
         if not silent and hasattr(self, "lbl_update_status"):
             self.lbl_update_status.setText(self.i18n.t("updates_checking"))
-        self.update_thread = UpdateCheckerThread(current_version=__version__, parent=self)
+        self.update_thread = UpdateCheckerThread(current_version=APP_VERSION, parent=self)
         self.update_thread.update_checked.connect(
             lambda info: self._on_update_checked(info, silent=silent)
         )
@@ -2343,6 +2561,155 @@ class MainWindow(QMainWindow):
         self.translator.clear_cache()
         self._save_settings()
 
+    def _refresh_lang_pair_combo(self) -> None:
+        if not hasattr(self, "lang_pair_combo"):
+            return
+        self.lang_pair_combo.blockSignals(True)
+        self.lang_pair_combo.clear()
+        saved_pair = str(self.settings.get("lang_pair", DEFAULT_LANG_PAIR)).strip().lower()
+        for pack in self.lang_pack_manager.list_packs():
+            if self.lang_pack_manager.is_installed(pack.pair_id):
+                badge = f"✓ {self.i18n.t('lang_pair_installed')}"
+            else:
+                badge = f"~{pack.approx_size_mb} MB · {self.i18n.t('lang_pair_downloadable')}"
+            self.lang_pair_combo.addItem(f"{pack.display_name}  [{badge}]", pack.pair_id)
+        idx = self.lang_pair_combo.findData(saved_pair)
+        if idx >= 0:
+            self.lang_pair_combo.setCurrentIndex(idx)
+        self.lang_pair_combo.blockSignals(False)
+
+    def _on_lang_pair_changed(self) -> None:
+        if not hasattr(self, "lang_pair_combo"):
+            return
+        pair_id = str(self.lang_pair_combo.currentData() or DEFAULT_LANG_PAIR).strip().lower()
+        self.settings["lang_pair"] = pair_id
+        pack = self.lang_pack_manager.get_pack(pair_id)
+        if hasattr(self, "card_nmt") and pack is not None:
+            self.card_nmt.set_metric(
+                self.card_nmt.lbl_val.text(),
+                sub_text=f"Opus-MT {pack.source_lang.upper()} → {pack.target_lang.upper()}",
+            )
+        if hasattr(self, "lbl_lang_pair_hint"):
+            changed = pair_id != getattr(self._local_translator, "lang_pair", DEFAULT_LANG_PAIR)
+            self.lbl_lang_pair_hint.setText(
+                self.i18n.t("lang_pair_restart_hint", pair=pair_id.upper())
+            )
+            self.lbl_lang_pair_hint.setVisible(changed)
+        self._save_settings()
+
+    def _on_mps_accel_toggled(self, checked: bool) -> None:
+        self.settings["nmt_device"] = "mps" if checked else "cpu"
+        self._save_settings()
+
+    def _open_glossary_hub_dialog(self) -> None:
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self.i18n.t("glossary_hub_title"))
+        dlg.setMinimumSize(480, 360)
+        dlg.setStyleSheet(
+            """
+            QDialog { background-color: #0E0E11; color: #F4F4F5; }
+            QLabel { color: #D4D4D8; font-size: 8.8pt; }
+            QListWidget {
+                background-color: #141417; color: #F4F4F5;
+                border: 1px solid #24242A; border-radius: 8px; padding: 4px;
+            }
+            QListWidget::item { padding: 7px 10px; border-radius: 5px; }
+            QListWidget::item:selected { background-color: #25252D; color: #FFFFFF; }
+            QPushButton {
+                background-color: #1E1E24; color: #F4F4F5;
+                border: 1px solid #32323C; border-radius: 7px;
+                padding: 6px 14px; font-weight: 600;
+            }
+            QPushButton:hover { background-color: #2B2B34; border-color: #52525E; }
+            QPushButton:disabled { color: #52525B; background-color: #151519; }
+            """
+        )
+
+        lay = QVBoxLayout(dlg)
+        lay.setContentsMargins(16, 16, 16, 16)
+        lay.setSpacing(10)
+
+        lbl_status = QLabel(self.i18n.t("glossary_hub_loading"))
+        lbl_status.setWordWrap(True)
+        lay.addWidget(lbl_status)
+
+        list_widget = QListWidget()
+        lay.addWidget(list_widget, stretch=1)
+
+        btn_row = QHBoxLayout()
+        btn_row.addStretch(1)
+        btn_install = QPushButton(self.i18n.t("glossary_hub_install_btn"))
+        btn_install.setEnabled(False)
+        btn_close = QPushButton("Kapat" if self.i18n.lang == "tr" else "Close")
+        btn_close.clicked.connect(dlg.reject)
+        btn_row.addWidget(btn_install)
+        btn_row.addWidget(btn_close)
+        lay.addLayout(btn_row)
+
+        def _populate(items: List[RemoteGlossaryItem]) -> None:
+            list_widget.clear()
+            if not items:
+                lbl_status.setText(self.i18n.t("glossary_hub_empty"))
+                return
+            lbl_status.setText(f"{len(items)} paket bulundu" if self.i18n.lang == "tr" else f"{len(items)} pack(s) found")
+            for item in items:
+                status_tag = (
+                    self.i18n.t("glossary_hub_installed")
+                    if item.is_local
+                    else self.i18n.t("glossary_hub_available")
+                )
+                size_kb = max(1, round(item.size_bytes / 1024)) if item.size_bytes else 0
+                label = f"{item.pack_id}  ({size_kb} KB · {status_tag})"
+                row = QListWidgetItem(label)
+                row.setData(Qt.ItemDataRole.UserRole, item)
+                list_widget.addItem(row)
+
+        def _on_sel_changed() -> None:
+            cur = list_widget.currentItem()
+            item = cur.data(Qt.ItemDataRole.UserRole) if cur else None
+            btn_install.setEnabled(isinstance(item, RemoteGlossaryItem) and bool(item.download_url))
+
+        list_widget.currentItemChanged.connect(lambda _c, _p: _on_sel_changed())
+
+        def _on_install_clicked() -> None:
+            cur = list_widget.currentItem()
+            item = cur.data(Qt.ItemDataRole.UserRole) if cur else None
+            if not isinstance(item, RemoteGlossaryItem) or not item.download_url:
+                return
+            btn_install.setEnabled(False)
+            lbl_status.setText(f"{item.pack_id}...")
+            inst_thread = _GlossaryHubInstallThread(self.glossary_hub, item, parent=dlg)
+
+            def _on_installed(pack_id: str, _path: str) -> None:
+                self.custom_glossary.reload()
+                self._refresh_glossary_combo()
+                lbl_status.setText(self.i18n.t("glossary_hub_install_ok", pack=pack_id))
+                btn_install.setEnabled(True)
+
+            def _on_inst_err(err: str) -> None:
+                lbl_status.setText(self.i18n.t("glossary_hub_install_err", err=err))
+                btn_install.setEnabled(True)
+
+            inst_thread.installed.connect(_on_installed)
+            inst_thread.failed.connect(_on_inst_err)
+            self._glossary_hub_thread = inst_thread
+            inst_thread.start()
+
+        btn_install.clicked.connect(_on_install_clicked)
+
+        fetch_thread = _GlossaryHubFetchThread(self.glossary_hub, parent=dlg)
+        fetch_thread.fetched.connect(_populate)
+        fetch_thread.failed.connect(
+            lambda err: lbl_status.setText(self.i18n.t("glossary_hub_install_err", err=err))
+        )
+        self._glossary_hub_thread = fetch_thread
+        fetch_thread.start()
+        dlg.exec()
+        if fetch_thread.isRunning():
+            fetch_thread.wait(1500)
+        if self._glossary_hub_thread and self._glossary_hub_thread.isRunning():
+            self._glossary_hub_thread.wait(1500)
+
     def _on_save_profile_clicked(self) -> None:
         name, ok = QInputDialog.getText(
             self,
@@ -2442,7 +2809,7 @@ class MainWindow(QMainWindow):
         if not QSystemTrayIcon.isSystemTrayAvailable():
             return
         self.tray_icon = QSystemTrayIcon(create_app_icon(), self)
-        self.tray_icon.setToolTip(f"SubVision AI v{__version__}")
+        self.tray_icon.setToolTip(f"SubVision AI v{APP_VERSION}")
         menu = QMenu(self)
 
         act_show = QAction("Stüdyoyu Göster", self)
@@ -2673,18 +3040,18 @@ class MainWindow(QMainWindow):
         self._update_session_kpi()
 
         stamp = datetime.now().strftime("%H:%M:%S")
-        self._history_entries.append(
-            HistoryEntry(
-                timestamp=stamp,
-                en_text=en_text,
-                tr_text=tr_text,
-                elapsed_sec=max(0.0, time.monotonic() - self._session_start_ts),
-            )
+        entry = HistoryEntry(
+            timestamp=stamp,
+            en_text=en_text,
+            tr_text=tr_text,
+            elapsed_sec=max(0.0, time.monotonic() - self._session_start_ts),
         )
+        self._history_entries.append(entry)
         tag = "ÖNBELLEK" if is_cached else ctype
         card = self._create_history_card(stamp, total_ms, tag, en_text, tr_text)
         item = QListWidgetItem()
         item.setData(Qt.ItemDataRole.UserRole, tr_text)
+        item.setData(Qt.ItemDataRole.UserRole + 1, entry)
         vp_w = self.list_history.viewport().width()
         avail_w = (vp_w - 16) if vp_w > 400 else max(520, self.width() - 84)
         card.resize(avail_w, 64)
@@ -3061,6 +3428,8 @@ class MainWindow(QMainWindow):
             self._auto_profile_timer.stop()
         if hasattr(self, "loader_thread") and self.loader_thread.isRunning():
             self.loader_thread.wait(2000)
+        if self._glossary_hub_thread and self._glossary_hub_thread.isRunning():
+            self._glossary_hub_thread.wait(1500)
         if self.bench_worker and self.bench_worker.isRunning():
             self.bench_worker.wait(2000)
         if self.worker and self.worker.running:

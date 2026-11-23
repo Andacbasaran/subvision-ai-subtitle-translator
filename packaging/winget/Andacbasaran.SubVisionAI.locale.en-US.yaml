@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.6.0.schema.json
 PackageIdentifier: Andacbasaran.SubVisionAI
-PackageVersion: 1.5.0
+PackageVersion: 1.6.0
 PackageLocale: en-US
 Publisher: Andac Basaran
 PublisherUrl: https://subvisionai.andacbasaran.com/
@@ -24,6 +24,6 @@ Tags:
   - overlay
   - offline
   - ai
-ReleaseNotesUrl: https://github.com/Andacbasaran/subvision-ai-subtitle-translator/releases/tag/v1.5.0
+ReleaseNotesUrl: https://github.com/Andacbasaran/subvision-ai-subtitle-translator/releases/tag/v1.6.0
 ManifestType: defaultLocale
 ManifestVersion: 1.6.0

@@ -4,14 +4,15 @@
 
 # ⚡ SubVision AI — Gerçek Zamanlı Ekran Üstü & Canlı Ses Altyazı Stüdyosu (EN ➔ TR)
 
-**🇬🇧 [English README](README.md)** · **🇹🇷 Türkçe (Aktif)** · **[🎮 Uyumluluk Matrisi](COMPATIBILITY.md)** · **[🤝 Katkıda Bulun](CONTRIBUTING.md)** · **[🛡️ Güvenlik](SECURITY.md)** · **[📜 Değişiklik Günlüğü](CHANGELOG.md)**
+**🇬🇧 [English README](README.md)** · **🇹🇷 Türkçe (Aktif)** · **[🎮 Uyumluluk Matrisi](COMPATIBILITY.md)** · **[🕹️ Steam Deck Rehberi](docs/STEAM_DECK_GUIDE.md)** · **[🤝 Katkıda Bulun](CONTRIBUTING.md)** · **[🛡️ Güvenlik](SECURITY.md)** · **[📜 Değişiklik Günlüğü](CHANGELOG.md)**
 
-**Oyunlar, Diziler, Filmler ve Canlı Yayınlar İçin Ultra Düşük Gecikmeli (~88 ms), %100 Çevrimdışı, 0 MB VRAM Ekran Üstü & Canlı Ses Türkçe Altyazı Çevirici — Windows x64 & macOS Apple Silicon (M1–M4) Yerel Desteğiyle**
+**Oyunlar, Diziler, Filmler ve Canlı Yayınlar İçin Ultra Düşük Gecikmeli (~88 ms), %100 Çevrimdışı, 0 MB VRAM Çok Dilli Ekran Üstü & Canlı Ses Altyazı Çevirici — Windows x64, macOS Apple Silicon (MPS) ve Linux / Steam Deck Yerel Desteğiyle**
 
 [![Resmi Web Sitesi](https://img.shields.io/badge/🌐_Resmi_Web_Sitesi-subvisionai.andacbasaran.com-0EA5E9?style=for-the-badge)](https://subvisionai.andacbasaran.com/)
-[![Windows İndir](https://img.shields.io/badge/⬇️_Windows_x64-SubVisionAI.exe_(v1.5.0)-2563EB?style=for-the-badge&logo=windows&logoColor=white)](https://subvisionai.andacbasaran.com/downloads/SubVisionAI.exe)
-[![macOS İndir](https://img.shields.io/badge/⬇️_macOS_Apple_Silicon-SubVisionAI--macOS.dmg_(v1.5.0)-18181B?style=for-the-badge&logo=apple&logoColor=white)](https://subvisionai.andacbasaran.com/downloads/SubVisionAI-macOS.dmg)
-[![GitHub Releases](https://img.shields.io/badge/📦_Tüm_Paketler-Setup_%2F_Portable_%2F_DMG-1D4ED8?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Andacbasaran/subvision-ai-subtitle-translator/releases/latest)
+[![Windows İndir](https://img.shields.io/badge/⬇️_Windows_x64-SubVisionAI.exe_(v1.6.0)-2563EB?style=for-the-badge&logo=windows&logoColor=white)](https://subvisionai.andacbasaran.com/downloads/SubVisionAI.exe)
+[![macOS İndir](https://img.shields.io/badge/⬇️_macOS_Apple_Silicon-SubVisionAI--macOS.dmg_(v1.6.0)-18181B?style=for-the-badge&logo=apple&logoColor=white)](https://subvisionai.andacbasaran.com/downloads/SubVisionAI-macOS.dmg)
+[![Linux / Steam Deck İndir](https://img.shields.io/badge/⬇️_Linux_%2F_Steam_Deck-SubVisionAI--Linux.tar.gz_(v1.6.0)-E95420?style=for-the-badge&logo=linux&logoColor=white)](https://subvisionai.andacbasaran.com/downloads/SubVisionAI-Linux.tar.gz)
+[![GitHub Releases](https://img.shields.io/badge/📦_Tüm_Paketler-Win_%2F_macOS_%2F_Linux-1D4ED8?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Andacbasaran/subvision-ai-subtitle-translator/releases/latest)
 
 [![CI](https://github.com/Andacbasaran/subvision-ai-subtitle-translator/actions/workflows/ci.yml/badge.svg)](https://github.com/Andacbasaran/subvision-ai-subtitle-translator/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/Andacbasaran/subvision-ai-subtitle-translator?style=flat-square&color=F59E0B)](https://github.com/Andacbasaran/subvision-ai-subtitle-translator/releases/latest)
@@ -26,45 +27,45 @@
 
 <br/>
 
-[**✨ Neden SubVision AI?**](#-neden-subvision-ai-v150-yenilikleri) · [**🖥️ Arayüz**](#️-uygulama-arayüzü-subvision-ai-studio-20) · [**⚖️ Karşılaştırma**](#️-alternatiflerle-karşılaştırma) · [**🚀 İndirme & Kurulum**](#-indirme-kurulum-ve-opsiyonel-kaldırma) · [**🎮 2 Tuşla Kullanım**](#-2-tuşla-kullanım--global-kısayollar) · [**📊 Benchmark**](#-performans-testleri-ve-benchmark-analizi) · [**🧠 Mimari**](#-sistem-mimarisi-asenkron-pipeline-architecture) · [**🗺️ Yol Haritası**](#️-yol-haritası-roadmap)
+[**✨ Neden SubVision AI?**](#-neden-subvision-ai-v160-yenilikleri) · [**🖥️ Arayüz**](#️-uygulama-arayüzü-subvision-ai-studio-20) · [**⚖️ Karşılaştırma**](#️-alternatiflerle-karşılaştırma) · [**🚀 İndirme & Kurulum**](#-indirme-kurulum-ve-opsiyonel-kaldırma) · [**🎮 2 Tuşla Kullanım**](#-2-tuşla-kullanım--global-kısayollar) · [**📊 Benchmark**](#-performans-testleri-ve-benchmark-analizi) · [**🧠 Mimari**](#-sistem-mimarisi-asenkron-pipeline-architecture) · [**🗺️ Yol Haritası**](#️-yol-haritası-roadmap)
 
 </div>
 
 ---
 
-## ✨ Neden SubVision AI? (v1.5.0 Yenilikleri)
+## ✨ Neden SubVision AI? (v1.6.0 Yenilikleri)
 
-**SubVision AI**, ekranda açık olan herhangi bir **PC Oyunu** *(Spider-Man 2, RDR2, Baldur's Gate 3, Cyberpunk 2077 vb.)*, **Dizi / Film Platformu** *(Netflix, Prime Video, Disney+, VLC, Blu-ray)* veya **Canlı Yayın / Video** *(YouTube, Twitch, Udemy)* üzerindeki İngilizce altyazıları gerçek zamanlı okuyan, **tamamen kendi bilgisayarınızda (`%100 Çevrimdışı CPU`)** Türkçeye çeviren ve orijinal altyazının tam üzerine şeffaf bir **`Click-Through Overlay`** olarak yansıtan açık kaynak kodlu masaüstü stüdyosudur.
+**SubVision AI**, ekranda açık olan herhangi bir **PC Oyunu** *(Spider-Man 2, Elden Ring, RDR2, The Witcher 3, Baldur's Gate 3, Cyberpunk 2077, Skyrim, Starfield, Persona 5 vb.)*, **Dizi / Film Platformu** *(Netflix, Prime Video, Disney+, VLC, Blu-ray)* veya **Canlı Yayın / Video** *(YouTube, Twitch, Udemy)* üzerindeki altyazıları gerçek zamanlı okuyan, **tamamen kendi bilgisayarınızda (`%100 Çevrimdışı`)** çeviren ve orijinal altyazının tam üzerine şeffaf bir **`Click-Through Overlay`** olarak yansıtan açık kaynak kodlu masaüstü stüdyosudur.
 
 <table>
   <tr>
     <td width="50%">
-      <b>🎨 Studio 2.0 & Sıkı Dinamik Hizalama (v1.5.0)</b><br/>
-      Yeni <b>Cinema Frame</b> logosu ve sadeleştirilmiş koyu stüdyo arayüzü. Orijinal İngilizce altyazının boyutunu ölçerek Türkçe çeviriyi kutudan taşmadan <b>sıkıca tam üstüne</b> oturtur.
+      <b>🌍 Çoklu Dil Paketi Yöneticisi (v1.6.0)</b><br/>
+      Ayarlar içinden tek tıkla <b>8 çevrimdışı dil çifti</b> (<code>EN ➔ TR / ES / DE / FR / PT / RU / IT</code> ve <code>JA ➔ EN</code>) arasında CTranslate2 / OPUS-MT paketlerini indirip geçiş yapın.
     </td>
     <td width="50%">
-      <b>🍎 Yerel macOS Apple Silicon (M1–M4) & Windows x64</b><br/>
-      Windows'ta SHA-256 imzalı <code>.exe</code> / Portable <code>.zip</code> paketlerinin yanında artık yerel <b>macOS <code>.dmg</code></b> paketi, Cocoa click-through katmanı ve çapraz platform otomatik güncelleyici ile gelir.
+      <b>🍎 Apple Silicon MPS &amp; 🐧 Linux / Steam Deck (v1.6.0)</b><br/>
+      <b>Windows x64</b>, opsiyonel <b>Apple Silicon MPS GPU hızlandırmalı</b> (otomatik CPU yedekli) <b>macOS M1–M4</b> ve <b>Linux / Steam Deck (SteamOS)</b> için yerel paketler — bkz. <a href="docs/STEAM_DECK_GUIDE.md">Steam Deck Rehberi</a>.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <b>📚 Topluluk Sözlük Merkezi &amp; 9 Hazır Oyun Paketi</b><br/>
+      Uygulama içi <b>Topluluk Sözlük Merkezi</b> ile terim paketlerini keşfedin; <b>9 yerleşik oyun sözlüğü</b> (<code>elden_ring</code>, <code>rdr2</code>, <code>witcher3</code>, <code>skyrim</code>, <code>starfield</code>, <code>persona5</code>, <code>spiderman2</code>, <code>baldurs_gate3</code>, <code>cyberpunk2077</code>) hazır gelir.
+    </td>
+    <td width="50%">
+      <b>📒 Kelime Defteri &amp; Zengin HTML Anki <code>.tsv</code> Dışa Aktarım</b><br/>
+      Oyun veya dizi izlerken karşılaştığınız yeni kelimeleri ve deyimleri <b>Kelime Defteri</b>'ne kaydedin; tek tıkla şık <b>zengin HTML Anki <code>.tsv</code></b> destesi, <b>SRT</b> veya <b>CSV</b> olarak dışa aktarın.
     </td>
   </tr>
   <tr>
     <td width="50%">
       <b>⚡ Asenkron Latest-Frame-Wins Pipeline (~88 ms · 0 MB VRAM)</b><br/>
-      RapidOCR (<code>~20 ms</code>) ve CTranslate2 INT8 NMT (<code>~68 ms</code>) ayrı iş parçacıklarında çalışır. Hızlı diyaloglarda kuyruk birikmez; sabit sahnelerde <code>0.18 ms</code> (<code>%0.2 CPU</code>) ile sıfır FPS kaybı sağlar.
+      RapidOCR (<code>~20 ms</code>) ve CTranslate2 INT8 NMT (<code>~68 ms</code>) ayrı iş parçacıklarında çalışır. Sıkı dinamik hizalama ve <code>Alt+Tab</code> pencere kilidi ile sabit sahnelerde <code>0.18 ms</code> (<code>%0.2 CPU</code>) tüketir.
     </td>
     <td width="50%">
-      <b>🔒 Pencere Kilidi (Alt+Tab), Uygulama Profilleri & Oyun Sözlükleri</b><br/>
-      Oyundan <code>Alt+Tab</code> yaptığınızda altyazı otomatik gizlenir. Her oyun/oynatıcı için ayrı ROI ve görünüm profili kaydedilir; <code>glossaries/</code> altındaki JSON sözlüklerle özel isimler doğru korunur.
-    </td>
-  </tr>
-  <tr>
-    <td width="50%">
-      <b>🧠 Opsiyonel Bağlam Duyarlı LLM Katmanı</b><br/>
-      Varsayılan olarak <b>%100 çevrimdışı CTranslate2 INT8</b> kullanır; dilerseniz son 3 repliği hatırlayan bağlam modunu yerel <b>Ollama</b>, <b>Gemini</b>, <b>DeepL</b> veya <b>OpenAI uyumlu</b> API'lerle açabilirsiniz (anlık CT2 yedeklemeli).
-    </td>
-    <td width="50%">
-      <b>🎙️ Opsiyonel Canlı Ses (Whisper) & SRT / Anki Dışa Aktarım</b><br/>
-      Altyazısız Twitch veya YouTube yayınları için <b>faster-whisper</b> (INT8 CPU) ile canlı sesten Türkçe altyazı üretin; çevrilen diyalog geçmişini tek tıkla <b>SRT</b> veya <b>Anki CSV</b> olarak dışa aktarın.
+      <b>🧠 Opsiyonel Bağlam LLM &amp; 🎙️ Canlı Ses Modu (Whisper)</b><br/>
+      Varsayılan <b>%100 çevrimdışı CTranslate2 INT8</b> motorunu koruyun veya yerel <b>Ollama</b>, <b>Gemini</b>, <b>DeepL</b>, <b>OpenAI</b> bağlam katmanı ile <b>faster-whisper</b> canlı ses çevirisini etkinleştirin.
     </td>
   </tr>
 </table>
@@ -110,13 +111,14 @@
 
 ## ⚖️ Alternatiflerle Karşılaştırma
 
-| Kriter | ⚡ SubVision AI v1.5.0 | Geleneksel OCR Çeviriciler *(Tesseract / PyTorch FP32)* | Bulut / Ücretli Ekran Çeviriciler |
+| Kriter | ⚡ SubVision AI v1.6.0 | Geleneksel OCR Çeviriciler *(Tesseract / PyTorch FP32)* | Bulut / Ücretli Ekran Çeviriciler |
 | :--- | :---: | :---: | :---: |
 | **Uçtan Uca Gecikme** | **`~88 ms`** *(Önbellekli ~20 ms)* | `300 – 800+ ms` *(Kuyruk birikmesi)* | `400 – 1.200 ms` *(Ağ gecikmesi)* |
-| **Ekran Kartı (VRAM) Kullanımı** | **`0 MB VRAM`** *(%100 CPU)* | `1.2 – 2.4 GB VRAM` | Düşük / Değişken |
-| **%100 Çevrimdışı & Gizli** | **Evet** *(Varsayılan CT2 INT8)* | Evet | Hayır *(Bulut API zorunlu)* |
-| **Platform Desteği** | **Windows x64 · macOS M1–M4 · Linux** | Çoğunlukla Windows | Windows / Web |
-| **Sıkı Hizalama & Alt+Tab Kilidi** | **Evet** *(Yerel Win32 & Cocoa)* | Basit kutu | Basit kutu |
+| **Ekran Kartı (VRAM) Kullanımı** | **`0 MB VRAM`** *(CPU / opsiyonel Apple MPS)* | `1.2 – 2.4 GB VRAM` | Düşük / Değişken |
+| **%100 Çevrimdışı & Gizli** | **Evet** *(8 çevrimdışı dil paketi)* | Evet | Hayır *(Bulut API zorunlu)* |
+| **Platform Desteği** | **Windows x64 · macOS M1–M4 · Linux / Steam Deck** | Çoğunlukla Windows | Windows / Web |
+| **Sıkı Hizalama & Alt+Tab Kilidi** | **Evet** *(Yerel Win32, Cocoa & X11/Wayland)* | Basit kutu | Basit kutu |
+| **Sözlükler, Kelime Defteri & Anki `.tsv`** | **9 Oyun Paketi + Hub + Zengin Anki `.tsv`** | Yok / Manuel | Kısıtlı |
 | **Bağlam LLM & Canlı Ses (Whisper)** | **Opsiyonel** *(Ollama/Gemini/DeepL/OpenAI)* | Yok | Yalnızca ücretli plan |
 | **Ücret & Lisans** | **%100 Ücretsiz & Açık Kaynak (MIT)** | Karışık | Abonelik / API Ücreti |
 
@@ -143,13 +145,17 @@
 1. [**🌐 subvisionai.andacbasaran.com**](https://subvisionai.andacbasaran.com/) adresinden veya doğrudan [**⬇️ SubVisionAI.exe**](https://subvisionai.andacbasaran.com/downloads/SubVisionAI.exe) bağlantısından kurulum yardımcısını indirin.
 2. **`SubVisionAI.exe`** dosyası **SHA-256 Authenticode dijital imzalı ve DigiCert zaman damgalıdır**. Kullanıcı onayı olmadan arka planda hiçbir dosya çıkartmaz (*Zero Silent-Dropper*).
 3. İlk açılışta yalnızca `227 MB` boyutundaki yerel yapay zeka çeviri modeli indirilir; sonrasında internet bağlantısı olmadan **%100 çevrimdışı** çalışır.
-4. Alternatif olarak [**📦 GitHub Releases**](https://github.com/Andacbasaran/subvision-ai-subtitle-translator/releases/latest) sayfasından `SubVisionAI-Setup-v1.5.0-Windows-x64.exe` veya `SubVisionAI-Portable-v1.5.0-Windows-x64.zip` paketlerini indirebilir, ayrıca [`packaging/winget/`](packaging/winget/) ve [`packaging/scoop/`](packaging/scoop/) manifestlerini kullanabilirsiniz.
+4. Alternatif olarak [**📦 GitHub Releases**](https://github.com/Andacbasaran/subvision-ai-subtitle-translator/releases/latest) sayfasından `SubVisionAI-Setup-v1.6.0-Windows-x64.exe` veya `SubVisionAI-Portable-v1.6.0-Windows-x64.zip` paketlerini indirebilir, ayrıca [`packaging/winget/`](packaging/winget/) ve [`packaging/scoop/`](packaging/scoop/) manifestlerini kullanabilirsiniz.
 
 ### Seçenek 2: macOS Apple Silicon (M1 / M2 / M3 / M4)
 1. [**⬇️ SubVisionAI-macOS.dmg**](https://subvisionai.andacbasaran.com/downloads/SubVisionAI-macOS.dmg) paketini web sitesinden veya [**📦 GitHub Releases**](https://github.com/Andacbasaran/subvision-ai-subtitle-translator/releases/latest) üzerinden indirin.
-2. `.dmg` dosyasını açıp **SubVision AI** uygulamasını `Applications` (Uygulamalar) klasörüne sürükleyin.
+2. `.dmg` dosyasını açıp **SubVision AI** uygulamasını `Applications` (Uygulamalar) klasörüne sürükleyin. Otomatik CPU yedeklemeli **Apple Silicon MPS** hızlandırmasını destekler.
 3. **Homebrew Cask** formülü [`packaging/homebrew/`](packaging/homebrew/) klasöründe yer alır.
 4. *İlk açılış notu:* Ekran yakalama ve global `F7`/`F8` kısayolları için *Sistem Ayarları ➔ Gizlilik ve Güvenlik* altında **Ekran Kaydı** ve **Erişilebilirlik** izinlerini onaylayın.
+
+### Seçenek 3: Linux & Steam Deck (SteamOS)
+1. [**⬇️ SubVisionAI-Linux.tar.gz**](https://subvisionai.andacbasaran.com/downloads/SubVisionAI-Linux.tar.gz) (`SubVisionAI-v1.6.0-Linux-x86_64.tar.gz`) paketini indirin, arşivi açın ve `./SubVisionAI` komutuyla başlatın.
+2. **Steam Deck / SteamOS:** Masaüstü ve Oyun Modu kurulum adımları için [**🕹️ Steam Deck Rehberi (`docs/STEAM_DECK_GUIDE.md`)**](docs/STEAM_DECK_GUIDE.md) dosyasını inceleyin.
 
 ### 🗑️ Otomatik Kurulan Opsiyonel Bileşen Seçimli Kaldırma Yardımcısı (Windows)
 Uygulamayı kurduğunuzda **`SubVisionAI-Uninstaller.exe`** kurulum dizinine, Başlat Menüsüne ve *Windows Ayarlar ➔ Uygulamalar* listesine **otomatik olarak** eklenir. Uygulama içindeki **`Ayarlar ➔ İndirilen Bileşenler / Uygulamayı Kaldır`** üzerinden hangi bileşenlerin silineceğini tek tek seçebilirsiniz:
@@ -159,7 +165,7 @@ Uygulamayı kurduğunuzda **`SubVisionAI-Uninstaller.exe`** kurulum dizinine, Ba
 4. ☑️ **Kişisel Kullanıcı Ayarları, Profiller ve Alan Kalibrasyonu**
 5. ☐ **Yayıncı Dijital İmza Sertifikası Kaydı (`SubVision AI Open Source`)**
 
-### Seçenek 3: Linux & Kaynak Koddan Çalıştırma *(Developer Setup)*
+### Seçenek 4: Kaynak Koddan Çalıştırma *(Developer Setup)*
 
 ```bash
 git clone https://github.com/Andacbasaran/subvision-ai-subtitle-translator.git
@@ -262,40 +268,45 @@ flowchart TD
 ```text
 ├── main.py                              # PyQt6 Studio 2.0 giriş noktası ve MainWindow
 ├── subvision/                           # Modüler çekirdek Python paketi
-│   ├── hardware.py                      # Evrensel CPU/ISA algılama ve uyarlanabilir thread/FPS profili
+│   ├── hardware.py                      # Evrensel CPU/ISA + Apple Silicon MPS algılama ve uyarlanabilir thread/FPS profili
 │   ├── ocr_engine.py                    # MSS regional capture, adaptif maske ve anti-phantom RapidOCR
-│   ├── translator.py                    # %100 çevrimdışı CTranslate2 (INT8/FP32) EN -> TR motoru + LRU Cache
+│   ├── translator.py                    # %100 çevrimdışı CTranslate2 (INT8/FP32/MPS) NMT motoru + LRU Cache
+│   ├── language_packs.py                # Çoklu Dil Paketi Yöneticisi (en-tr/es/de/fr/pt/ru/it + ja-en)
 │   ├── context_translator.py            # Opsiyonel 3-turlu bağlam LLM katmanı (Ollama/Gemini/DeepL/OpenAI) + CT2 yedeği
 │   ├── audio_whisper.py                 # Opsiyonel canlı ses yakalama (WASAPI/sounddevice) + faster-whisper VAD
 │   ├── glossary.py                      # OCR temizleyici, anti-gibberish filtresi ve konuşmacı ayrıştırıcı
 │   ├── custom_glossary.py               # Kullanıcı ve oyun bazlı JSON sözlük yükleyici
-│   ├── overlay_ui.py                    # Sıkı dinamik hizalamalı click-through overlay (Win32 / Cocoa) & ROI seçici
+│   ├── glossary_hub.py                  # Topluluk Sözlük Merkezi tarayıcısı ve paket eşitleyici
+│   ├── vocab_learner.py                 # Kişisel Kelime Defteri ve öğrenme takipçisi
+│   ├── overlay_ui.py                    # Sıkı dinamik hizalamalı click-through overlay (Win32 / Cocoa / X11) & ROI seçici
 │   ├── window_tracker.py                # Hedef pencere kilidi (Alt+Tab otomatik gizleme)
 │   ├── profiles.py                      # Uygulama/oyun bazlı ROI ve görünüm profilleri
-│   ├── exporters.py                     # Diyalog geçmişi dışa aktarıcıları (SRT & Anki CSV)
+│   ├── exporters.py                     # Diyalog & Kelime dışa aktarıcıları (SRT, Anki CSV, zengin HTML Anki .tsv)
 │   ├── workers.py                       # Asenkron Latest-Frame-Wins iş parçacıkları ve benchmark worker
 │   ├── ui_widgets.py                    # HiDPI PyQt6 Studio 2.0 bileşenleri ve vektör ikonlar
 │   ├── updater.py                       # Çapraz platform GitHub Releases SemVer otomatik güncelleyici
 │   └── i18n.py                          # Hafif EN / TR arayüz yerelleştirme katmanı
 ├── tests/
 │   └── test_pipeline.py                 # Otomatik birim ve entegrasyon test paketi
-├── scripts/                             # start.sh, baslat.bat, benchmark.py, build_exe.py, build_macos.py
+├── scripts/                             # start.sh, baslat.bat, benchmark.py, build_exe.py, build_macos.py, build_linux.py
 ├── packaging/                           # Inno Setup (inno/installer.iss), Winget, Scoop, Homebrew Cask
-├── glossaries/                          # Hazır oyun sözlükleri (spiderman2.json, baldurs_gate3.json, cyberpunk2077.json)
-├── website/                             # Resmi web sitesi (subvisionai.andacbasaran.com) ve Cloudflare Worker
-├── docs/                                # Dokümantasyon ve lansman rehberleri
+├── glossaries/                          # 9 hazır oyun sözlüğü (elden_ring, rdr2, witcher3, skyrim, starfield, persona5, spiderman2, baldurs_gate3, cyberpunk2077)
+├── website/                             # Resmi SEO TR/EN web sitesi (subvisionai.andacbasaran.com) ve Cloudflare Worker
+├── docs/                                # Dokümantasyon (STEAM_DECK_GUIDE.md, LAUNCH_PLAYBOOK.md)
 ├── assets/                              # Cinema Frame ikonları (.icns/.ico/.png/.svg), UI ve benchmark görselleri
-└── .github/workflows/                   # Çapraz platform CI (ci.yml) ve birleşik Windows + macOS Release (release.yml)
+└── .github/workflows/                   # Çapraz platform CI (ci.yml) ve birleşik 3-platform Release (release.yml)
 ```
 
 ---
 
 ## 🗺️ Yol Haritası (Roadmap)
 
-- [ ] **Çoklu Hedef Dil Desteği (`EN ➔ ES / DE / PT / JA / FR / KO`)** — Seçilebilir CTranslate2 / OPUS-MT modelleriyle küresel dil çiftleri.
-- [ ] **Topluluk Oyun Sözlüğü Havuzu** — `glossaries/` altında RPG, JRPG ve bilim-kurgu oyunları için topluluk sözlükleri.
-- [ ] **Linux AppImage / Flatpak & Universal macOS Paketi** — Daha fazla platformda tek tıkla kurulum.
+- [x] **Çoklu Hedef Dil Desteği (`EN ➔ TR / ES / DE / FR / PT / RU / IT` & `JA ➔ EN`)** — Seçilebilir CTranslate2 / OPUS-MT Dil Paketi Yöneticisi v1.6.0 ile eklendi.
+- [x] **Topluluk Oyun Sözlüğü Merkezi & 9 Hazır Oyun Paketi** — Elden Ring, RDR2, Witcher 3, Skyrim, Starfield, Persona 5, Spider-Man 2, BG3 ve Cyberpunk 2077 v1.6.0 ile eklendi.
+- [x] **Linux & Steam Deck (SteamOS) Paketleme** — Yerel Linux `.tar.gz` paketleri ve Steam Deck kurulum rehberi v1.6.0 ile eklendi.
+- [x] **Kelime Defteri & Zengin HTML Anki `.tsv` Dışa Aktarım** — Dil öğrenme iş akışı v1.6.0 ile eklendi.
 - [ ] **İlk Açılış Kalibrasyon Sihirbazı** — Yeni kullanıcılar için 10 saniyede hazır kurulum rehberi.
+- [ ] **Linux AppImage / Flatpak & Universal macOS Paketi** — Daha fazla tek tıkla kurulum formatı.
 
 ---
 

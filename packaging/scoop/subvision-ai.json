@@ -1,11 +1,11 @@
 {
-    "version": "1.5.0",
+    "version": "1.6.0",
     "description": "Real-time, 100% offline English-to-Turkish on-screen & live-audio subtitle translator studio (0 MB VRAM).",
     "homepage": "https://subvisionai.andacbasaran.com/",
     "license": "MIT",
     "architecture": {
         "64bit": {
-            "url": "https://github.com/Andacbasaran/subvision-ai-subtitle-translator/releases/download/v1.5.0/SubVisionAI-Portable-v1.5.0-Windows-x64.zip",
+            "url": "https://github.com/Andacbasaran/subvision-ai-subtitle-translator/releases/download/v1.6.0/SubVisionAI-Portable-v1.6.0-Windows-x64.zip",
             "hash": "REPLACE_WITH_SHA256_FROM_RELEASE_SHA256SUMS_TXT"
         }
     },
