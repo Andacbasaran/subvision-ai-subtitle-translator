@@ -618,6 +618,265 @@ class TestSubVisionV14Features(unittest.TestCase):
             self.assertIn("English;Turkish;Timestamp", csv_txt)
             self.assertIn("Stay with me!;Benimle kal!;12:00:01", csv_txt)
 
+    def test_09_roi_selector_paint_no_qfont_float_crash(self) -> None:
+        """ROISelectorOverlay çiziminin hem boşta hem sürükleme sırasında QFont float hatası vermediğini doğrular."""
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PyQt6.QtCore import QPoint
+        from PyQt6.QtWidgets import QApplication
+        from overlay_ui import ROISelectorOverlay
+
+        app = QApplication.instance() or QApplication([])
+        self.assertIsNotNone(app)
+
+        selector = ROISelectorOverlay(on_selected=lambda _roi: None)
+        selector.resize(1280, 720)
+        # Boşta çizim (F7 açılışı — eski 8.8 float crash noktası)
+        pix_idle = selector.grab()
+        self.assertFalse(pix_idle.isNull())
+
+        # Sürükleme çizimi (eski 8.2 float crash noktası)
+        selector.start_pos = QPoint(220, 520)
+        selector.end_pos = QPoint(1060, 640)
+        selector.is_selecting = True
+        pix_drag = selector.grab()
+        self.assertFalse(pix_drag.isNull())
+        selector.close()
+
+    def test_10_dynamic_tight_overlay_hug_and_tr_overflow(self) -> None:
+        """Overlay'in tüm ROI yerine orijinal altyazı kutusunu sıkıca örttüğünü ve uzun TR'de genişlediğini doğrular."""
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PyQt6.QtCore import QRect
+        from PyQt6.QtWidgets import QApplication
+        from overlay_ui import SubtitleOverlayWindow, compute_dynamic_overlay_plan
+
+        app = QApplication.instance() or QApplication([])
+        self.assertIsNotNone(app)
+
+        canvas = QRect(0, 0, 1280, 220)
+        local_roi = QRect(140, 60, 1000, 110)
+        # 1000 px ROI ortasında yalnızca 180 px genişliğinde dar 1 satırlık orijinal altyazı
+        narrow_layout = {
+            "bbox": (0.41, 0.36, 0.59, 0.64),
+            "lines": [(0.41, 0.36, 0.59, 0.64)],
+            "line_h_norm": 0.28,
+            "line_count": 1,
+        }
+
+        short_plan = compute_dynamic_overlay_plan(
+            tr_text="Bekle!",
+            en_text="Wait!",
+            canvas_rect=canvas,
+            local_roi_rect=local_roi,
+            layout=narrow_layout,
+            overlay_mode="cover",
+            font_size_pt=24,
+            auto_fit_font=True,
+        )
+        self.assertIsNotNone(short_plan)
+        assert short_plan is not None
+        # Tüm 1000 px ROI'yi kaplamak yerine orijinal ~180 px kutuyu sıkıca sarmalı
+        self.assertLess(short_plan.backdrop_union.width(), 320.0)
+        orig_left = local_roi.left() + 0.41 * local_roi.width()
+        orig_right = local_roi.left() + 0.59 * local_roi.width()
+        self.assertLessEqual(short_plan.backdrop_union.left(), orig_left)
+        self.assertGreaterEqual(short_plan.backdrop_union.right(), orig_right)
+
+        # 2 kelimelik cümle TR'de 5+ kelimeye uzadığında kontrollü biçimde genişlemeli
+        long_plan = compute_dynamic_overlay_plan(
+            tr_text="Bir saniye bekle, sakın hareket etme!",
+            en_text="Hold on!",
+            canvas_rect=canvas,
+            local_roi_rect=local_roi,
+            layout=narrow_layout,
+            overlay_mode="cover",
+            font_size_pt=24,
+            auto_fit_font=True,
+        )
+        self.assertIsNotNone(long_plan)
+        assert long_plan is not None
+        self.assertGreater(long_plan.backdrop_union.width(), short_plan.backdrop_union.width() + 80.0)
+        self.assertLessEqual(long_plan.backdrop_union.left(), orig_left)
+        self.assertGreaterEqual(long_plan.backdrop_union.right(), orig_right)
+
+        # SubtitleOverlayWindow çizimi ve temizlenme doğrulaması
+        overlay = SubtitleOverlayWindow()
+        overlay.align_to_roi(
+            {"left": 100, "top": 700, "width": 1000, "height": 110, "qt_left": 100, "qt_top": 700, "qt_width": 1000, "qt_height": 110}
+        )
+        overlay.set_subtitle("Bekle!", "Wait!", orig_line_h_px=30, layout=narrow_layout)
+        self.assertIsNotNone(overlay._render_plan)
+        self.assertFalse(overlay.grab().isNull())
+        overlay.set_subtitle("")
+        self.assertIsNone(overlay._render_plan)
+        overlay.close()
+
+    def test_11_ocr_normalized_bbox_and_outlier_filtering(self) -> None:
+        """OCR satır projeksiyonunun sıkı bbox çıkardığını ve kenardaki izole HUD pikselini elediğini doğrular."""
+        mask = np.zeros((110, 960), dtype=np.uint8)
+        # Ortada 180px genişliğinde gerçek metin bandı (x=390..570, y=40..68)
+        for rx in range(390, 570, 6):
+            mask[40:68, rx : rx + 3] = 255
+        # Sağ köşede küçük izole HUD paraziti (x=935..941, y=42..60)
+        mask[42:60, 935:941] = 255
+
+        ocr_ready = np.full((110, 960, 3), 255, dtype=np.uint8)
+        crops, boxes, median_h, line_count = SubtitleOCREngine.extract_fast_line_crops_with_boxes(
+            ocr_ready, mask
+        )
+        self.assertEqual(line_count, 1)
+        self.assertEqual(len(crops), 1)
+        self.assertEqual(len(boxes), 1)
+        self.assertGreaterEqual(median_h, 24)
+
+        layout = SubtitleOCREngine._build_normalized_layout(boxes, 960, 110, measured_h=median_h)
+        self.assertIsNotNone(layout)
+        assert layout is not None
+        u1, v1, u2, v2 = layout["bbox"]
+        # İzole sağ kenar paraziti elendiği için kutu ortada dar kalmalı
+        self.assertGreater(u1, 0.35)
+        self.assertLess(u2, 0.65)
+        self.assertLess(u2 - u1, 0.30)
+
+        # DBNet satır birleştirme kontrolü
+        merged = SubtitleOCREngine._group_dbnet_boxes_into_lines(
+            [(100, 20, 220, 44), (235, 22, 360, 46), (180, 60, 310, 84)]
+        )
+        self.assertEqual(len(merged), 2)
+        self.assertEqual(merged[0], (100, 20, 360, 46))
+        self.assertEqual(merged[1], (180, 60, 310, 84))
+
+    def test_12_target_window_lock_and_alt_tab_gating(self) -> None:
+        """Hedef uygulama kilidinin Alt+Tab forum metinlerini dışladığını ve oyun odağında devam ettiğini doğrular."""
+        from subvision.window_tracker import TargetWindowSpec, WindowInfo, is_target_foreground
+
+        game_win = WindowInfo(hwnd=1001, pid=5000, process_name="gta6.exe", title="Grand Theft Auto VI")
+        game_child = WindowInfo(hwnd=1002, pid=5000, process_name="gta6.exe", title="GTA6 Overlay")
+        forum_win = WindowInfo(hwnd=2002, pid=6000, process_name="chrome.exe", title="Technopat Sosyal")
+        own_win = WindowInfo(hwnd=3003, pid=9999, process_name="python.exe", title="SubVision AI")
+
+        # 1) Kilit yok -> her zaman aktif
+        self.assertTrue(is_target_foreground(None, forum_win, own_pid=9999))
+        self.assertTrue(is_target_foreground(TargetWindowSpec(), forum_win, own_pid=9999))
+
+        # 2) Oyun kilitli -> oyunda True, forumda ve SubVision'ın kendi penceresinde False
+        game_target = TargetWindowSpec(hwnd=1001, process_name="gta6.exe", title="Grand Theft Auto VI")
+        self.assertTrue(is_target_foreground(game_target, game_win, own_pid=9999, window_alive_fn=lambda _: True))
+        self.assertTrue(is_target_foreground(game_target, game_child, own_pid=9999, window_alive_fn=lambda _: True))
+        self.assertFalse(is_target_foreground(game_target, forum_win, own_pid=9999, window_alive_fn=lambda _: True))
+        self.assertFalse(is_target_foreground(game_target, own_win, own_pid=9999, window_alive_fn=lambda _: True))
+
+        # 3) Çok pencereli tarayıcı izolasyonu: YouTube penceresi (2001) kilitliyken Forum penceresi (2002) reddedilmeli
+        yt_win = WindowInfo(hwnd=2001, pid=6000, process_name="chrome.exe", title="YouTube - Video")
+        yt_target = TargetWindowSpec(hwnd=2001, process_name="chrome.exe", title="YouTube - Video")
+        self.assertTrue(
+            is_target_foreground(
+                yt_target, yt_win, own_pid=9999, window_alive_fn=lambda h: h == 2001, root_owner_fn=lambda h: h
+            )
+        )
+        self.assertFalse(
+            is_target_foreground(
+                yt_target, forum_win, own_pid=9999, window_alive_fn=lambda h: h == 2001, root_owner_fn=lambda h: h
+            )
+        )
+
+        # 4) Anti-cheat / yükseltilmiş oyun (process_name boş) -> HWND veya başlık ile eşleşmeli
+        ac_win = WindowInfo(hwnd=4004, pid=7000, process_name="", title="VALORANT")
+        ac_target = TargetWindowSpec(hwnd=4004, process_name="", title="VALORANT")
+        self.assertTrue(is_target_foreground(ac_target, ac_win, own_pid=9999, window_alive_fn=lambda _: True))
+        self.assertFalse(is_target_foreground(ac_target, forum_win, own_pid=9999, window_alive_fn=lambda _: True))
+
+    def test_13_worker_alt_tab_pause_resume_and_packaging(self) -> None:
+        """CaptureTranslateWorker'ın Alt+Tab anında OCR'ı duraklatıp geri dönünce devam ettiğini ve paketlemeyi doğrular."""
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        import time
+        from PyQt6.QtWidgets import QApplication
+        import build_exe
+        import main as app_main
+        from subvision.window_tracker import TargetWindowSpec, WindowInfo
+        from subvision.workers import CaptureTranslateWorker
+
+        app = QApplication.instance() or QApplication([])
+        self.assertIsNotNone(app)
+        self.assertTrue(hasattr(app_main, "QCheckBox"))
+        self.assertIn(("subvision/window_tracker.py", "subvision/window_tracker.py"), build_exe.EMBEDDED_FILES)
+        self.assertIn("res_window_tracker.py", build_exe.LauncherCSharpSource)
+
+        game_win = WindowInfo(hwnd=101, pid=4242, process_name="game.exe", title="Game")
+        forum_win = WindowInfo(hwnd=202, pid=5353, process_name="chrome.exe", title="Forum")
+        current_fg = {"win": game_win}
+        capture_calls = {"count": 0}
+        emitted_focus = []
+        emitted_subs = []
+        emitted_clears = []
+
+        class _FakeOCR:
+            last_line_height_px = 28
+            last_subtitle_layout = {"bbox": (0.3, 0.3, 0.7, 0.7), "lines": [(0.3, 0.3, 0.7, 0.7)], "line_h_norm": 0.4, "line_count": 1}
+
+            def reset_state(self):
+                pass
+
+            def capture_and_read(self, box, sct):
+                capture_calls["count"] += 1
+                return "NEW_TEXT", "Hold on!", 5.0
+
+        class _FakeTranslator:
+            def try_fast_lookup(self, text):
+                return "Bekle!", 0.1, True
+
+        class _DummyMSS:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+        worker = CaptureTranslateWorker(
+            ocr_engine=_FakeOCR(),
+            translator=_FakeTranslator(),
+            roi={"left": 0, "top": 0, "width": 800, "height": 100},
+            scan_interval_sec=0.025,
+            idle_scan_interval_sec=0.04,
+            target_filter=TargetWindowSpec(hwnd=101, process_name="game.exe", title="Game"),
+            foreground_provider=lambda: current_fg["win"],
+        )
+        worker.target_focus_changed.connect(lambda focused: emitted_focus.append(focused))
+        worker.subtitle_updated.connect(lambda *args: emitted_subs.append(args))
+        worker.subtitle_cleared.connect(lambda: emitted_clears.append(True))
+
+        with patch("subvision.workers.mss.mss", return_value=_DummyMSS()):
+            worker.start()
+            # Oyun odaktayken yakalama çalışmalı
+            t_end = time.monotonic() + 1.0
+            while not emitted_subs and time.monotonic() < t_end:
+                app.processEvents()
+                time.sleep(0.02)
+            self.assertGreaterEqual(len(emitted_subs), 1)
+            self.assertIsInstance(emitted_subs[0][6], dict)
+
+            # Alt+Tab ile foruma geç -> focus False & clear gelmeli, OCR durmalı
+            current_fg["win"] = forum_win
+            t_end = time.monotonic() + 1.0
+            while (False not in emitted_focus) and time.monotonic() < t_end:
+                app.processEvents()
+                time.sleep(0.02)
+            self.assertIn(False, emitted_focus)
+            self.assertGreaterEqual(len(emitted_clears), 1)
+            frozen_count = capture_calls["count"]
+            time.sleep(0.18)
+            self.assertEqual(capture_calls["count"], frozen_count)
+
+            # Oyuna geri dön -> focus True gelmeli ve OCR devam etmeli
+            current_fg["win"] = game_win
+            t_end = time.monotonic() + 1.0
+            while (True not in emitted_focus) and time.monotonic() < t_end:
+                app.processEvents()
+                time.sleep(0.02)
+            self.assertIn(True, emitted_focus)
+            self.assertGreater(capture_calls["count"], frozen_count)
+
+            worker.stop()
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

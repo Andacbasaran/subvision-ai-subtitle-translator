@@ -57,6 +57,7 @@ EMBEDDED_FILES = [
     ("subvision/workers.py", "subvision/workers.py"),
     ("subvision/custom_glossary.py", "subvision/custom_glossary.py"),
     ("subvision/profiles.py", "subvision/profiles.py"),
+    ("subvision/window_tracker.py", "subvision/window_tracker.py"),
     ("subvision/exporters.py", "subvision/exporters.py"),
     ("glossaries/spiderman2.json", "glossaries/spiderman2.json"),
     ("glossaries/cyberpunk2077.json", "glossaries/cyberpunk2077.json"),
@@ -145,8 +146,8 @@ namespace SubVisionAI
         {
             _value = 0;
             _maximum = 100;
-            _trackColor = Color.FromArgb(19, 29, 49);
-            _fillColor = Color.FromArgb(56, 189, 248);
+            _trackColor = Color.FromArgb(36, 36, 42);
+            _fillColor = Color.FromArgb(250, 250, 250);
             this.DoubleBuffered = true;
             this.Height = 10;
         }
@@ -233,6 +234,7 @@ namespace SubVisionAI
             { "res_workers.py", "subvision\\workers.py" },
             { "res_custom_glossary.py", "subvision\\custom_glossary.py" },
             { "res_profiles.py", "subvision\\profiles.py" },
+            { "res_window_tracker.py", "subvision\\window_tracker.py" },
             { "res_exporters.py", "subvision\\exporters.py" },
             { "res_spiderman2.json", "glossaries\\spiderman2.json" },
             { "res_cyberpunk2077.json", "glossaries\\cyberpunk2077.json" },
@@ -619,13 +621,13 @@ namespace SubVisionAI
 
         private void InitializeUi()
         {
-            Color bgDark = Color.FromArgb(6, 10, 19);
-            Color cardDark = Color.FromArgb(12, 19, 34);
-            Color borderCol = Color.FromArgb(30, 45, 69);
-            Color textPrimary = Color.FromArgb(248, 250, 252);
-            Color textMuted = Color.FromArgb(148, 163, 184);
-            Color accent = Color.FromArgb(37, 99, 235);
-            Color cyanCol = Color.FromArgb(56, 189, 248);
+            Color bgDark = Color.FromArgb(10, 10, 12);
+            Color cardDark = Color.FromArgb(20, 20, 23);
+            Color borderCol = Color.FromArgb(36, 36, 42);
+            Color textPrimary = Color.FromArgb(250, 250, 250);
+            Color textMuted = Color.FromArgb(161, 161, 170);
+            Color accent = Color.FromArgb(250, 250, 250);
+            Color cyanCol = Color.FromArgb(245, 158, 11);
 
             this.Text = "SubVision AI — Hızlı Kurulum";
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -754,7 +756,7 @@ namespace SubVisionAI
             _btnOpenUninstaller.Click += delegate { OpenUninstallerDialog(); };
             this.Controls.Add(_btnOpenUninstaller);
 
-            _btnStartInstall = CreateFlatButton("Kurulumu Başlat", new Point(292, 310), new Size(152, 34), accent, Color.White, cyanCol);
+            _btnStartInstall = CreateFlatButton("Kurulumu Başlat", new Point(292, 310), new Size(152, 34), accent, Color.FromArgb(9, 9, 11), accent);
             _btnStartInstall.Click += delegate { StartSetupAsync(); };
             this.Controls.Add(_btnStartInstall);
 
@@ -912,7 +914,7 @@ namespace SubVisionAI
             _chkRegisterUninstaller.Enabled = false;
             _chkTrustPublisherCert.Enabled = false;
             _btnCancel.Text = "İptal";
-            _progressBar.FillColor = Color.FromArgb(59, 130, 246);
+            _progressBar.FillColor = Color.FromArgb(250, 250, 250);
 
             bool optDesktop = _chkDesktopShortcut.Checked;
             bool optReg = _chkRegisterUninstaller.Checked;
@@ -1269,13 +1271,13 @@ namespace SubVisionAI
 
         private void InitializeUi()
         {
-            Color bgDark = Color.FromArgb(6, 10, 19);
-            Color cardDark = Color.FromArgb(12, 19, 34);
-            Color borderCol = Color.FromArgb(30, 45, 69);
-            Color textPrimary = Color.FromArgb(248, 250, 252);
-            Color textMuted = Color.FromArgb(148, 163, 184);
-            Color dangerCol = Color.FromArgb(220, 38, 38);
-            Color amberCol = Color.FromArgb(217, 119, 6);
+            Color bgDark = Color.FromArgb(10, 10, 12);
+            Color cardDark = Color.FromArgb(20, 20, 23);
+            Color borderCol = Color.FromArgb(36, 36, 42);
+            Color textPrimary = Color.FromArgb(250, 250, 250);
+            Color textMuted = Color.FromArgb(161, 161, 170);
+            Color dangerCol = Color.FromArgb(225, 29, 72);
+            Color amberCol = Color.FromArgb(245, 158, 11);
 
             this.Text = "SubVision AI — Kaldırma ve Bileşen Yöneticisi";
             this.FormBorderStyle = FormBorderStyle.FixedDialog;

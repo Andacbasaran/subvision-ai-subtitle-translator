@@ -80,9 +80,13 @@ class SubtitleOCREngine:
         self._pending_borderline_text: str = ""
         self._last_hybrid_dbnet_ts: float = 0.0
 
-        # Auto-Fit overlay için ölçülen orijinal altyazı satır metrikleri (fiziksel ROI pikselinde)
+        # Auto-Fit ve dinamik sıkı hizalama (tight-hug) overlay için ölçülen orijinal altyazı metrikleri
         self.last_line_height_px: int = 0
         self.last_line_count: int = 0
+        self.last_subtitle_layout: Optional[Dict] = None
+        self._last_read_boxes: List[Tuple[int, int, int, int]] = []
+        self._last_read_proc_shape: Tuple[int, int] = (0, 0)
+        self._last_read_layout: Optional[Dict] = None
 
         if not lazy_init:
             self.ensure_initialized()
@@ -166,6 +170,10 @@ class SubtitleOCREngine:
         self._last_hybrid_dbnet_ts = 0.0
         self.last_line_height_px = 0
         self.last_line_count = 0
+        self.last_subtitle_layout = None
+        self._last_read_boxes = []
+        self._last_read_proc_shape = (0, 0)
+        self._last_read_layout = None
 
     @staticmethod
     def compute_subtitle_binary_mask(bgr_img: np.ndarray) -> Tuple[np.ndarray, float]:
@@ -229,16 +237,162 @@ class SubtitleOCREngine:
         return ocr_ready_bgr, mask_u8, bright_ratio
 
     @staticmethod
-    def extract_fast_line_crops_with_metrics(
-        ocr_ready_bgr: np.ndarray, mask_u8: np.ndarray
-    ) -> Tuple[List[np.ndarray], int, int]:
+    def _filter_horizontal_runs(xs: np.ndarray, line_h: int) -> Tuple[int, int]:
         """
-        0.2 ms'de ikili (binary) altyazı maskesinden 1-4 satırlık sıkı (tight) altyazı şeritlerini çıkarır.
-        Ayrıca:
-        - Far / pencere / HUD kutusu gibi aşırı dolu veya çok yüksek parazit bloklarını (ink-ratio & yükseklik) eler.
-        - Geniş ROI içinde 'No!', 'Hey!', 'Wait.' gibi kısa 1 kelimelik altyazıları korur.
-        - Auto-Fit overlay için ölçülen medyan satır yüksekliğini ve satır sayısını döndürür.
-        Dönüş: (line_crops, median_line_height_px, line_count)
+        Satırdaki aktif X sütunlarını yatay kümelere ayırır ve ana metinden çok uzakta kalan
+        küçük izole HUD/parazit noktalarını (outlier) atarak sıkı (tight) yatay sınırları döndürür.
+        """
+        if len(xs) == 0:
+            return 0, 0
+        split_gap = max(40, int(line_h * 3.5))
+        diffs = np.diff(xs)
+        split_idx = np.where(diffs > split_gap)[0] + 1
+        clusters = np.split(xs, split_idx)
+        if len(clusters) == 1:
+            return int(xs[0]), int(xs[-1])
+
+        spans = [(int(c[0]), int(c[-1]), len(c)) for c in clusters if len(c) > 0]
+        main_idx = max(range(len(spans)), key=lambda i: (spans[i][1] - spans[i][0], spans[i][2]))
+        main_x1, main_x2, _ = spans[main_idx]
+
+        min_island_w = max(18, int(line_h * 1.4))
+        max_island_gap = max(48, int(line_h * 4.0))
+        kept: List[Tuple[int, int]] = []
+        for idx, (cx1, cx2, _cnt) in enumerate(spans):
+            if idx == main_idx:
+                kept.append((cx1, cx2))
+                continue
+            cw = cx2 - cx1
+            dist_to_main = min(abs(cx2 - main_x1), abs(cx1 - main_x2))
+            if cw >= min_island_w or dist_to_main <= max_island_gap:
+                kept.append((cx1, cx2))
+
+        return min(c[0] for c in kept), max(c[1] for c in kept)
+
+    @staticmethod
+    def _group_dbnet_boxes_into_lines(
+        boxes: List[Tuple[int, int, int, int]]
+    ) -> List[Tuple[int, int, int, int]]:
+        """
+        DBNet kelime/parça kutularını dikey örtüşmeye göre görsel satırlara birleştirir
+        ve yukarıdan aşağıya sıralı sıkı satır kutuları döndürür.
+        """
+        if not boxes:
+            return []
+        ordered = sorted(boxes, key=lambda b: ((b[1] + b[3]) * 0.5, b[0]))
+        lines: List[List[int]] = []
+        for x1, y1, x2, y2 in ordered:
+            bh = max(1, y2 - y1)
+            ymid = (y1 + y2) * 0.5
+            merged = False
+            for line in lines:
+                ly1, ly2 = line[1], line[3]
+                lh = max(1, ly2 - ly1)
+                lmid = (ly1 + ly2) * 0.5
+                overlap = min(y2, ly2) - max(y1, ly1)
+                min_h = min(bh, lh)
+                if overlap >= 0.45 * min_h or abs(ymid - lmid) <= 0.55 * min_h:
+                    line[0] = min(line[0], x1)
+                    line[1] = min(line[1], y1)
+                    line[2] = max(line[2], x2)
+                    line[3] = max(line[3], y2)
+                    merged = True
+                    break
+            if not merged:
+                lines.append([x1, y1, x2, y2])
+        lines.sort(key=lambda b: (b[1], b[0]))
+        return [(b[0], b[1], b[2], b[3]) for b in lines]
+
+    @staticmethod
+    def _build_normalized_layout(
+        line_boxes: List[Tuple[int, int, int, int]],
+        proc_w: int,
+        proc_h: int,
+        measured_h: int = 0,
+        roi: Optional[Dict[str, int]] = None,
+        safe_roi: Optional[Dict[str, int]] = None,
+    ) -> Optional[Dict]:
+        """
+        Algılanan satır kutularını DPI ve yeniden boyutlandırmadan bağımsız [0.0, 1.0] ROI
+        koordinatlarına dönüştürür.
+        """
+        if not line_boxes or proc_w <= 0 or proc_h <= 0:
+            return None
+
+        roi_w = float(roi["width"]) if (roi and roi.get("width", 0) > 0) else float(proc_w)
+        roi_h = float(roi["height"]) if (roi and roi.get("height", 0) > 0) else float(proc_h)
+        off_x = float(safe_roi["left"] - roi["left"]) if (roi and safe_roi) else 0.0
+        off_y = float(safe_roi["top"] - roi["top"]) if (roi and safe_roi) else 0.0
+        span_w = float(safe_roi["width"]) if (safe_roi and safe_roi.get("width", 0) > 0) else roi_w
+        span_h = float(safe_roi["height"]) if (safe_roi and safe_roi.get("height", 0) > 0) else roi_h
+
+        def _norm_x(px: float) -> float:
+            u = (off_x + (px / float(proc_w)) * span_w) / max(1.0, roi_w)
+            return max(0.0, min(1.0, round(u, 5)))
+
+        def _norm_y(py: float) -> float:
+            v = (off_y + (py / float(proc_h)) * span_h) / max(1.0, roi_h)
+            return max(0.0, min(1.0, round(v, 5)))
+
+        norm_lines: List[Tuple[float, float, float, float]] = []
+        norm_heights: List[float] = []
+        for x1, y1, x2, y2 in line_boxes:
+            u1, v1 = _norm_x(x1), _norm_y(y1)
+            u2, v2 = _norm_x(x2), _norm_y(y2)
+            if u2 > u1 and v2 > v1:
+                norm_lines.append((u1, v1, u2, v2))
+                norm_heights.append(v2 - v1)
+
+        if not norm_lines:
+            return None
+
+        u_min = min(b[0] for b in norm_lines)
+        v_min = min(b[1] for b in norm_lines)
+        u_max = max(b[2] for b in norm_lines)
+        v_max = max(b[3] for b in norm_lines)
+
+        if measured_h > 0:
+            line_h_norm = max(0.01, min(1.0, ((float(measured_h) / float(proc_h)) * span_h) / max(1.0, roi_h)))
+        else:
+            norm_heights.sort()
+            line_h_norm = norm_heights[len(norm_heights) // 2]
+
+        return {
+            "bbox": (u_min, v_min, u_max, v_max),
+            "lines": norm_lines,
+            "line_h_norm": round(line_h_norm, 5),
+            "line_count": len(norm_lines),
+        }
+
+    @staticmethod
+    def _layout_changed_significantly(
+        prev_layout: Optional[Dict], new_layout: Optional[Dict]
+    ) -> bool:
+        """Benzer metinde 2. satırın eklenmesi veya kutunun büyümesi halinde overlay güncellemesi sağlar."""
+        if not new_layout or not new_layout.get("bbox"):
+            return False
+        if not prev_layout or not prev_layout.get("bbox"):
+            return True
+        pu1, pv1, pu2, pv2 = prev_layout["bbox"]
+        nu1, nv1, nu2, nv2 = new_layout["bbox"]
+        pw = max(1e-4, pu2 - pu1)
+        ph = max(1e-4, pv2 - pv1)
+        nw = max(1e-4, nu2 - nu1)
+        nh = max(1e-4, nv2 - nv1)
+        if nw > pw * 1.12 or nh > ph * 1.12:
+            return True
+        if abs(nu1 - pu1) > 0.06 or abs(nu2 - pu2) > 0.06 or abs(nv1 - pv1) > 0.08 or abs(nv2 - pv2) > 0.08:
+            return True
+        return False
+
+    @classmethod
+    def extract_fast_line_crops_with_boxes(
+        cls, ocr_ready_bgr: np.ndarray, mask_u8: np.ndarray
+    ) -> Tuple[List[np.ndarray], List[Tuple[int, int, int, int]], int, int]:
+        """
+        0.2 ms'de ikili (binary) altyazı maskesinden 1-4 satırlık sıkı (tight) altyazı şeritlerini
+        ve her satırın tam (x1, y1, x2, y2) sınır kutusunu çıkarır.
+        Dönüş: (line_crops, line_boxes_px, median_line_height_px, line_count)
         """
         h, w = mask_u8.shape[:2]
         connected = cv2.morphologyEx(mask_u8, cv2.MORPH_CLOSE, _KERNEL_HORIZ_CONNECT)
@@ -276,6 +430,7 @@ class SubtitleOCREngine:
 
         max_valid_line_h = max(64, int(h * 0.80))
         crops: List[np.ndarray] = []
+        boxes: List[Tuple[int, int, int, int]] = []
         valid_heights: List[int] = []
 
         for y1, y2 in lines_y[:4]:
@@ -289,8 +444,7 @@ class SubtitleOCREngine:
             if len(xs) < 4:
                 continue
 
-            x1 = int(xs[0])
-            x2 = int(xs[-1])
+            x1, x2 = cls._filter_horizontal_runs(xs, line_h)
             line_w = x2 - x1
             if line_w < 10:
                 continue
@@ -324,10 +478,21 @@ class SubtitleOCREngine:
                         value=(255, 255, 255),
                     )
             crops.append(raw_crop)
+            boxes.append((x1, y1, x2, y2))
             valid_heights.append(line_h)
 
         median_h = sorted(valid_heights)[len(valid_heights) // 2] if valid_heights else 0
-        return crops, median_h, len(crops)
+        return crops, boxes, median_h, len(crops)
+
+    @classmethod
+    def extract_fast_line_crops_with_metrics(
+        cls, ocr_ready_bgr: np.ndarray, mask_u8: np.ndarray
+    ) -> Tuple[List[np.ndarray], int, int]:
+        """Geriye dönük uyumlu yardımcı: (line_crops, median_line_height_px, line_count) döndürür."""
+        crops, _, median_h, line_count = cls.extract_fast_line_crops_with_boxes(
+            ocr_ready_bgr, mask_u8
+        )
+        return crops, median_h, line_count
 
     @classmethod
     def extract_fast_line_crops(
@@ -404,7 +569,9 @@ class SubtitleOCREngine:
         assert self.ocr is not None
 
         t0 = time.perf_counter()
+        proc_h, proc_w = frame_bgr.shape[:2]
         valid_lines: List[str] = []
+        accepted_boxes: List[Tuple[int, int, int, int]] = []
         scores: List[float] = []
         measured_h = 0
         measured_lines = 0
@@ -414,14 +581,15 @@ class SubtitleOCREngine:
                 ocr_ready_bgr, mask_u8 = precomputed_mask
             else:
                 ocr_ready_bgr, mask_u8, _ = self.apply_subtitle_color_mask(frame_bgr)
-            line_crops, measured_h, measured_lines = self.extract_fast_line_crops_with_metrics(
-                ocr_ready_bgr, mask_u8
+            line_crops, crop_boxes, measured_h, measured_lines = (
+                self.extract_fast_line_crops_with_boxes(ocr_ready_bgr, mask_u8)
             )
 
             if line_crops:
                 rec_res, _ = self.ocr.text_rec(line_crops)
                 if rec_res:
-                    for text, score in rec_res:
+                    accepted_heights: List[int] = []
+                    for idx, (text, score) in enumerate(rec_res):
                         t_clean = text.strip()
                         sc = float(score)
                         # Kısa 1-4 harfli okumalarda hayalet paraziti önlemek için daha sıkı güven eşiği
@@ -429,6 +597,13 @@ class SubtitleOCREngine:
                         if sc >= min_req and t_clean:
                             valid_lines.append(t_clean)
                             scores.append(sc)
+                            if idx < len(crop_boxes):
+                                bx = crop_boxes[idx]
+                                accepted_boxes.append(bx)
+                                accepted_heights.append(max(1, bx[3] - bx[1]))
+                    if accepted_heights:
+                        measured_h = sorted(accepted_heights)[len(accepted_heights) // 2]
+                        measured_lines = len(accepted_boxes)
 
             # Hibrit modda hızlı filtre metin bulamazsa YALNIZCA cooldown + kenar yoğunluğu uygunsa DBNet çalıştır
             if not valid_lines and self.ocr_mode == "hybrid" and allow_hybrid_fallback:
@@ -441,6 +616,7 @@ class SubtitleOCREngine:
                     if res:
                         sorted_boxes = sorted(res, key=lambda item: (item[0][0][1], item[0][0][0]))
                         box_heights: List[int] = []
+                        raw_db_boxes: List[Tuple[int, int, int, int]] = []
                         for box, text, score in sorted_boxes:
                             t_clean = text.strip()
                             sc = float(score)
@@ -449,18 +625,25 @@ class SubtitleOCREngine:
                                 valid_lines.append(t_clean)
                                 scores.append(sc)
                                 try:
-                                    ys = [pt[1] for pt in box]
-                                    box_heights.append(int(max(ys) - min(ys)))
+                                    xs = [int(round(pt[0])) for pt in box]
+                                    ys = [int(round(pt[1])) for pt in box]
+                                    x1, x2 = max(0, min(xs)), min(proc_w, max(xs))
+                                    y1, y2 = max(0, min(ys)), min(proc_h, max(ys))
+                                    if x2 > x1 and y2 > y1:
+                                        raw_db_boxes.append((x1, y1, x2, y2))
+                                        box_heights.append(y2 - y1)
                                 except Exception:
                                     pass
+                        accepted_boxes = self._group_dbnet_boxes_into_lines(raw_db_boxes)
                         if box_heights:
                             measured_h = sorted(box_heights)[len(box_heights) // 2]
-                            measured_lines = len(valid_lines)
+                            measured_lines = max(1, len(accepted_boxes) or len(valid_lines))
         else:
             res, _ = self.ocr(frame_bgr)
             if res:
                 sorted_boxes = sorted(res, key=lambda item: (item[0][0][1], item[0][0][0]))
                 box_heights = []
+                raw_db_boxes = []
                 for box, text, score in sorted_boxes:
                     t_clean = text.strip()
                     sc = float(score)
@@ -469,13 +652,19 @@ class SubtitleOCREngine:
                         valid_lines.append(t_clean)
                         scores.append(sc)
                         try:
-                            ys = [pt[1] for pt in box]
-                            box_heights.append(int(max(ys) - min(ys)))
+                            xs = [int(round(pt[0])) for pt in box]
+                            ys = [int(round(pt[1])) for pt in box]
+                            x1, x2 = max(0, min(xs)), min(proc_w, max(xs))
+                            y1, y2 = max(0, min(ys)), min(proc_h, max(ys))
+                            if x2 > x1 and y2 > y1:
+                                raw_db_boxes.append((x1, y1, x2, y2))
+                                box_heights.append(y2 - y1)
                         except Exception:
                             pass
+                accepted_boxes = self._group_dbnet_boxes_into_lines(raw_db_boxes)
                 if box_heights:
                     measured_h = sorted(box_heights)[len(box_heights) // 2]
-                    measured_lines = len(valid_lines)
+                    measured_lines = max(1, len(accepted_boxes) or len(valid_lines))
 
         raw_joined = " ".join(valid_lines)
         cleaned = clean_ocr_text(raw_joined)
@@ -484,6 +673,17 @@ class SubtitleOCREngine:
         if cleaned and not is_plausible_subtitle_text(cleaned, avg_confidence=avg_conf):
             cleaned = ""
             avg_conf = 0.0
+
+        if cleaned and accepted_boxes:
+            self._last_read_boxes = accepted_boxes
+            self._last_read_proc_shape = (proc_w, proc_h)
+            self._last_read_layout = self._build_normalized_layout(
+                accepted_boxes, proc_w, proc_h, measured_h=measured_h
+            )
+        else:
+            self._last_read_boxes = []
+            self._last_read_proc_shape = (proc_w, proc_h)
+            self._last_read_layout = None
 
         elapsed_ms = (time.perf_counter() - t0) * 1000.0
         return cleaned, elapsed_ms, avg_conf, measured_h, measured_lines
@@ -499,6 +699,9 @@ class SubtitleOCREngine:
         if cleaned:
             self.last_line_height_px = measured_h
             self.last_line_count = measured_lines
+            self.last_subtitle_layout = self._last_read_layout
+        else:
+            self.last_subtitle_layout = None
         return cleaned, elapsed_ms
 
     @staticmethod
@@ -568,6 +771,7 @@ class SubtitleOCREngine:
                 if self._empty_frames_count >= 4:
                     self._last_clean_text = ""
                     self._prev_thumb = None
+                    self.last_subtitle_layout = None
                     elapsed = (time.perf_counter() - t0) * 1000.0
                     return "EMPTY", "", elapsed
                 elapsed = (time.perf_counter() - t0) * 1000.0
@@ -615,13 +819,30 @@ class SubtitleOCREngine:
             self._empty_frames_count += 1
             if self._empty_frames_count >= 4:
                 self._last_clean_text = ""
+                self.last_subtitle_layout = None
                 return "EMPTY", "", elapsed
             return "UNCHANGED", self._last_clean_text, elapsed
 
         self._empty_frames_count = 0
 
+        proc_w, proc_h = self._last_read_proc_shape
+        new_layout = self._build_normalized_layout(
+            self._last_read_boxes,
+            proc_w,
+            proc_h,
+            measured_h=measured_h,
+            roi=roi,
+            safe_roi=safe_roi,
+        )
+
         if self.is_similar_to_last(cleaned):
             self._pending_borderline_text = ""
+            if self._layout_changed_significantly(self.last_subtitle_layout, new_layout):
+                if measured_h > 0 and resize_scale > 0:
+                    self.last_line_height_px = int(round(measured_h / resize_scale))
+                    self.last_line_count = max(1, measured_lines)
+                self.last_subtitle_layout = new_layout
+                return "NEW_TEXT", self._last_clean_text, elapsed
             return "UNCHANGED", self._last_clean_text, elapsed
 
         # Sınır güvenli okumalarda (0.58 - 0.78) tek karelik hayalet paraziti önlemek için 2 kare onayı
@@ -645,5 +866,6 @@ class SubtitleOCREngine:
             self.last_line_height_px = int(round(measured_h / resize_scale))
             self.last_line_count = max(1, measured_lines)
 
+        self.last_subtitle_layout = new_layout
         self._last_clean_text = cleaned
         return "NEW_TEXT", cleaned, elapsed

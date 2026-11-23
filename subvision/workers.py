@@ -5,7 +5,7 @@ Extracted from main.py for modular architecture and isolated unit testing.
 
 import threading
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 import cv2
 import mss
@@ -14,6 +14,12 @@ from PyQt6.QtCore import QThread, pyqtSignal
 
 from hardware import HardwareProfile
 from ocr_engine import SubtitleOCREngine
+from subvision.window_tracker import (
+    TargetWindowSpec,
+    WindowInfo,
+    get_foreground_window_info,
+    is_target_foreground,
+)
 
 
 class ModelLoaderThread(QThread):
@@ -26,8 +32,8 @@ class ModelLoaderThread(QThread):
     finished_ok = pyqtSignal()
     failed = pyqtSignal(str)
 
-    def __init__(self, translator, ocr_engine: SubtitleOCREngine):
-        super().__init__()
+    def __init__(self, translator, ocr_engine: SubtitleOCREngine, parent=None):
+        super().__init__(parent)
         self.translator = translator
         self.ocr_engine = ocr_engine
 
@@ -59,8 +65,9 @@ class BenchmarkWorker(QThread):
         ocr_engine: SubtitleOCREngine,
         translator,
         hw_profile: HardwareProfile,
+        parent=None,
     ):
-        super().__init__()
+        super().__init__(parent)
         self.ocr_engine = ocr_engine
         self.translator = translator
         self.hw_profile = hw_profile
@@ -151,7 +158,7 @@ class LatestTextSlot:
     def __init__(self) -> None:
         self._cond = threading.Condition()
         self._generation: int = 0
-        self._pending: Optional[Tuple[int, str, float, int]] = None
+        self._pending: Optional[Tuple[int, str, float, int, Optional[dict]]] = None
         self._closed: bool = False
         self.dropped_count: int = 0
 
@@ -160,13 +167,19 @@ class LatestTextSlot:
         with self._cond:
             return self._generation
 
-    def submit(self, en_text: str, ocr_ms: float, orig_line_h: int = 0) -> int:
+    def submit(
+        self,
+        en_text: str,
+        ocr_ms: float,
+        orig_line_h: int = 0,
+        layout: Optional[dict] = None,
+    ) -> int:
         with self._cond:
             if self._pending is not None:
                 self.dropped_count += 1
             self._generation += 1
             gen = self._generation
-            self._pending = (gen, en_text, ocr_ms, orig_line_h)
+            self._pending = (gen, en_text, ocr_ms, orig_line_h, layout)
             self._cond.notify()
             return gen
 
@@ -183,7 +196,9 @@ class LatestTextSlot:
             self._generation += 1
             self._cond.notify_all()
 
-    def take(self, timeout: float = 0.25) -> Optional[Tuple[int, str, float, int]]:
+    def take_with_layout(
+        self, timeout: float = 0.25
+    ) -> Optional[Tuple[int, str, float, int, Optional[dict]]]:
         with self._cond:
             if self._pending is None and not self._closed:
                 self._cond.wait(timeout=timeout)
@@ -193,15 +208,23 @@ class LatestTextSlot:
             self._pending = None
             return item
 
+    def take(self, timeout: float = 0.25) -> Optional[Tuple[int, str, float, int]]:
+        item = self.take_with_layout(timeout=timeout)
+        if item is None:
+            return None
+        gen, en_text, ocr_ms, orig_line_h, _layout = item
+        return (gen, en_text, ocr_ms, orig_line_h)
+
     def is_current(self, generation: int) -> bool:
         with self._cond:
             return (not self._closed) and (generation == self._generation)
 
 
 class CaptureTranslateWorker(QThread):
-    subtitle_updated = pyqtSignal(str, str, float, float, bool, int)
+    subtitle_updated = pyqtSignal(str, str, float, float, bool, int, object)
     subtitle_cleared = pyqtSignal()
     status_tick = pyqtSignal(str)
+    target_focus_changed = pyqtSignal(bool)
 
     def __init__(
         self,
@@ -210,34 +233,52 @@ class CaptureTranslateWorker(QThread):
         roi: Dict[str, int],
         scan_interval_sec: float = 0.0417,
         idle_scan_interval_sec: float = 0.0714,
+        target_filter: Optional[TargetWindowSpec] = None,
+        foreground_provider: Callable[[], Optional[WindowInfo]] = get_foreground_window_info,
+        parent=None,
     ):
-        super().__init__()
+        super().__init__(parent)
         self.ocr_engine = ocr_engine
         self.translator = translator
-        self.roi = roi
+        self.roi = dict(roi)
         self.scan_interval_sec = max(0.025, float(scan_interval_sec))
         self.idle_scan_interval_sec = max(self.scan_interval_sec, float(idle_scan_interval_sec))
         self.running = False
         self._slot = LatestTextSlot()
         self._nmt_thread: Optional[threading.Thread] = None
+        self._filter_lock = threading.Lock()
+        self._target_filter: Optional[TargetWindowSpec] = target_filter
+        self._filter_dirty: bool = True
+        self._foreground_provider = foreground_provider
 
     def update_timing(self, scan_interval_sec: float, idle_scan_interval_sec: float) -> None:
         self.scan_interval_sec = max(0.025, float(scan_interval_sec))
         self.idle_scan_interval_sec = max(self.scan_interval_sec, float(idle_scan_interval_sec))
 
+    def set_target_filter(self, spec: Optional[TargetWindowSpec]) -> None:
+        with self._filter_lock:
+            self._target_filter = spec
+            self._filter_dirty = True
+
+    def _get_target_filter(self) -> Tuple[Optional[TargetWindowSpec], bool]:
+        with self._filter_lock:
+            dirty = self._filter_dirty
+            self._filter_dirty = False
+            return self._target_filter, dirty
+
     def _translation_loop(self) -> None:
         while self.running:
-            item = self._slot.take(timeout=0.25)
+            item = self._slot.take_with_layout(timeout=0.25)
             if item is None:
                 continue
-            gen, en_text, ocr_ms, orig_line_h = item
+            gen, en_text, ocr_ms, orig_line_h, layout = item
             if not self._slot.is_current(gen):
                 continue
             try:
                 tr_text, tr_ms, is_cached = self.translator.translate_with_metrics(en_text)
                 if tr_text and self.running and self._slot.is_current(gen):
                     self.subtitle_updated.emit(
-                        en_text, tr_text, ocr_ms, tr_ms, is_cached, orig_line_h
+                        en_text, tr_text, ocr_ms, tr_ms, is_cached, orig_line_h, layout
                     )
             except Exception as exc:
                 self.status_tick.emit(f"Çeviri hatası: {exc}")
@@ -254,16 +295,47 @@ class CaptureTranslateWorker(QThread):
         self._nmt_thread.start()
 
         idle_streak_sec = 0.0
+        target_active = True
+        last_focus_check_ts = 0.0
 
         with mss.mss() as sct:
             while self.running:
                 loop_start = time.perf_counter()
                 try:
+                    target_spec, filter_dirty = self._get_target_filter()
+                    now_mono = time.monotonic()
+                    if target_spec and target_spec.is_active:
+                        if filter_dirty or (now_mono - last_focus_check_ts) >= 0.10:
+                            last_focus_check_ts = now_mono
+                            fg = self._foreground_provider()
+                            is_focused = is_target_foreground(target_spec, fg)
+                            if is_focused != target_active:
+                                target_active = is_focused
+                                if not target_active:
+                                    self._slot.invalidate()
+                                    self.ocr_engine.reset_state()
+                                    self.subtitle_cleared.emit()
+                                    self.target_focus_changed.emit(False)
+                                else:
+                                    self.ocr_engine.reset_state()
+                                    idle_streak_sec = 0.0
+                                    self.target_focus_changed.emit(True)
+                    elif not target_active:
+                        target_active = True
+                        self.ocr_engine.reset_state()
+                        idle_streak_sec = 0.0
+                        self.target_focus_changed.emit(True)
+
+                    if not target_active:
+                        time.sleep(0.12)
+                        continue
+
+                    roi_snap = dict(self.roi)
                     capture_box = {
-                        "left": self.roi["left"],
-                        "top": self.roi["top"],
-                        "width": self.roi["width"],
-                        "height": self.roi["height"],
+                        "left": int(roi_snap["left"]),
+                        "top": int(roi_snap["top"]),
+                        "width": int(roi_snap["width"]),
+                        "height": int(roi_snap["height"]),
                     }
                     status, en_text, ocr_ms = self.ocr_engine.capture_and_read(capture_box, sct)
 
@@ -274,15 +346,16 @@ class CaptureTranslateWorker(QThread):
                     elif status == "NEW_TEXT" and en_text:
                         idle_streak_sec = 0.0
                         orig_line_h = self.ocr_engine.last_line_height_px
+                        layout = self.ocr_engine.last_subtitle_layout
                         fast_hit = self.translator.try_fast_lookup(en_text)
                         if fast_hit is not None:
                             self._slot.invalidate()
                             tr_text, tr_ms, is_cached = fast_hit
                             self.subtitle_updated.emit(
-                                en_text, tr_text, ocr_ms, tr_ms, is_cached, orig_line_h
+                                en_text, tr_text, ocr_ms, tr_ms, is_cached, orig_line_h, layout
                             )
                         else:
-                            self._slot.submit(en_text, ocr_ms, orig_line_h)
+                            self._slot.submit(en_text, ocr_ms, orig_line_h, layout=layout)
                     else:
                         idle_streak_sec += self.scan_interval_sec
                 except Exception as exc:

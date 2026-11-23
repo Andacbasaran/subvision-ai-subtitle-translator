@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Matte Obsidian Flat Tile -->
+  <rect x="12" y="12" width="488" height="488" rx="114" fill="#111114" stroke="#27272E" stroke-width="6"/>
+
+  <!-- Widescreen Architectural Viewfinder Frame -->
+  <g fill="none" stroke="#FAFAFA" stroke-width="22" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 98 184 L 98 138 Q 98 124 112 124 L 166 124"/>
+    <path d="M 346 124 L 400 124 Q 414 124 414 138 L 414 184"/>
+    <path d="M 98 328 L 98 374 Q 98 388 112 388 L 166 388"/>
+    <path d="M 346 388 L 400 388 Q 414 388 414 374 L 414 328"/>
+  </g>
+
+  <!-- Lower-Third Cinema Subtitle Track -->
+  <rect x="170" y="236" width="172" height="24" rx="12" fill="#52525B"/>
+  <rect x="142" y="284" width="228" height="34" rx="17" fill="#F59E0B"/>
+</svg>

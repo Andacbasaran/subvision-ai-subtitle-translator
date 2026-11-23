@@ -7,10 +7,9 @@ and automatically detects the foreground Windows process via pure `ctypes`
 (zero extra dependencies).
 """
 
-import ctypes
-import os
-import sys
 from typing import Dict, List, Optional
+
+from subvision.window_tracker import get_foreground_window_info
 
 
 def get_foreground_process_name() -> Optional[str]:
@@ -18,35 +17,9 @@ def get_foreground_process_name() -> Optional[str]:
     Returns the lowercase executable name (e.g. 'vlc.exe', 'chrome.exe', 'rdr2.exe')
     of the currently focused Windows application, or None on unsupported OS / error.
     """
-    if sys.platform != "win32":
-        return None
-    try:
-        user32 = ctypes.windll.user32
-        kernel32 = ctypes.windll.kernel32
-
-        hwnd = user32.GetForegroundWindow()
-        if not hwnd:
-            return None
-
-        pid = ctypes.c_ulong(0)
-        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
-        if not pid.value:
-            return None
-
-        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
-        h_proc = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid.value)
-        if not h_proc:
-            return None
-        try:
-            buf_size = ctypes.c_ulong(1024)
-            buf = ctypes.create_unicode_buffer(1024)
-            ok = kernel32.QueryFullProcessImageNameW(h_proc, 0, buf, ctypes.byref(buf_size))
-            if ok and buf.value:
-                return os.path.basename(buf.value).lower()
-        finally:
-            kernel32.CloseHandle(h_proc)
-    except Exception:
-        return None
+    info = get_foreground_window_info()
+    if info and info.process_name:
+        return info.process_name
     return None
 
 
