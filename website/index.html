@@ -996,79 +996,493 @@
       color: var(--text);
     }
 
-    /* SCENE 2: STUDIO WINDOW PREVIEW WITH 3D TILT */
-    .preview-tabs {
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-      padding: 3px;
-      border-radius: 9px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      margin-bottom: 14px;
-    }
-
-    .preview-tab-btn {
-      background: transparent;
-      border: 1px solid transparent;
-      color: var(--muted);
-      font-family: inherit;
-      font-size: 0.78rem;
-      font-weight: 600;
-      min-block-size: 30px;
-      padding: 6px 14px;
-      border-radius: 6px;
-      cursor: pointer;
-      white-space: nowrap;
-      transition: color 0.18s ease, background-color 0.18s ease, border-color 0.18s ease;
-    }
-
-    .preview-tab-btn:hover {
-      color: var(--text);
-    }
-
-    .preview-tab-btn.active {
-      background: #25252E;
-      border-color: var(--border-strong);
-      color: var(--text);
+    /* SCENE 2: INTERACTIVE STUDIO SHOWCASE */
+    .studio-showcase {
+      width: 100%;
+      max-width: 1020px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.55fr) minmax(265px, 1fr);
+      gap: 16px;
+      align-items: stretch;
+      margin-bottom: 16px;
+      text-align: left;
     }
 
     .studio-perspective {
       width: 100%;
-      max-width: 720px;
-      perspective: 1100px;
-      margin-bottom: 16px;
+      perspective: 1200px;
+      display: flex;
     }
 
     .studio-frame {
       width: 100%;
+      display: flex;
+      flex-direction: column;
       border-radius: 14px;
-      padding: 7px;
-      background: linear-gradient(145deg, #1E1E26 0%, #121217 100%);
+      overflow: hidden;
+      background: linear-gradient(150deg, #1B1B24 0%, #111116 100%);
       border: 1px solid var(--border-strong);
-      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.58);
       transform-style: preserve-3d;
-      transition: transform 0.25s var(--ease-out), border-color 0.25s ease;
+      transition: transform 0.25s var(--ease-out), border-color 0.25s ease, box-shadow 0.25s ease;
     }
 
     .studio-frame:hover {
-      border-color: rgba(245, 158, 11, 0.4);
+      border-color: rgba(245, 158, 11, 0.45);
+      box-shadow: 0 28px 72px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(245, 158, 11, 0.12);
     }
 
-    .studio-frame img {
+    .window-chrome {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 9px 13px;
+      background: #15151C;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .window-chrome-left {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .window-dots {
+      display: inline-flex;
+      gap: 5px;
+      flex-shrink: 0;
+    }
+
+    .window-dots span {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #2C2C36;
+      border: 1px solid #3B3B48;
+    }
+
+    .window-dots span:nth-child(1) { background: rgba(239, 68, 68, 0.55); border-color: transparent; }
+    .window-dots span:nth-child(2) { background: rgba(245, 158, 11, 0.55); border-color: transparent; }
+    .window-dots span:nth-child(3) { background: rgba(16, 185, 129, 0.55); border-color: transparent; }
+
+    .window-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .window-chrome-right {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .window-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.66rem;
+      color: #34D399;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.28);
+    }
+
+    .window-zoom-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--surface-elevated);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 0.71rem;
+      font-weight: 600;
+      min-block-size: 24px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: color 0.16s ease, border-color 0.16s ease, background-color 0.16s ease;
+    }
+
+    .window-zoom-btn:hover {
+      color: var(--text);
+      border-color: var(--border-strong);
+      background: #25252F;
+    }
+
+    .studio-media-wrap {
+      position: relative;
+      flex: 1;
+      background: #0B0B0E;
+      padding: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .studio-media-wrap img {
       width: 100%;
       height: auto;
-      max-height: 40dvh;
+      max-height: 39dvh;
       object-fit: contain;
-      border-radius: 9px;
+      border-radius: 7px;
       display: block;
       background: #0C0C0E;
-      transition: opacity 0.22s ease, transform 0.26s var(--ease-out);
+      cursor: zoom-in;
+      transition: opacity 0.22s ease, transform 0.28s var(--ease-out);
     }
 
-    .studio-frame img.switching {
-      opacity: 0.25;
-      transform: scale(0.985);
+    .studio-media-wrap img.switching {
+      opacity: 0.2;
+      transform: scale(0.98);
+    }
+
+    /* Interactive Hotspot Pins */
+    .hotspot-layer {
+      position: absolute;
+      inset: 8px;
+      pointer-events: none;
+    }
+
+    .hotspot-pin {
+      position: absolute;
+      left: var(--x, 50%);
+      top: var(--y, 50%);
+      transform: translate(-50%, -50%);
+      width: 26px;
+      height: 26px;
+      border-radius: 999px;
+      border: 1.5px solid #FDE68A;
+      background: rgba(245, 158, 11, 0.92);
+      color: #09090B;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      font-weight: 800;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      pointer-events: auto;
+      box-shadow: 0 4px 16px rgba(245, 158, 11, 0.45);
+      transition: transform 0.2s var(--ease-spring), background-color 0.18s ease, box-shadow 0.2s ease;
+    }
+
+    .hotspot-pin:hover,
+    .hotspot-pin[aria-pressed="true"] {
+      transform: translate(-50%, -50%) scale(1.14);
+      background: #FBBF24;
+      box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.28), 0 6px 20px rgba(245, 158, 11, 0.55);
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+      .hotspot-pin::after {
+        content: "";
+        position: absolute;
+        inset: -5px;
+        border-radius: 999px;
+        border: 1.5px solid rgba(245, 158, 11, 0.65);
+        pointer-events: none;
+        animation: pin-ripple 2.4s ease-out infinite;
+      }
+    }
+
+    @keyframes pin-ripple {
+      0% { transform: scale(0.85); opacity: 0.8; }
+      100% { transform: scale(1.65); opacity: 0; }
+    }
+
+    .hotspot-callout {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 9px 13px;
+      background: #14141B;
+      border-top: 1px solid var(--border);
+      font-size: 0.77rem;
+      line-height: 1.38;
+      color: var(--muted);
+    }
+
+    .hotspot-callout-main {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .hotspot-callout-badge {
+      flex-shrink: 0;
+      width: 20px;
+      height: 20px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      border: 1px solid rgba(245, 158, 11, 0.5);
+      color: #FCD34D;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.68rem;
+      font-weight: 700;
+      display: grid;
+      place-items: center;
+    }
+
+    .hotspot-callout strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    /* Right Side Interactive Inspector Cards */
+    .studio-inspector {
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+
+    .inspector-card {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      width: 100%;
+      padding: 12px 14px 12px 16px;
+      border-radius: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      text-align: left;
+      font-family: inherit;
+      color: var(--muted);
+      cursor: pointer;
+      transition: background-color 0.18s ease, border-color 0.2s ease, transform 0.2s var(--ease-spring);
+    }
+
+    .inspector-card::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 12px;
+      bottom: 12px;
+      width: 3px;
+      border-radius: 0 3px 3px 0;
+      background: transparent;
+      transition: background-color 0.2s ease;
+    }
+
+    .inspector-card:hover {
+      background: #17171F;
+      border-color: var(--border-strong);
+      color: var(--text);
+    }
+
+    .inspector-card.active {
+      background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, #171720 60%);
+      border-color: rgba(245, 158, 11, 0.45);
+      color: var(--text);
+    }
+
+    .inspector-card.active::before {
+      background: var(--accent);
+    }
+
+    .inspector-card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .inspector-card-title {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.86rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .inspector-step-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 5px;
+      background: #23232D;
+      border: 1px solid var(--border-strong);
+      color: var(--muted);
+    }
+
+    .inspector-card.active .inspector-step-num {
+      background: var(--accent-soft);
+      border-color: rgba(245, 158, 11, 0.5);
+      color: #FCD34D;
+    }
+
+    .inspector-card-desc {
+      font-size: 0.77rem;
+      line-height: 1.45;
+      color: var(--muted);
+    }
+
+    .inspector-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 2px;
+    }
+
+    .inspector-chip {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.67rem;
+      font-weight: 500;
+      padding: 2px 7px;
+      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+
+    .inspector-card.active .inspector-chip {
+      color: #E4E4E7;
+      border-color: #3A3A47;
+    }
+
+    /* Native Fullscreen Lightbox Dialog (Top-Layer Animated) */
+    .studio-lightbox {
+      margin: auto;
+      width: min(94vw, 1120px);
+      max-height: 92dvh;
+      padding: 0;
+      border-radius: 16px;
+      border: 1px solid var(--border-strong);
+      background: #121218;
+      color: var(--text);
+      box-shadow: 0 32px 96px rgba(0, 0, 0, 0.8);
+      overflow: hidden;
+      opacity: 0;
+      transition-property: opacity, transform, display, overlay;
+      transition-duration: 0.26s;
+      transition-timing-function: var(--ease-out);
+      transition-behavior: allow-discrete;
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+      .studio-lightbox {
+        transform: scale(0.95);
+      }
+    }
+
+    .studio-lightbox[open]:where(:not([data-closing])) {
+      opacity: 1;
+    }
+
+    @starting-style {
+      .studio-lightbox[open]:where(:not([data-closing])) {
+        opacity: 0;
+      }
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+      .studio-lightbox[open]:where(:not([data-closing])) {
+        transform: scale(1);
+      }
+      @starting-style {
+        .studio-lightbox[open]:where(:not([data-closing])) {
+          transform: scale(0.95);
+        }
+      }
+    }
+
+    .studio-lightbox::backdrop {
+      background-color: rgba(4, 4, 7, 0);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      transition-property: background-color, display, overlay;
+      transition-duration: 0.26s;
+      transition-timing-function: ease-out;
+      transition-behavior: allow-discrete;
+    }
+
+    .studio-lightbox[open]:where(:not([data-closing]))::backdrop {
+      background-color: rgba(4, 4, 7, 0.82);
+    }
+
+    @starting-style {
+      .studio-lightbox[open]:where(:not([data-closing]))::backdrop {
+        background-color: rgba(4, 4, 7, 0);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .studio-lightbox,
+      .studio-lightbox::backdrop {
+        transition-duration: 0.1s;
+      }
+    }
+
+    .lightbox-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 16px;
+      background: #16161E;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .lightbox-title {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .lightbox-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .lightbox-btn {
+      background: var(--surface-elevated);
+      border: 1px solid var(--border-strong);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.78rem;
+      font-weight: 600;
+      min-block-size: 30px;
+      padding: 5px 11px;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: background-color 0.15s ease, border-color 0.15s ease;
+    }
+
+    .lightbox-btn:hover {
+      background: #292935;
+      border-color: var(--muted);
+    }
+
+    .lightbox-body {
+      padding: 14px;
+      background: #0A0A0D;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .lightbox-body img {
+      width: 100%;
+      height: auto;
+      max-height: 76dvh;
+      object-fit: contain;
+      border-radius: 8px;
+      display: block;
     }
 
     /* Flat Bottom Navigation Dock */
@@ -1136,6 +1550,36 @@
       }
       .headline .accent-text {
         -webkit-text-fill-color: CanvasText;
+      }
+    }
+
+    @media (max-width: 860px) {
+      .studio-showcase {
+        grid-template-columns: 1fr;
+        max-width: 640px;
+        gap: 10px;
+      }
+
+      .studio-inspector {
+        flex-direction: row;
+        overflow-x: auto;
+        gap: 8px;
+      }
+
+      .inspector-card {
+        min-width: 170px;
+        flex: 1;
+        padding: 9px 11px;
+      }
+
+      .inspector-card-desc,
+      .inspector-chips,
+      .window-status {
+        display: none;
+      }
+
+      .studio-media-wrap img {
+        max-height: 29dvh;
       }
     }
 
@@ -1362,7 +1806,7 @@
       </div>
     </section>
 
-    <!-- SCENE 2: STUDIO WINDOW PREVIEW & DOWNLOAD -->
+    <!-- SCENE 2: INTERACTIVE STUDIO WINDOW SHOWCASE & DOWNLOAD -->
     <section class="scene" id="scene-2" inert>
       <div class="eyebrow" data-reveal="1" data-i18n="studioEyebrow">SubVision Studio v1.5</div>
       <h2 class="headline headline--sm" data-reveal="2">
@@ -1370,19 +1814,91 @@
         <span class="accent-text" data-i18n="studioTitle2">Tamamen sizin kontrolünüzde.</span>
       </h2>
 
-      <div class="preview-tabs" role="tablist" id="preview-tablist" aria-label="Arayüz Sekmeleri" data-reveal="3">
-        <button type="button" role="tab" aria-selected="true" class="preview-tab-btn active" data-tab="0" data-i18n="tabHome">1. Ana Ekran</button>
-        <button type="button" role="tab" aria-selected="false" class="preview-tab-btn" data-tab="1" data-i18n="tabHistory">2. Diyalog Geçmişi</button>
-        <button type="button" role="tab" aria-selected="false" class="preview-tab-btn" data-tab="2" data-i18n="tabSettings">3. Ayarlar &amp; Telemetri</button>
-      </div>
+      <div class="studio-showcase" data-reveal="3">
+        <!-- Left: Interactive App Window with Hotspots & Fullscreen Zoom -->
+        <div class="studio-perspective">
+          <div class="studio-frame" id="studio-tilt-card">
+            <div class="window-chrome">
+              <div class="window-chrome-left">
+                <div class="window-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+                <span class="window-title" id="window-title-text">SubVision AI Studio · 1. Ana Ekran</span>
+              </div>
+              <div class="window-chrome-right">
+                <span class="window-status">● 0 MB VRAM · INT8</span>
+                <button type="button" class="window-zoom-btn" id="btn-open-lightbox">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+                  <span data-i18n="zoomBtn">Tam Ekran</span>
+                </button>
+              </div>
+            </div>
 
-      <div class="studio-perspective" data-reveal="4">
-        <div class="studio-frame" id="studio-tilt-card">
-          <img id="studio-preview-img" src="/assets/ui_preview.png?v=1.5.0" alt="SubVision AI Studio Uygulama Arayüzü" width="1200" height="750" loading="lazy" />
+            <div class="studio-media-wrap">
+              <img id="studio-preview-img" src="/assets/ui_preview.png?v=1.5.0" alt="SubVision AI Studio Uygulama Arayüzü" width="1200" height="750" loading="lazy" />
+              <div class="hotspot-layer" id="hotspot-layer">
+                <button type="button" class="hotspot-pin" data-pin="0" style="--x: 28%; --y: 34%;" aria-pressed="true" aria-label="Feature 1">1</button>
+                <button type="button" class="hotspot-pin" data-pin="1" style="--x: 72%; --y: 66%;" aria-pressed="false" aria-label="Feature 2">2</button>
+              </div>
+            </div>
+
+            <div class="hotspot-callout" id="hotspot-callout">
+              <div class="hotspot-callout-main">
+                <span class="hotspot-callout-badge" id="callout-num">1</span>
+                <span><strong id="callout-title">2 Tuşla Anında Başlatma:</strong> <span id="callout-desc">F7 ile altyazı alanını seç, F8 ile canlı çeviriyi başlat — Alt+Tab yapınca otomatik duraklar.</span></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Interactive Studio Tab Inspector -->
+        <div class="studio-inspector" role="tablist" id="preview-tablist" aria-label="Arayüz Sekmeleri">
+          <button type="button" role="tab" aria-selected="true" class="inspector-card active" data-tab="0">
+            <div class="inspector-card-head">
+              <span class="inspector-card-title">
+                <span class="inspector-step-num">01</span>
+                <span data-i18n="tabHome">Ana Ekran</span>
+              </span>
+            </div>
+            <p class="inspector-card-desc" data-i18n="tabHomeDesc">F7 alan seçici, F8 canlı çeviri, hedef pencere kilidi ve tek ekranda overlay görünüm kontrolleri.</p>
+            <div class="inspector-chips">
+              <span class="inspector-chip">F7 → F8</span>
+              <span class="inspector-chip">Auto-Fit</span>
+              <span class="inspector-chip">Alt+Tab Lock</span>
+            </div>
+          </button>
+
+          <button type="button" role="tab" aria-selected="false" class="inspector-card" data-tab="1">
+            <div class="inspector-card-head">
+              <span class="inspector-card-title">
+                <span class="inspector-step-num">02</span>
+                <span data-i18n="tabHistory">Diyalog Geçmişi</span>
+              </span>
+            </div>
+            <p class="inspector-card-desc" data-i18n="tabHistoryDesc">Tüm replikleri gecikme rozetiyle takip et, tek tıkla kopyala veya .SRT / Anki .CSV olarak dışa aktar.</p>
+            <div class="inspector-chips">
+              <span class="inspector-chip">.SRT Export</span>
+              <span class="inspector-chip">Anki .CSV</span>
+              <span class="inspector-chip">1-Click Copy</span>
+            </div>
+          </button>
+
+          <button type="button" role="tab" aria-selected="false" class="inspector-card" data-tab="2">
+            <div class="inspector-card-head">
+              <span class="inspector-card-title">
+                <span class="inspector-step-num">03</span>
+                <span data-i18n="tabSettings">Ayarlar &amp; Telemetri</span>
+              </span>
+            </div>
+            <p class="inspector-card-desc" data-i18n="tabSettingsDesc">CTranslate2 INT8, opsiyonel Ollama/Gemini/Whisper motorları, oyun sözlükleri ve dahili donanım hız testi.</p>
+            <div class="inspector-chips">
+              <span class="inspector-chip">Ollama / Gemini</span>
+              <span class="inspector-chip">Whisper VAD</span>
+              <span class="inspector-chip">Benchmark</span>
+            </div>
+          </button>
         </div>
       </div>
 
-      <div class="cta-group" data-reveal="5">
+      <div class="cta-group" data-reveal="4">
         <a href="/downloads/SubVisionAI.exe" class="btn-download" download="SubVisionAI.exe">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
           <span>Windows (.exe)</span>
@@ -1399,6 +1915,21 @@
     </section>
 
   </main>
+
+  <!-- Native Fullscreen Studio Lightbox -->
+  <dialog id="studio-lightbox" class="studio-lightbox" aria-labelledby="lightbox-title">
+    <div class="lightbox-bar">
+      <span class="lightbox-title" id="lightbox-title">SubVision AI Studio · 1. Ana Ekran</span>
+      <div class="lightbox-actions">
+        <button type="button" class="lightbox-btn" id="lightbox-prev" data-i18n="lightboxPrev">← Önceki</button>
+        <button type="button" class="lightbox-btn" id="lightbox-next" data-i18n="lightboxNext">Sonraki →</button>
+        <button type="button" class="lightbox-btn" id="lightbox-close" data-i18n="lightboxClose">Kapat</button>
+      </div>
+    </div>
+    <div class="lightbox-body">
+      <img id="lightbox-img" src="/assets/ui_preview.png?v=1.5.0" alt="SubVision AI Studio" width="1200" height="750" />
+    </div>
+  </dialog>
 
   <nav class="bottom-dock" id="bottom-dock" aria-label="Sahne Seçici">
     <button type="button" class="dock-btn active" data-scene-target="0" aria-current="step" data-i18n="dockIntro">Tanıtım</button>
@@ -1446,9 +1977,16 @@
         studioTitle1: "Sade. Düz.",
         studioTitle2: "Tamamen sizin kontrolünüzde.",
         previewTabsLabel: "Arayüz Sekmeleri",
-        tabHome: "1. Ana Ekran",
-        tabHistory: "2. Diyalog Geçmişi",
-        tabSettings: "3. Ayarlar & Telemetri",
+        zoomBtn: "Tam Ekran",
+        lightboxPrev: "← Önceki",
+        lightboxNext: "Sonraki →",
+        lightboxClose: "Kapat",
+        tabHome: "Ana Ekran",
+        tabHomeDesc: "F7 alan seçici, F8 canlı çeviri, hedef pencere kilidi ve tek ekranda overlay görünüm kontrolleri.",
+        tabHistory: "Diyalog Geçmişi",
+        tabHistoryDesc: "Tüm replikleri gecikme rozetiyle takip et, tek tıkla kopyala veya .SRT / Anki .CSV olarak dışa aktar.",
+        tabSettings: "Ayarlar & Telemetri",
+        tabSettingsDesc: "CTranslate2 INT8, opsiyonel Ollama/Gemini/Whisper motorları, oyun sözlükleri ve dahili donanım hız testi.",
         previewAlt: "SubVision AI Studio Uygulama Arayüzü",
         studioCaptionPrefix: "En güncel v1.5.0 sürümünü doğrudan indirir ·",
         studioCaptionLink: "Tüm Paketler (GitHub Releases)",
@@ -1493,9 +2031,16 @@
         studioTitle1: "Clean. Flat.",
         studioTitle2: "Completely in your control.",
         previewTabsLabel: "Interface Tabs",
-        tabHome: "1. Home",
-        tabHistory: "2. Dialogue History",
-        tabSettings: "3. Settings & Telemetry",
+        zoomBtn: "Fullscreen",
+        lightboxPrev: "← Prev",
+        lightboxNext: "Next →",
+        lightboxClose: "Close",
+        tabHome: "Home",
+        tabHomeDesc: "F7 region selector, F8 live toggle, target-window lock, and single-screen overlay appearance controls.",
+        tabHistory: "Dialogue History",
+        tabHistoryDesc: "Track every line with latency badges, 1-click copy, or export directly to .SRT subtitles and Anki .CSV cards.",
+        tabSettings: "Settings & Telemetry",
+        tabSettingsDesc: "CTranslate2 INT8, optional Ollama/Gemini/Whisper engines, custom game glossaries, and built-in hardware benchmark.",
         previewAlt: "SubVision AI Studio Application Interface",
         studioCaptionPrefix: "Direct download for latest v1.5.0 ·",
         studioCaptionLink: "All Packages (GitHub Releases)",
@@ -1703,13 +2248,21 @@
     });
 
     window.addEventListener('wheel', (e) => {
-      if (isTransitioning) return;
+      if (isTransitioning || studioLightbox?.open) return;
       if (Math.abs(e.deltaY) < 18) return;
       if (e.deltaY > 0 && currentScene < totalScenes - 1) goScene(currentScene + 1);
       else if (e.deltaY < 0 && currentScene > 0) goScene(currentScene - 1);
     }, { passive: true });
 
     window.addEventListener('keydown', (e) => {
+      if (studioLightbox?.open) {
+        if (e.key === 'ArrowLeft') {
+          switchPreviewTab((activeStudioTab + STUDIO_TABS.length - 1) % STUDIO_TABS.length, false);
+        } else if (e.key === 'ArrowRight') {
+          switchPreviewTab((activeStudioTab + 1) % STUDIO_TABS.length, false);
+        }
+        return;
+      }
       if (e.key === 'ArrowDown' || e.key === 'PageDown') {
         if (currentScene < totalScenes - 1) goScene(currentScene + 1);
       } else if (e.key === 'ArrowUp' || e.key === 'PageUp') {
@@ -1862,32 +2415,226 @@
       advanceSample((sampleIdx + 1) % SAMPLES.length);
     }, 3800);
 
-    /* Studio Preview Tabs + Subtle 3D Tilt (Scene 2) */
-    const PREVIEW_IMAGES = [
-      "/assets/ui_preview.png?v=1.5.0",
-      "/assets/ui_preview_history.png?v=1.5.0",
-      "/assets/ui_preview_settings.png?v=1.5.0"
+    /* Studio Preview Inspector, Interactive Hotspots, 3D Tilt & Native Lightbox (Scene 2) */
+    const STUDIO_TABS = [
+      {
+        img: "/assets/ui_preview.png?v=1.5.0",
+        title: { tr: "SubVision AI Studio · 1. Ana Ekran", en: "SubVision AI Studio · 1. Home" },
+        pins: [
+          {
+            x: "28%",
+            y: "34%",
+            title: { tr: "2 Tuşla Anında Başlatma:", en: "2-Key Instant Launch:" },
+            desc: {
+              tr: "F7 ile altyazı alanını seç, F8 ile canlı çeviriyi başlat — Alt+Tab yapınca otomatik duraklar.",
+              en: "Press F7 to select the subtitle region and F8 to start — auto-pauses cleanly on Alt+Tab."
+            }
+          },
+          {
+            x: "70%",
+            y: "68%",
+            title: { tr: "Canlı Önizleme & Auto-Fit:", en: "Live Preview & Auto-Fit:" },
+            desc: {
+              tr: "Overlay rengini, arka plan koyuluğunu ve otomatik yazı boyutunu anlık olarak ayarla.",
+              en: "Tune overlay color, background opacity, and dynamic tight-hugging font sizing in real time."
+            }
+          }
+        ]
+      },
+      {
+        img: "/assets/ui_preview_history.png?v=1.5.0",
+        title: { tr: "SubVision AI Studio · 2. Diyalog Geçmişi", en: "SubVision AI Studio · 2. Dialogue History" },
+        pins: [
+          {
+            x: "34%",
+            y: "38%",
+            title: { tr: "Gecikme Rozeti & Tek Tık Kopyala:", en: "Latency Badges & 1-Click Copy:" },
+            desc: {
+              tr: "Her replik zaman damgası ve INT8/Önbellek gecikmesiyle kaydedilir; satıra tıklayıp panoya kopyala.",
+              en: "Every line logs timestamp and INT8/Cache latency; click any row to copy the Turkish line."
+            }
+          },
+          {
+            x: "74%",
+            y: "24%",
+            title: { tr: ".SRT & Anki .CSV Dışa Aktarma:", en: ".SRT & Anki .CSV Export:" },
+            desc: {
+              tr: "Oyun veya dizi oturumunu tek tıkla altyazı dosyasına ya da İngilizce kelime kartlarına dönüştür.",
+              en: "Turn any gaming or movie session into timed .SRT subtitles or Anki study flashcards in one click."
+            }
+          }
+        ]
+      },
+      {
+        img: "/assets/ui_preview_settings.png?v=1.5.0",
+        title: { tr: "SubVision AI Studio · 3. Ayarlar & Telemetri", en: "SubVision AI Studio · 3. Settings & Telemetry" },
+        pins: [
+          {
+            x: "32%",
+            y: "34%",
+            title: { tr: "Hibrit Motor & Oyun Sözlükleri:", en: "Hybrid Engine & Game Glossaries:" },
+            desc: {
+              tr: "Varsayılan %100 çevrimdışı CTranslate2 INT8; istersen Ollama, Gemini, DeepL veya Whisper ekle.",
+              en: "100% offline CTranslate2 INT8 by default; optionally enable Ollama, Gemini, DeepL, or live Whisper."
+            }
+          },
+          {
+            x: "70%",
+            y: "66%",
+            title: { tr: "Canlı Donanım Telemetrisi & Benchmark:", en: "Live Hardware Telemetry & Benchmark:" },
+            desc: {
+              tr: "OCR ve NMT hızlarını milisaniye cinsinden izle, işlemcine özel hız profilini tek tıkla test et.",
+              en: "Monitor OCR and NMT latencies in milliseconds and run the built-in CPU benchmark anytime."
+            }
+          }
+        ]
+      }
     ];
 
-    function switchPreviewTab(tabIdx) {
-      const img = document.getElementById('studio-preview-img');
-      if (!img || !PREVIEW_IMAGES[tabIdx]) return;
-      img.classList.add('switching');
-      setTimeout(() => {
-        img.src = PREVIEW_IMAGES[tabIdx];
-        img.classList.remove('switching');
-      }, 140);
-      document.querySelectorAll('.preview-tab-btn').forEach((b, i) => {
-        const active = i === tabIdx;
-        b.classList.toggle('active', active);
-        b.setAttribute('aria-selected', String(active));
+    let activeStudioTab = 0;
+    let activePinIdx = 0;
+
+    function renderStudioHotspot(pinIdx) {
+      const tab = STUDIO_TABS[activeStudioTab];
+      if (!tab) return;
+      activePinIdx = pinIdx;
+      const pinData = tab.pins[pinIdx] || tab.pins[0];
+      const lang = activeLang === "tr" ? "tr" : "en";
+
+      const numEl = document.getElementById("callout-num");
+      const titleEl = document.getElementById("callout-title");
+      const descEl = document.getElementById("callout-desc");
+      if (numEl) numEl.textContent = String(pinIdx + 1);
+      if (titleEl) titleEl.textContent = pinData.title[lang];
+      if (descEl) descEl.textContent = pinData.desc[lang];
+
+      document.querySelectorAll(".hotspot-pin").forEach((el, i) => {
+        el.setAttribute("aria-pressed", String(i === pinIdx));
       });
     }
 
-    document.querySelectorAll('.preview-tab-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        switchPreviewTab(Number.parseInt(btn.getAttribute('data-tab') || '0', 10));
+    function syncStudioMetaForLanguage() {
+      const tab = STUDIO_TABS[activeStudioTab];
+      if (!tab) return;
+      const lang = activeLang === "tr" ? "tr" : "en";
+      const winTitle = document.getElementById("window-title-text");
+      const lbTitle = document.getElementById("lightbox-title");
+      if (winTitle) winTitle.textContent = tab.title[lang];
+      if (lbTitle) lbTitle.textContent = tab.title[lang];
+      renderStudioHotspot(activePinIdx);
+    }
+
+    function switchPreviewTab(tabIdx, animate = true) {
+      const tab = STUDIO_TABS[tabIdx];
+      const img = document.getElementById('studio-preview-img');
+      const lbImg = document.getElementById('lightbox-img');
+      if (!img || !tab) return;
+      activeStudioTab = tabIdx;
+      activePinIdx = 0;
+
+      if (animate) {
+        img.classList.add('switching');
+        setTimeout(() => {
+          img.src = tab.img;
+          img.classList.remove('switching');
+        }, 140);
+      } else {
+        img.src = tab.img;
+      }
+      if (lbImg) lbImg.src = tab.img;
+
+      document.querySelectorAll('.inspector-card').forEach((card, i) => {
+        const active = i === tabIdx;
+        card.classList.toggle('active', active);
+        card.setAttribute('aria-selected', String(active));
       });
+
+      document.querySelectorAll('.hotspot-pin').forEach((pinEl, i) => {
+        const cfg = tab.pins[i];
+        if (!cfg) return;
+        pinEl.style.setProperty('--x', cfg.x);
+        pinEl.style.setProperty('--y', cfg.y);
+      });
+
+      syncStudioMetaForLanguage();
+    }
+
+    document.querySelectorAll('.inspector-card').forEach((card) => {
+      card.addEventListener('click', () => {
+        switchPreviewTab(Number.parseInt(card.getAttribute('data-tab') || '0', 10));
+      });
+    });
+
+    document.querySelectorAll('.hotspot-pin').forEach((pinEl) => {
+      const idx = Number.parseInt(pinEl.getAttribute('data-pin') || '0', 10);
+      pinEl.addEventListener('click', () => renderStudioHotspot(idx));
+      pinEl.addEventListener('mouseenter', () => renderStudioHotspot(idx));
+    });
+
+    /* Native Dialog Lightbox with Top-Layer Exit Fallback */
+    const studioLightbox = document.getElementById('studio-lightbox');
+    let supportsDisplayTransition;
+    function canTransitionDisplay() {
+      if (supportsDisplayTransition !== undefined) return supportsDisplayTransition;
+      if (!window.CSS?.supports?.('transition-behavior', 'allow-discrete') || !document.body) {
+        return false;
+      }
+      const probe = document.createElement('div');
+      probe.style.cssText = 'transition: display 1s allow-discrete !important; display: block;';
+      document.body.appendChild(probe);
+      getComputedStyle(probe).display;
+      probe.style.display = 'none';
+      supportsDisplayTransition = getComputedStyle(probe).display === 'block';
+      probe.remove();
+      return supportsDisplayTransition;
+    }
+
+    function supportsTopLayerExit() {
+      return window.CSS?.supports?.('overlay', 'auto') && canTransitionDisplay();
+    }
+
+    async function closeTopLayer(dialogEl) {
+      if (!dialogEl || !dialogEl.open) return;
+      if (!supportsTopLayerExit()) {
+        dialogEl.setAttribute('data-closing', '');
+        const animations = dialogEl.getAnimations({ subtree: true });
+        if (animations.length > 0) {
+          await Promise.race([
+            Promise.allSettled(animations.map((a) => a.finished)),
+            new Promise((r) => setTimeout(r, 600))
+          ]);
+        }
+        if (!dialogEl.hasAttribute('data-closing')) return;
+        dialogEl.removeAttribute('data-closing');
+      }
+      dialogEl.close();
+    }
+
+    function openLightbox() {
+      if (!studioLightbox || studioLightbox.open) return;
+      const tab = STUDIO_TABS[activeStudioTab];
+      const lbImg = document.getElementById('lightbox-img');
+      if (lbImg && tab) lbImg.src = tab.img;
+      syncStudioMetaForLanguage();
+      studioLightbox.showModal();
+    }
+
+    document.getElementById('btn-open-lightbox')?.addEventListener('click', openLightbox);
+    document.getElementById('studio-preview-img')?.addEventListener('click', openLightbox);
+    document.getElementById('lightbox-close')?.addEventListener('click', () => closeTopLayer(studioLightbox));
+    document.getElementById('lightbox-prev')?.addEventListener('click', () => {
+      switchPreviewTab((activeStudioTab + STUDIO_TABS.length - 1) % STUDIO_TABS.length, false);
+    });
+    document.getElementById('lightbox-next')?.addEventListener('click', () => {
+      switchPreviewTab((activeStudioTab + 1) % STUDIO_TABS.length, false);
+    });
+
+    studioLightbox?.addEventListener('cancel', (e) => {
+      e.preventDefault();
+      closeTopLayer(studioLightbox);
+    });
+    studioLightbox?.addEventListener('click', (e) => {
+      if (e.target === studioLightbox) closeTopLayer(studioLightbox);
     });
 
     const tiltCard = document.getElementById('studio-tilt-card');
@@ -1896,14 +2643,21 @@
         const rect = tiltCard.getBoundingClientRect();
         const x = (e.clientX - rect.left) / rect.width - 0.5;
         const y = (e.clientY - rect.top) / rect.height - 0.5;
-        tiltCard.style.transform = `rotateX(${(-y * 5.5).toFixed(2)}deg) rotateY(${(x * 7).toFixed(2)}deg)`;
+        tiltCard.style.transform = `rotateX(${(-y * 4.5).toFixed(2)}deg) rotateY(${(x * 5.5).toFixed(2)}deg)`;
       });
       tiltCard.addEventListener('pointerleave', () => {
         tiltCard.style.transform = 'rotateX(0deg) rotateY(0deg)';
       });
     }
 
+    const _origApplyLanguage = applyLanguage;
+    applyLanguage = function(lang, persist = false) {
+      _origApplyLanguage(lang, persist);
+      syncStudioMetaForLanguage();
+    };
+
     applyLanguage(detectClientLang(), false);
+    switchPreviewTab(0, false);
   </script>
 </body>
 </html>
