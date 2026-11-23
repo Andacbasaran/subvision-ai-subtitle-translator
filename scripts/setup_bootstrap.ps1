@@ -4,7 +4,8 @@
 $ErrorActionPreference = "Stop"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-$AppDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+$AppDir = Split-Path -Parent $ScriptDir
 Set-Location $AppDir
 
 $VenvPy = Join-Path $AppDir ".venv\Scripts\python.exe"

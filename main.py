@@ -42,23 +42,6 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from hardware import (
-    HardwareProfile,
-    PROFILE_AUTO,
-    PROFILE_BALANCED,
-    PROFILE_ECO,
-    PROFILE_PERFORMANCE,
-    RuntimeTuning,
-    apply_thread_env_defaults,
-    compute_runtime_tuning,
-    detect_hardware_profile,
-    format_hardware_summary,
-    get_app_base_dir,
-    get_ui_font_family,
-    get_writable_data_dir,
-)
-from ocr_engine import SubtitleOCREngine
-from overlay_ui import ROISelectorOverlay, SubtitleOverlayWindow
 from subvision import __version__
 from subvision.audio_whisper import AudioCaptureTranslateWorker, detect_audio_capabilities
 from subvision.context_translator import (
@@ -78,13 +61,26 @@ from subvision.exporters import (
     export_history_to_anki_csv,
     export_history_to_srt,
 )
-from subvision.i18n import LanguageManager
-from subvision.profiles import ProfileManager, get_foreground_process_name
-from subvision.window_tracker import (
-    TargetWindowSpec,
-    WindowInfo,
-    list_visible_windows,
+from subvision.hardware import (
+    HardwareProfile,
+    PROFILE_AUTO,
+    PROFILE_BALANCED,
+    PROFILE_ECO,
+    PROFILE_PERFORMANCE,
+    RuntimeTuning,
+    apply_thread_env_defaults,
+    compute_runtime_tuning,
+    detect_hardware_profile,
+    format_hardware_summary,
+    get_app_base_dir,
+    get_ui_font_family,
+    get_writable_data_dir,
 )
+from subvision.i18n import LanguageManager
+from subvision.ocr_engine import SubtitleOCREngine
+from subvision.overlay_ui import ROISelectorOverlay, SubtitleOverlayWindow
+from subvision.profiles import ProfileManager, get_foreground_process_name
+from subvision.translator import LocalEnTrTranslator
 from subvision.ui_widgets import (
     ColorDotSwatch,
     FlatComboBox,
@@ -101,13 +97,17 @@ from subvision.updater import (
     UpdateInfo,
     apply_downloaded_update,
 )
+from subvision.window_tracker import (
+    TargetWindowSpec,
+    WindowInfo,
+    list_visible_windows,
+)
 from subvision.workers import (
     BenchmarkWorker,
     CaptureTranslateWorker,
     LatestTextSlot,
     ModelLoaderThread,
 )
-from translator import LocalEnTrTranslator
 
 APP_TITLE = f"SubVision AI v{__version__} — Real-Time Subtitle Studio (EN -> TR)"
 DATA_DIR = get_writable_data_dir()
@@ -2965,7 +2965,7 @@ class MainWindow(QMainWindow):
                 QMessageBox.information(
                     dlg,
                     "SubVision AI",
-                    "SubVisionAI-Uninstaller.exe bulunamadı.\nDerlemek için: python build_exe.py",
+                    "SubVisionAI-Uninstaller.exe bulunamadı.\nDerlemek için: python scripts/build_exe.py",
                 )
                 return
 

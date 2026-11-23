@@ -1,7 +1,7 @@
 """
 SubVision AI — Donanım & Uçtan Uca Gecikme Performans Testi (Benchmark Suite)
 Çalıştırmak için:
-    python benchmark.py
+    python scripts/benchmark.py
 """
 
 import json
@@ -15,13 +15,17 @@ from typing import Dict, List
 import cv2
 import numpy as np
 
-from hardware import (
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
+
+from subvision.hardware import (
     compute_runtime_tuning,
     detect_hardware_profile,
     get_ui_font_family,
 )
-from ocr_engine import SubtitleOCREngine
-from translator import LocalEnTrTranslator
+from subvision.ocr_engine import SubtitleOCREngine
+from subvision.translator import LocalEnTrTranslator
 
 
 def make_synthetic_subtitle_frame(
@@ -71,7 +75,7 @@ def generate_visual_assets(bm: Dict) -> None:
     from PyQt6.QtWidgets import QApplication
     import main as app_main
 
-    base_dir = os.path.dirname(os.path.abspath(__file__))
+    base_dir = REPO_ROOT
     assets_dir = os.path.join(base_dir, "assets")
     os.makedirs(assets_dir, exist_ok=True)
 
@@ -490,7 +494,7 @@ def run_benchmarks() -> Dict:
         "vram_usage_mb": 0,
     }
 
-    out_json = os.path.join(os.path.dirname(os.path.abspath(__file__)), "benchmark_results.json")
+    out_json = os.path.join(REPO_ROOT, "benchmark_results.json")
     with open(out_json, "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2)
 

@@ -5,9 +5,9 @@
 ; ayarlarını opsiyonel olarak silme veya koruma seçeneği sunar.
 ;
 ; Derleme komutu:
-;   python build_exe.py --only-pyinstaller
-;   iscc /DMyAppVersion=1.5.0 installer.iss
-;   python build_exe.py --sign dist\SubVisionAI-Setup-v1.5.0-Windows-x64.exe
+;   python scripts/build_exe.py --only-pyinstaller
+;   iscc /DMyAppVersion=1.5.0 packaging\inno\installer.iss
+;   python scripts/build_exe.py --sign dist\SubVisionAI-Setup-v1.5.0-Windows-x64.exe
 
 #ifndef MyAppVersion
   #define MyAppVersion "1.5.0"
@@ -31,10 +31,10 @@ AppUpdatesURL={#MyAppURL}/releases
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
-LicenseFile=LICENSE
-OutputDir=dist
+LicenseFile=..\..\LICENSE
+OutputDir=..\..\dist
 OutputBaseFilename=SubVisionAI-Setup-v{#MyAppVersion}-Windows-x64
-SetupIconFile=assets\app_icon.ico
+SetupIconFile=..\..\assets\app_icon.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 UninstallDisplayName={#MyAppName}
 Compression=lzma2/max
@@ -61,7 +61,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 
 [Files]
-Source: "dist\SubVisionAI\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\..\dist\SubVisionAI\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"

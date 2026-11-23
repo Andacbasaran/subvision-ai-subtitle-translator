@@ -31,7 +31,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from hardware import get_app_base_dir, get_ui_font_family
+from subvision.hardware import get_app_base_dir, get_ui_font_family
 
 
 def make_flat_icon(kind: str, color_hex: str = "#FAFAFA", size: int = 14) -> QIcon:

@@ -512,7 +512,7 @@ def get_app_base_dir() -> str:
     """
     if getattr(sys, "frozen", False):
         return os.path.dirname(os.path.abspath(sys.executable))
-    return os.path.dirname(os.path.abspath(__file__))
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def _is_dir_writable(path: str) -> bool:

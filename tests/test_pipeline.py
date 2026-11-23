@@ -1,18 +1,23 @@
 """
 SubVision AI — Otomatik Birim ve Entegrasyon Test Paketi (Unit & Integration Tests)
 Çalıştırmak için:
-    python -m unittest test_pipeline.py -v
+    python -m unittest discover -s tests -v
 """
 
 import os
+import sys
 import unittest
 from unittest.mock import patch
 
 import cv2
 import numpy as np
 
-from benchmark import make_synthetic_subtitle_frame
-from glossary import (
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
+
+from scripts.benchmark import make_synthetic_subtitle_frame
+from subvision.glossary import (
     clean_ocr_text,
     extract_speaker_and_body,
     is_plausible_subtitle_text,
@@ -20,7 +25,7 @@ from glossary import (
     normalize_all_caps_text,
     normalize_slang_for_nmt,
 )
-from hardware import (
+from subvision.hardware import (
     HardwareProfile,
     PROFILE_AUTO,
     PROFILE_BALANCED,
@@ -32,8 +37,8 @@ from hardware import (
     get_ct2_safe_path,
     select_compute_type_candidates,
 )
-from ocr_engine import SubtitleOCREngine
-from translator import LocalEnTrTranslator
+from subvision.ocr_engine import SubtitleOCREngine
+from subvision.translator import LocalEnTrTranslator
 
 
 class TestHardwareCompatibility(unittest.TestCase):
@@ -170,7 +175,7 @@ class TestHardwareCompatibility(unittest.TestCase):
                 if compute_type == "int8":
                     raise ValueError("int8 unsupported on this CPU")
 
-        with patch("translator.ctranslate2.Translator", side_effect=_FakeTranslator):
+        with patch("subvision.translator.ctranslate2.Translator", side_effect=_FakeTranslator):
             engine, active_type = tr._create_ct2_translator("/fake/model")
 
         self.assertIsNotNone(engine)
@@ -370,7 +375,7 @@ class TestSubVisionPipeline(unittest.TestCase):
         """Auto-Fit font hesabının uzun Türkçe cümleyi kutuya sığdıracak şekilde otomatik küçülttüğünü doğrular."""
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
         from PyQt6.QtWidgets import QApplication
-        from overlay_ui import compute_autofit_font_size
+        from subvision.overlay_ui import compute_autofit_font_size
 
         app = QApplication.instance() or QApplication([])
         self.assertIsNotNone(app)
@@ -405,7 +410,7 @@ class TestSubVisionPipeline(unittest.TestCase):
 
     def test_15_installer_uninstaller_and_signing_config(self) -> None:
         """Kurulum yardımcısı, opsiyonel kaldırıcı (Uninstaller) ve dijital imzalama yapılandırmasını doğrular."""
-        import build_exe
+        from scripts import build_exe
 
         cs_src = build_exe.LauncherCSharpSource
         self.assertIn("SetupWizardForm", cs_src)
@@ -415,7 +420,7 @@ class TestSubVisionPipeline(unittest.TestCase):
         self.assertNotIn(".Kill()", cs_src)
         self.assertTrue(callable(build_exe.ensure_publisher_certificate_and_sign))
 
-        iss_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "installer.iss")
+        iss_path = os.path.join(REPO_ROOT, "packaging", "inno", "installer.iss")
         with open(iss_path, "rb") as f:
             raw_iss = f.read()
         self.assertTrue(raw_iss.startswith(b"\xef\xbb\xbf"), "installer.iss UTF-8 BOM içermeli")
@@ -680,7 +685,7 @@ class TestSubVisionV14Features(unittest.TestCase):
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
         from PyQt6.QtCore import QPoint
         from PyQt6.QtWidgets import QApplication
-        from overlay_ui import ROISelectorOverlay
+        from subvision.overlay_ui import ROISelectorOverlay
 
         app = QApplication.instance() or QApplication([])
         self.assertIsNotNone(app)
@@ -704,7 +709,7 @@ class TestSubVisionV14Features(unittest.TestCase):
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
         from PyQt6.QtCore import QRect
         from PyQt6.QtWidgets import QApplication
-        from overlay_ui import SubtitleOverlayWindow, compute_dynamic_overlay_plan
+        from subvision.overlay_ui import SubtitleOverlayWindow, compute_dynamic_overlay_plan
 
         app = QApplication.instance() or QApplication([])
         self.assertIsNotNone(app)
@@ -847,7 +852,7 @@ class TestSubVisionV14Features(unittest.TestCase):
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
         import time
         from PyQt6.QtWidgets import QApplication
-        import build_exe
+        from scripts import build_exe
         import main as app_main
         from subvision.window_tracker import TargetWindowSpec, WindowInfo
         from subvision.workers import CaptureTranslateWorker

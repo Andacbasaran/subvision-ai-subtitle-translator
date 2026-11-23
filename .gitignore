@@ -10,13 +10,17 @@ runtime/
 # Lokal Yapay Zeka Modeli (Uygulama ilk açılışta HuggingFace üzerinden otomatik indirir)
 models/
 
-# PyInstaller Derleme Çıktıları
+# PyInstaller & Paketleme Derleme Çıktıları
 build/
 dist/
+release_out/
 *.spec
+*.dmg
+SubVisionAI.exe
 
-# Kullanıcı Yerel Ayarları & Hata Kayıtları
+# Kullanıcı Yerel Ayarları, Benchmark & Hata Kayıtları
 user_settings.json
+benchmark_results.json
 crash.log
 
 # İşletim Sistemi Geçici Dosyaları

@@ -1,0 +1,41 @@
+changelog:
+  exclude:
+    labels:
+      - ignore-for-release
+      - duplicate
+      - invalid
+      - wontfix
+    authors:
+      - dependabot
+  categories:
+    - title: "🚀 Features"
+      labels:
+        - feat
+        - feature
+        - enhancement
+    - title: "🐛 Bug Fixes"
+      labels:
+        - fix
+        - bug
+        - bugfix
+    - title: "⚡ Performance"
+      labels:
+        - perf
+        - performance
+    - title: "📦 Packaging & CI"
+      labels:
+        - ci
+        - build
+        - packaging
+        - release
+    - title: "📚 Documentation"
+      labels:
+        - docs
+        - documentation
+    - title: "🧹 Maintenance"
+      labels:
+        - chore
+        - refactor
+        - test
+        - dependencies
+        - "*"

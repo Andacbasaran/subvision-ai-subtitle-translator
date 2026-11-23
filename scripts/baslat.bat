@@ -1,10 +1,10 @@
 @echo off
 chcp 65001 >nul
 title SubVision AI - Anlik Ekran Altyazi Cevirici (EN - TR)
-cd /d "%~dp0"
+cd /d "%~dp0.."
 
-if exist "%~dp0SubVisionAI.exe" (
-    start "" "%~dp0SubVisionAI.exe"
+if exist "%~dp0..\SubVisionAI.exe" (
+    start "" "%~dp0..\SubVisionAI.exe"
     exit /b 0
 )
 

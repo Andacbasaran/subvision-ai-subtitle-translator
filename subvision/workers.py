@@ -12,8 +12,8 @@ import mss
 import numpy as np
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from hardware import HardwareProfile
-from ocr_engine import SubtitleOCREngine
+from subvision.hardware import HardwareProfile
+from subvision.ocr_engine import SubtitleOCREngine
 from subvision.window_tracker import (
     TargetWindowSpec,
     WindowInfo,

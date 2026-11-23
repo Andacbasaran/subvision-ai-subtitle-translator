@@ -4,9 +4,10 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$REPO_ROOT"
 
-VENV_DIR="$SCRIPT_DIR/.venv"
+VENV_DIR="$REPO_ROOT/.venv"
 MARKER_FILE="$VENV_DIR/.deps_installed"
 
 # Python 3.10+ yorumlayıcısını bul
@@ -33,9 +34,9 @@ fi
 if [ ! -f "$MARKER_FILE" ]; then
     echo "[2/2] Bağımlılıklar kuruluyor (PyQt6, RapidOCR, CTranslate2)..."
     "$VENV_DIR/bin/python" -m pip install --upgrade pip >/dev/null 2>&1 || true
-    "$VENV_DIR/bin/python" -m pip install --prefer-binary -r "$SCRIPT_DIR/requirements.txt"
+    "$VENV_DIR/bin/python" -m pip install --prefer-binary -r "$REPO_ROOT/requirements.txt"
     touch "$MARKER_FILE"
 fi
 
 echo "[OK] SubVision AI başlatılıyor..."
-exec "$VENV_DIR/bin/python" "$SCRIPT_DIR/main.py" "$@"
+exec "$VENV_DIR/bin/python" "$REPO_ROOT/main.py" "$@"

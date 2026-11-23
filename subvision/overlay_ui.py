@@ -31,7 +31,7 @@ from PyQt6.QtGui import (
 )
 from PyQt6.QtWidgets import QWidget
 
-from hardware import get_app_base_dir, get_ui_font_family, get_windows_build
+from subvision.hardware import get_app_base_dir, get_ui_font_family, get_windows_build
 
 WDA_NONE = 0x00000000
 WDA_EXCLUDEFROMCAPTURE = 0x00000011

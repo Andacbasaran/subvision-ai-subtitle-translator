@@ -3,28 +3,81 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>SubVision — Ekrandaki Her Altyazı. Anında Türkçe.</title>
-  <meta name="description" content="Oyunlar, diziler ve videolar için anlık, çevrimdışı ve açık kaynak kodlu ekran üstü Türkçe altyazı çevirici." />
+  <title>SubVision AI — Ekrandaki Her Altyazı. Anında Türkçe.</title>
+  <meta name="description" content="Oyunlar, diziler, filmler ve canlı yayınlar için Windows ve macOS Apple Silicon destekli, ~88 ms gecikmeli, 0 MB VRAM ve %100 çevrimdışı açık kaynak Türkçe altyazı çevirici." />
+  <meta name="keywords" content="SubVision AI, real-time subtitle translator, offline subtitle translator, gaming subtitle overlay, oyun altyazı çevirici, anlık Türkçe altyazı, CTranslate2, RapidOCR, Whisper, macOS Apple Silicon, Windows" />
+  <meta name="author" content="Andac Basaran" />
+  <meta name="robots" content="index, follow, max-image-preview:large" />
   <meta name="theme-color" content="#0C0C0E" />
   <meta name="color-scheme" content="dark" />
 
   <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="SubVision AI" />
   <meta property="og:url" content="https://subvisionai.andacbasaran.com/" />
-  <meta property="og:title" content="SubVision — Ekrandaki Her Altyazı. Anında Türkçe." />
-  <meta property="og:description" content="Oyunlar ve videolar için sıfır FPS kaybıyla çalışan açık kaynak kodlu anlık Türkçe altyazı çevirici." />
-  <meta property="og:image" content="https://subvisionai.andacbasaran.com/assets/ui_preview.png?v=1.4.1" />
+  <meta property="og:locale" content="tr_TR" />
+  <meta property="og:locale:alternate" content="en_US" />
+  <meta property="og:title" content="SubVision AI — Ekrandaki Her Altyazı. Anında Türkçe." />
+  <meta property="og:description" content="Oyunlar ve videolar için Windows ve macOS Apple Silicon'da 0 MB VRAM ve sıfır FPS kaybıyla çalışan açık kaynak kodlu anlık Türkçe altyazı çevirici." />
+  <meta property="og:image" content="https://subvisionai.andacbasaran.com/assets/ui_preview.png?v=1.5.0" />
+  <meta property="og:image:alt" content="SubVision AI Studio v1.5.0 — Gerçek Zamanlı Ekran Üstü Altyazı Çevirici Arayüzü" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="750" />
 
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="SubVision — Ekrandaki Her Altyazı. Anında Türkçe." />
-  <meta name="twitter:description" content="Oyunlar ve videolar için sıfır FPS kaybıyla çalışan açık kaynak kodlu anlık Türkçe altyazı çevirici." />
-  <meta name="twitter:image" content="https://subvisionai.andacbasaran.com/assets/ui_preview.png?v=1.4.1" />
+  <meta name="twitter:title" content="SubVision AI — Ekrandaki Her Altyazı. Anında Türkçe." />
+  <meta name="twitter:description" content="Oyunlar ve videolar için Windows ve macOS Apple Silicon'da 0 MB VRAM ve sıfır FPS kaybıyla çalışan açık kaynak kodlu anlık Türkçe altyazı çevirici." />
+  <meta name="twitter:image" content="https://subvisionai.andacbasaran.com/assets/ui_preview.png?v=1.5.0" />
+  <meta name="twitter:image:alt" content="SubVision AI Studio v1.5.0 — Gerçek Zamanlı Ekran Üstü Altyazı Çevirici Arayüzü" />
 
   <link rel="canonical" href="https://subvisionai.andacbasaran.com/" />
-  <link rel="icon" type="image/png" href="/assets/app_icon.png?v=1.4.1" />
-  <link rel="shortcut icon" href="/favicon.ico?v=1.4.1" />
+  <link rel="alternate" hreflang="tr" href="https://subvisionai.andacbasaran.com/tr" />
+  <link rel="alternate" hreflang="en" href="https://subvisionai.andacbasaran.com/en" />
+  <link rel="alternate" hreflang="x-default" href="https://subvisionai.andacbasaran.com/" />
+
+  <link rel="icon" type="image/png" href="/assets/app_icon.png?v=1.5.0" />
+  <link rel="shortcut icon" href="/favicon.ico?v=1.5.0" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "SubVision AI",
+    "alternateName": "SubVision AI Subtitle Translator Studio",
+    "applicationCategory": "MultimediaApplication",
+    "operatingSystem": "Windows 10, Windows 11, macOS 13+ (Apple Silicon)",
+    "softwareVersion": "1.5.0",
+    "inLanguage": ["en", "tr"],
+    "isAccessibleForFree": true,
+    "license": "https://opensource.org/licenses/MIT",
+    "url": "https://subvisionai.andacbasaran.com/",
+    "downloadUrl": "https://github.com/Andacbasaran/subvision-ai-subtitle-translator/releases/latest",
+    "codeRepository": "https://github.com/Andacbasaran/subvision-ai-subtitle-translator",
+    "screenshot": "https://subvisionai.andacbasaran.com/assets/ui_preview.png?v=1.5.0",
+    "description": "Ultra-low-latency (~88 ms), 100% offline, 0 MB VRAM real-time English-to-Turkish on-screen and live-audio subtitle translator for PC games, movies, and streams.",
+    "featureList": [
+      "~88 ms end-to-end async OCR + CTranslate2 INT8 translation",
+      "0 MB VRAM usage (100% CPU, zero FPS drop in games)",
+      "Dynamic tight-hugging click-through subtitle overlay",
+      "Target-window lock with Alt+Tab auto-pause",
+      "Optional context-aware LLM layer (Ollama, Gemini, DeepL, OpenAI)",
+      "Optional live audio Whisper transcription mode",
+      "Windows x64 installer & macOS Apple Silicon native DMG"
+    ],
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "author": {
+      "@type": "Person",
+      "name": "Andac Basaran",
+      "url": "https://andacbasaran.com"
+    }
+  }
+  </script>
 
   <style>
     :root {
@@ -69,7 +122,7 @@
       outline-offset: 2px;
     }
 
-    /* Subtle flat architectural dot-grid background (zero blurred neon orbs) */
+    /* Subtle flat architectural dot-grid background */
     .bg-grid {
       position: fixed;
       inset: 0;
@@ -123,7 +176,7 @@
     .top-actions {
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 12px;
       flex-shrink: 0;
     }
 
@@ -142,6 +195,43 @@
       color: var(--text);
     }
 
+    /* Compact Segmented Language Switcher */
+    .lang-switch {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      padding: 2px;
+      border-radius: 7px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+
+    .lang-btn {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 0.74rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      min-block-size: 28px;
+      min-inline-size: 32px;
+      padding: 4px 8px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: color 0.16s ease, background-color 0.16s ease, border-color 0.16s ease;
+    }
+
+    .lang-btn:hover {
+      color: var(--text);
+    }
+
+    .lang-btn[aria-pressed="true"] {
+      background: #25252C;
+      border-color: var(--border-strong);
+      color: var(--text);
+    }
+
     .btn-pill {
       display: inline-flex;
       align-items: center;
@@ -151,7 +241,8 @@
       color: #09090B;
       font-size: 0.82rem;
       font-weight: 700;
-      padding: 7px 14px;
+      min-block-size: 32px;
+      padding: 6px 14px;
       border-radius: 7px;
       white-space: nowrap;
       transition: background-color 0.18s ease, border-color 0.18s ease;
@@ -235,6 +326,16 @@
       color: var(--text);
     }
 
+    .headline--md {
+      font-size: clamp(1.65rem, 4vw, 3rem);
+      margin-bottom: 20px;
+    }
+
+    .headline--sm {
+      font-size: clamp(1.45rem, 3.2vw, 2.4rem);
+      margin-bottom: 12px;
+    }
+
     .headline span {
       color: var(--accent);
     }
@@ -242,13 +343,21 @@
     .subhead {
       font-size: clamp(0.95rem, 1.4vw, 1.1rem);
       color: var(--muted);
-      max-width: 520px;
+      max-width: 540px;
       font-weight: 400;
       line-height: 1.55;
       margin-bottom: 28px;
     }
 
-    /* Crisp Flat Inverted Primary CTA */
+    /* Crisp Flat Inverted Primary CTA + Secondary Platform CTA */
+    .cta-group {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
     .btn-download {
       display: inline-flex;
       align-items: center;
@@ -257,9 +366,9 @@
       background: var(--text);
       color: #09090B;
       border: 1px solid var(--text);
-      padding: 13px 28px;
+      padding: 13px 24px;
       border-radius: 9px;
-      font-size: 0.96rem;
+      font-size: 0.94rem;
       font-weight: 700;
       letter-spacing: -0.01em;
       white-space: nowrap;
@@ -269,6 +378,28 @@
     .btn-download:hover {
       background: #E4E4E7;
       border-color: #E4E4E7;
+    }
+
+    .btn-download-secondary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      background: var(--surface-elevated);
+      color: var(--text);
+      border: 1px solid var(--border-strong);
+      padding: 13px 22px;
+      border-radius: 9px;
+      font-size: 0.94rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+      transition: background-color 0.18s ease, border-color 0.18s ease;
+    }
+
+    .btn-download-secondary:hover {
+      background: #27272F;
+      border-color: var(--muted);
     }
 
     .caption-small {
@@ -295,7 +426,7 @@
       gap: 8px;
       flex-wrap: wrap;
       margin-top: 26px;
-      max-width: 680px;
+      max-width: 720px;
     }
 
     .spec-pill {
@@ -373,6 +504,7 @@
       font-family: inherit;
       font-size: 0.78rem;
       font-weight: 600;
+      min-block-size: 30px;
       padding: 5px 11px;
       border-radius: 7px;
       cursor: pointer;
@@ -452,6 +584,7 @@
       font-family: inherit;
       font-size: 0.78rem;
       font-weight: 600;
+      min-block-size: 30px;
       padding: 6px 14px;
       border-radius: 6px;
       cursor: pointer;
@@ -481,6 +614,7 @@
 
     .studio-frame img {
       width: 100%;
+      height: auto;
       max-height: 41dvh;
       object-fit: contain;
       border-radius: 8px;
@@ -513,6 +647,7 @@
       font-family: inherit;
       font-size: 0.82rem;
       font-weight: 600;
+      min-block-size: 32px;
       padding: 7px 16px;
       border-radius: 7px;
       cursor: pointer;
@@ -532,7 +667,9 @@
 
     @media (forced-colors: active) {
       .btn-download,
+      .btn-download-secondary,
       .btn-pill,
+      .lang-btn[aria-pressed="true"],
       .dock-btn.active,
       .preview-tab-btn.active {
         border: 2px solid ButtonText;
@@ -540,6 +677,7 @@
       .studio-frame,
       .demo-card,
       .spec-pill,
+      .lang-switch,
       .bottom-dock {
         border: 1px solid CanvasText;
       }
@@ -548,7 +686,11 @@
     @media (max-width: 640px) {
       .topbar {
         height: 56px;
-        padding: 0 16px;
+        padding: 0 14px;
+      }
+
+      .top-actions {
+        gap: 8px;
       }
 
       .hide-mobile {
@@ -564,9 +706,18 @@
         height: 64px;
       }
 
-      .btn-download {
+      .cta-group {
+        width: 100%;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .btn-download,
+      .btn-download-secondary {
         width: 100%;
         max-width: 280px;
+        padding: 11px 20px;
+        font-size: 0.88rem;
       }
 
       .demo-card {
@@ -585,18 +736,24 @@
 
   <!-- Minimal Flat Topbar -->
   <header class="topbar">
-    <button type="button" class="brand" onclick="goScene(0)">
-      <img src="/assets/app_icon.png?v=1.4.1" alt="" />
+    <button type="button" class="brand" id="brand-home-btn" aria-label="SubVision Home">
+      <img src="/assets/app_icon.png?v=1.5.0" alt="" width="30" height="30" />
       <span>SubVision</span>
     </button>
 
     <div class="top-actions">
       <a href="https://github.com/Andacbasaran/subvision-ai-subtitle-translator" target="_blank" rel="noopener" class="top-link">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-        <span>GitHub</span>
+        <span class="hide-mobile">GitHub</span>
       </a>
       <a href="https://andacbasaran.com" target="_blank" rel="noopener" class="top-link hide-mobile">andacbasaran.com</a>
-      <a href="/downloads/SubVisionAI.exe" class="btn-pill" download="SubVisionAI.exe">İndir</a>
+
+      <div class="lang-switch" role="group" id="lang-switch" aria-label="Dil Seçimi">
+        <button type="button" class="lang-btn" data-lang="tr" lang="tr" aria-pressed="true">TR</button>
+        <button type="button" class="lang-btn" data-lang="en" lang="en" aria-pressed="false">EN</button>
+      </div>
+
+      <a href="/downloads/SubVisionAI.exe" id="topbar-download-btn" class="btn-pill" download="SubVisionAI.exe" data-i18n="topDownload">İndir</a>
     </div>
   </header>
 
@@ -605,30 +762,37 @@
     <!-- SCENE 0: HERO -->
     <section class="scene active" id="scene-0">
       <div class="logo-showcase">
-        <img src="/assets/app_icon.png?v=1.4.1" alt="SubVision Logo" />
+        <img src="/assets/app_icon.png?v=1.5.0" alt="SubVision AI Logo" width="76" height="76" fetchpriority="high" />
       </div>
 
-      <div class="eyebrow">SubVision · Lokal Altyazı Stüdyosu</div>
+      <div class="eyebrow" data-i18n="heroEyebrow">SubVision v1.5 · Lokal Altyazı Stüdyosu</div>
       <h1 class="headline">
-        Ekrandaki her altyazı.<br />
-        <span>Anında Türkçe.</span>
+        <span style="color: inherit;" data-i18n="heroTitleLine1">Ekrandaki her altyazı.</span><br />
+        <span data-i18n="heroTitleLine2">Anında Türkçe.</span>
       </h1>
-      <p class="subhead">
+      <p class="subhead" data-i18n="heroSubhead">
         Oyunlar, diziler ve videolar üzerindeki İngilizce altyazıları orijinal boyutunda sıkıca kapatıp kendi bilgisayarınızda anlık Türkçeye çevirir.
       </p>
 
-      <a href="/downloads/SubVisionAI.exe" class="btn-download" download="SubVisionAI.exe">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
-        <span>Windows İçin İndir</span>
-      </a>
+      <div class="cta-group">
+        <a href="/downloads/SubVisionAI.exe" class="btn-download" download="SubVisionAI.exe">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
+          <span data-i18n="heroWinBtn">Windows İçin İndir</span>
+        </a>
+        <a href="/downloads/SubVisionAI-macOS.dmg" class="btn-download-secondary" download="SubVisionAI-macOS.dmg">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.33c.64-.78 1.08-1.86.96-2.94-.93.04-2.06.62-2.72 1.4-.58.68-1.1 1.79-.96 2.84 1.04.08 2.09-.52 2.72-1.3z"/></svg>
+          <span data-i18n="heroMacBtn">macOS (Apple Silicon)</span>
+        </a>
+      </div>
       <div class="caption-small">
-        Windows 10 &amp; 11 (64-bit) · %100 Ücretsiz ve <a href="https://github.com/Andacbasaran/subvision-ai-subtitle-translator" target="_blank" rel="noopener">Açık Kaynak (MIT)</a>
+        <span data-i18n="heroCaptionPrefix">v1.5.0 · Windows 10/11 (x64) &amp; macOS M1–M4 · %100 Ücretsiz ve</span>
+        <a href="https://github.com/Andacbasaran/subvision-ai-subtitle-translator" target="_blank" rel="noopener" data-i18n="heroCaptionLink">Açık Kaynak (MIT)</a>
       </div>
 
       <div class="specs-row">
-        <div class="spec-pill">Sıkı Dinamik Hizalama</div>
-        <div class="spec-pill">Pencere Kilidi (Alt+Tab)</div>
-        <div class="spec-pill">0 MB VRAM · %100 Çevrimdışı</div>
+        <div class="spec-pill" data-i18n="spec1">Sıkı Dinamik Hizalama</div>
+        <div class="spec-pill" data-i18n="spec2">Pencere Kilidi (Alt+Tab)</div>
+        <div class="spec-pill" data-i18n="spec3">0 MB VRAM · %100 Çevrimdışı</div>
         <a href="https://github.com/Andacbasaran/subvision-ai-subtitle-translator" target="_blank" rel="noopener" class="spec-pill">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
           <span>GitHub</span>
@@ -636,11 +800,12 @@
       </div>
     </section>
 
-    <!-- SCENE 1: NASIL ÇALIŞIR -->
-    <section class="scene" id="scene-1">
-      <div class="eyebrow">Nasıl Çalışır?</div>
-      <h2 class="headline" style="font-size: clamp(1.65rem, 4vw, 3rem); margin-bottom: 20px;">
-        İki tuş. <span>Sıfır zahmet.</span>
+    <!-- SCENE 1: HOW IT WORKS -->
+    <section class="scene" id="scene-1" inert>
+      <div class="eyebrow" data-i18n="howEyebrow">Nasıl Çalışır?</div>
+      <h2 class="headline headline--md">
+        <span style="color: inherit;" data-i18n="howTitle1">İki tuş.</span>
+        <span data-i18n="howTitle2">Sıfır zahmet.</span>
       </h2>
 
       <div class="demo-card">
@@ -648,63 +813,261 @@
           <div class="demo-steps-group">
             <div class="key-pill">
               <span class="key-badge">F7</span>
-              <span>Altyazı Bölgesini Seç</span>
+              <span data-i18n="keyF7">Altyazı Bölgesini Seç</span>
             </div>
             <div class="key-pill">
               <span class="key-badge">F8</span>
-              <span>Anlık Çeviriyi Başlat</span>
+              <span data-i18n="keyF8">Anlık Çeviriyi Başlat</span>
             </div>
           </div>
-          <button type="button" class="demo-pause-btn" id="btn-demo-pause" onclick="toggleDemoPlayback()">Duraklat</button>
+          <button type="button" class="demo-pause-btn" id="btn-demo-pause" aria-pressed="false">Duraklat</button>
         </div>
 
         <div class="cinema-viewport">
-          <span class="roi-corner">DİNAMİK ALTYAZI YAKALAMA ALANI</span>
-          <div class="morph-sub-en" id="demo-en">
+          <span class="roi-corner" data-i18n="roiCorner">DİNAMİK ALTYAZI YAKALAMA ALANI</span>
+          <div class="morph-sub-en" id="demo-en" lang="en">
             "Miles, watch out! The hunters are locking down the bridge!"
           </div>
-          <div class="morph-sub-tr" id="demo-tr">
+          <div class="morph-sub-tr" id="demo-tr" lang="tr">
             "Miles, dikkat et! Avcılar köprüyü abluka altına alıyor!"
           </div>
         </div>
       </div>
     </section>
 
-    <!-- SCENE 2: STÜDYO ARAYÜZÜ & İNDİR -->
-    <section class="scene" id="scene-2">
-      <div class="eyebrow">SubVision Studio v1.4</div>
-      <h2 class="headline" style="font-size: clamp(1.45rem, 3.2vw, 2.4rem); margin-bottom: 12px;">
-        Sade. Düz. <span>Tamamen sizin kontrolünüzde.</span>
+    <!-- SCENE 2: STUDIO WINDOW PREVIEW & DOWNLOAD -->
+    <section class="scene" id="scene-2" inert>
+      <div class="eyebrow" data-i18n="studioEyebrow">SubVision Studio v1.5</div>
+      <h2 class="headline headline--sm">
+        <span style="color: inherit;" data-i18n="studioTitle1">Sade. Düz.</span>
+        <span data-i18n="studioTitle2">Tamamen sizin kontrolünüzde.</span>
       </h2>
 
-      <div class="preview-tabs" role="tablist" aria-label="Arayüz Sekmeleri">
-        <button type="button" class="preview-tab-btn active" onclick="switchPreviewTab(0)">1. Ana Ekran</button>
-        <button type="button" class="preview-tab-btn" onclick="switchPreviewTab(1)">2. Diyalog Geçmişi</button>
-        <button type="button" class="preview-tab-btn" onclick="switchPreviewTab(2)">3. Ayarlar &amp; Telemetri</button>
+      <div class="preview-tabs" role="tablist" id="preview-tablist" aria-label="Arayüz Sekmeleri">
+        <button type="button" role="tab" aria-selected="true" class="preview-tab-btn active" data-tab="0" data-i18n="tabHome">1. Ana Ekran</button>
+        <button type="button" role="tab" aria-selected="false" class="preview-tab-btn" data-tab="1" data-i18n="tabHistory">2. Diyalog Geçmişi</button>
+        <button type="button" role="tab" aria-selected="false" class="preview-tab-btn" data-tab="2" data-i18n="tabSettings">3. Ayarlar &amp; Telemetri</button>
       </div>
 
       <div class="studio-frame">
-        <img id="studio-preview-img" src="/assets/ui_preview.png?v=1.4.1" alt="SubVision Uygulama Arayüzü" />
+        <img id="studio-preview-img" src="/assets/ui_preview.png?v=1.5.0" alt="SubVision AI Studio Uygulama Arayüzü" width="1200" height="750" loading="lazy" />
       </div>
 
-      <a href="/downloads/SubVisionAI.exe" class="btn-download" download="SubVisionAI.exe">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
-        <span>Hemen İndir (SubVisionAI.exe)</span>
-      </a>
+      <div class="cta-group">
+        <a href="/downloads/SubVisionAI.exe" class="btn-download" download="SubVisionAI.exe">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
+          <span>Windows (.exe)</span>
+        </a>
+        <a href="/downloads/SubVisionAI-macOS.dmg" class="btn-download-secondary" download="SubVisionAI-macOS.dmg">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.33c.64-.78 1.08-1.86.96-2.94-.93.04-2.06.62-2.72 1.4-.58.68-1.1 1.79-.96 2.84 1.04.08 2.09-.52 2.72-1.3z"/></svg>
+          <span>macOS (.dmg)</span>
+        </a>
+      </div>
       <div class="caption-small">
-        En güncel sürümü doğrudan indirir · <a href="https://github.com/Andacbasaran/subvision-ai-subtitle-translator/releases/latest" target="_blank" rel="noopener">Tüm Paketler (GitHub Releases)</a>
+        <span data-i18n="studioCaptionPrefix">En güncel v1.5.0 sürümünü doğrudan indirir ·</span>
+        <a href="https://github.com/Andacbasaran/subvision-ai-subtitle-translator/releases/latest" target="_blank" rel="noopener" data-i18n="studioCaptionLink">Tüm Paketler (GitHub Releases)</a>
       </div>
     </section>
 
   </main>
 
-  <nav class="bottom-dock" aria-label="Sahne Seçici">
-    <button type="button" class="dock-btn active" onclick="goScene(0)">Tanıtım</button>
-    <button type="button" class="dock-btn" onclick="goScene(1)">Nasıl Çalışır?</button>
-    <button type="button" class="dock-btn" onclick="goScene(2)">Uygulama</button>
+  <nav class="bottom-dock" id="bottom-dock" aria-label="Sahne Seçici">
+    <button type="button" class="dock-btn active" data-scene-target="0" aria-current="step" data-i18n="dockIntro">Tanıtım</button>
+    <button type="button" class="dock-btn" data-scene-target="1" data-i18n="dockHow">Nasıl Çalışır?</button>
+    <button type="button" class="dock-btn" data-scene-target="2" data-i18n="dockApp">Uygulama</button>
   </nav>
 
   <script>
+    window.__INITIAL_LANG__ = null;
+
+    const I18N = {
+      tr: {
+        pageTitle: "SubVision AI — Ekrandaki Her Altyazı. Anında Türkçe.",
+        metaDescription: "Oyunlar, diziler, filmler ve canlı yayınlar için Windows ve macOS Apple Silicon destekli, ~88 ms gecikmeli, 0 MB VRAM ve %100 çevrimdışı açık kaynak Türkçe altyazı çevirici.",
+        langSwitchLabel: "Dil Seçimi",
+        brandAria: "SubVision Ana Sayfa",
+        topDownload: "İndir",
+        heroEyebrow: "SubVision v1.5 · Lokal Altyazı Stüdyosu",
+        heroTitleLine1: "Ekrandaki her altyazı.",
+        heroTitleLine2: "Anında Türkçe.",
+        heroSubhead: "Oyunlar, diziler ve videolar üzerindeki İngilizce altyazıları orijinal boyutunda sıkıca kapatıp kendi bilgisayarınızda anlık Türkçeye çevirir.",
+        heroWinBtn: "Windows İçin İndir",
+        heroMacBtn: "macOS (Apple Silicon)",
+        heroCaptionPrefix: "v1.5.0 · Windows 10/11 (x64) & macOS M1–M4 · %100 Ücretsiz ve",
+        heroCaptionLink: "Açık Kaynak (MIT)",
+        spec1: "Sıkı Dinamik Hizalama",
+        spec2: "Pencere Kilidi (Alt+Tab)",
+        spec3: "0 MB VRAM · %100 Çevrimdışı",
+        howEyebrow: "Nasıl Çalışır?",
+        howTitle1: "İki tuş.",
+        howTitle2: "Sıfır zahmet.",
+        keyF7: "Altyazı Bölgesini Seç",
+        keyF8: "Anlık Çeviriyi Başlat",
+        pauseLabel: "Duraklat",
+        playLabel: "Oynat",
+        roiCorner: "DİNAMİK ALTYAZI YAKALAMA ALANI",
+        studioEyebrow: "SubVision Studio v1.5",
+        studioTitle1: "Sade. Düz.",
+        studioTitle2: "Tamamen sizin kontrolünüzde.",
+        previewTabsLabel: "Arayüz Sekmeleri",
+        tabHome: "1. Ana Ekran",
+        tabHistory: "2. Diyalog Geçmişi",
+        tabSettings: "3. Ayarlar & Telemetri",
+        previewAlt: "SubVision AI Studio Uygulama Arayüzü",
+        studioCaptionPrefix: "En güncel v1.5.0 sürümünü doğrudan indirir ·",
+        studioCaptionLink: "Tüm Paketler (GitHub Releases)",
+        dockAria: "Sahne Seçici",
+        dockIntro: "Tanıtım",
+        dockHow: "Nasıl Çalışır?",
+        dockApp: "Uygulama"
+      },
+      en: {
+        pageTitle: "SubVision AI — Real-Time Offline Subtitle Translator (EN → TR)",
+        metaDescription: "Ultra-low-latency (~88 ms), 100% offline, 0 MB VRAM real-time English-to-Turkish subtitle translator for PC games, movies, and live streams on Windows and macOS Apple Silicon.",
+        langSwitchLabel: "Language Switcher",
+        brandAria: "SubVision Home",
+        topDownload: "Download",
+        heroEyebrow: "SubVision v1.5 · Local Subtitle Studio",
+        heroTitleLine1: "Every on-screen subtitle.",
+        heroTitleLine2: "Instantly in Turkish.",
+        heroSubhead: "Reads English subtitles from games, movies, and streams and renders tight-hugging Turkish translations locally on your CPU in ~88 ms.",
+        heroWinBtn: "Download for Windows",
+        heroMacBtn: "macOS (Apple Silicon)",
+        heroCaptionPrefix: "v1.5.0 · Windows 10/11 (x64) & macOS M1–M4 · 100% Free &",
+        heroCaptionLink: "Open Source (MIT)",
+        spec1: "Tight Dynamic Overlay",
+        spec2: "Target-Window Lock (Alt+Tab)",
+        spec3: "0 MB VRAM · 100% Offline",
+        howEyebrow: "How It Works",
+        howTitle1: "Two keys.",
+        howTitle2: "Zero friction.",
+        keyF7: "Select Subtitle Region",
+        keyF8: "Start Live Translation",
+        pauseLabel: "Pause",
+        playLabel: "Play",
+        roiCorner: "DYNAMIC SUBTITLE CAPTURE REGION",
+        studioEyebrow: "SubVision Studio v1.5",
+        studioTitle1: "Clean. Flat.",
+        studioTitle2: "Completely in your control.",
+        previewTabsLabel: "Interface Tabs",
+        tabHome: "1. Home",
+        tabHistory: "2. Dialogue History",
+        tabSettings: "3. Settings & Telemetry",
+        previewAlt: "SubVision AI Studio Application Interface",
+        studioCaptionPrefix: "Direct download for latest v1.5.0 ·",
+        studioCaptionLink: "All Packages (GitHub Releases)",
+        dockAria: "Scene Navigation",
+        dockIntro: "Overview",
+        dockHow: "How It Works",
+        dockApp: "Studio UI"
+      }
+    };
+
+    let activeLang = "tr";
+    let demoPaused = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const pauseBtn = document.getElementById('btn-demo-pause');
+
+    function getCookieLang() {
+      const m = document.cookie.match(/(?:^|;\s*)sv_lang=(tr|en)(?:;|$)/i);
+      return m ? m[1].toLowerCase() : null;
+    }
+
+    function detectClientLang() {
+      const path = window.location.pathname.replace(/\/+$/, "");
+      if (path === "/tr") return "tr";
+      if (path === "/en") return "en";
+
+      const params = new URLSearchParams(window.location.search);
+      const qLang = (params.get("lang") || "").toLowerCase();
+      if (qLang === "tr" || qLang === "en") return qLang;
+
+      try {
+        const stored = localStorage.getItem("sv_lang");
+        if (stored === "tr" || stored === "en") return stored;
+      } catch (_) {}
+
+      const cookieLang = getCookieLang();
+      if (cookieLang === "tr" || cookieLang === "en") return cookieLang;
+
+      if (window.__INITIAL_LANG__ === "tr" || window.__INITIAL_LANG__ === "en") {
+        return window.__INITIAL_LANG__;
+      }
+
+      const langs = Array.isArray(navigator.languages) && navigator.languages.length
+        ? navigator.languages
+        : [navigator.language || ""];
+      for (const raw of langs) {
+        const code = String(raw || "").toLowerCase();
+        if (code === "tr" || code.startsWith("tr-")) return "tr";
+        if (code === "en" || code.startsWith("en-")) return "en";
+      }
+      return "en";
+    }
+
+    function syncPauseButtonLabel() {
+      if (!pauseBtn) return;
+      const dict = I18N[activeLang] || I18N.en;
+      pauseBtn.textContent = demoPaused ? dict.playLabel : dict.pauseLabel;
+      pauseBtn.setAttribute('aria-pressed', String(demoPaused));
+    }
+
+    function applyLanguage(lang, persist = false) {
+      const normalized = lang === "tr" ? "tr" : "en";
+      activeLang = normalized;
+      const dict = I18N[normalized];
+
+      document.documentElement.lang = normalized;
+      document.title = dict.pageTitle;
+      const descMeta = document.querySelector('meta[name="description"]');
+      if (descMeta) descMeta.setAttribute("content", dict.metaDescription);
+
+      document.querySelectorAll("[data-i18n]").forEach((el) => {
+        const key = el.getAttribute("data-i18n");
+        if (key && Object.prototype.hasOwnProperty.call(dict, key)) {
+          el.textContent = dict[key];
+        }
+      });
+
+      const langSwitch = document.getElementById("lang-switch");
+      if (langSwitch) langSwitch.setAttribute("aria-label", dict.langSwitchLabel);
+      const brandBtn = document.getElementById("brand-home-btn");
+      if (brandBtn) brandBtn.setAttribute("aria-label", dict.brandAria);
+      const previewTablist = document.getElementById("preview-tablist");
+      if (previewTablist) previewTablist.setAttribute("aria-label", dict.previewTabsLabel);
+      const previewImg = document.getElementById("studio-preview-img");
+      if (previewImg) previewImg.setAttribute("alt", dict.previewAlt);
+      const bottomDock = document.getElementById("bottom-dock");
+      if (bottomDock) bottomDock.setAttribute("aria-label", dict.dockAria);
+
+      document.querySelectorAll(".lang-btn").forEach((btn) => {
+        const isSelected = btn.getAttribute("data-lang") === normalized;
+        btn.setAttribute("aria-pressed", String(isSelected));
+      });
+
+      syncPauseButtonLabel();
+
+      if (persist) {
+        try {
+          localStorage.setItem("sv_lang", normalized);
+        } catch (_) {}
+        document.cookie = `sv_lang=${normalized}; path=/; max-age=31536000; SameSite=Lax`;
+
+        const currentPath = window.location.pathname.replace(/\/+$/, "");
+        if (currentPath === "/tr" || currentPath === "/en") {
+          window.history.replaceState(null, "", `/${normalized}`);
+        }
+      }
+    }
+
+    document.querySelectorAll(".lang-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const targetLang = btn.getAttribute("data-lang");
+        if (targetLang && targetLang !== activeLang) {
+          applyLanguage(targetLang, true);
+        }
+      });
+    });
+
     let currentScene = 0;
     const totalScenes = 3;
     let isTransitioning = false;
@@ -720,16 +1083,34 @@
         el.classList.remove('active', 'prev');
         if (i === currentScene) {
           el.classList.add('active');
-        } else if (i < currentScene) {
-          el.classList.add('prev');
+          el.removeAttribute('inert');
+        } else {
+          if (i < currentScene) el.classList.add('prev');
+          el.setAttribute('inert', '');
         }
       }
 
       const btns = document.querySelectorAll('.dock-btn');
-      btns.forEach((b, i) => b.classList.toggle('active', i === currentScene));
+      btns.forEach((b, i) => {
+        const isCurrent = i === currentScene;
+        b.classList.toggle('active', isCurrent);
+        if (isCurrent) {
+          b.setAttribute('aria-current', 'step');
+        } else {
+          b.removeAttribute('aria-current');
+        }
+      });
 
       setTimeout(() => { isTransitioning = false; }, 520);
     }
+
+    document.getElementById('brand-home-btn')?.addEventListener('click', () => goScene(0));
+    document.querySelectorAll('.dock-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const target = Number.parseInt(btn.getAttribute('data-scene-target') || '0', 10);
+        goScene(target);
+      });
+    });
 
     window.addEventListener('wheel', (e) => {
       if (isTransitioning) return;
@@ -764,10 +1145,20 @@
     }, { passive: true });
 
     const PREVIEW_IMAGES = [
-      "/assets/ui_preview.png?v=1.4.1",
-      "/assets/ui_preview_history.png?v=1.4.1",
-      "/assets/ui_preview_settings.png?v=1.4.1"
+      "/assets/ui_preview.png?v=1.5.0",
+      "/assets/ui_preview_history.png?v=1.5.0",
+      "/assets/ui_preview_settings.png?v=1.5.0"
     ];
+
+    (function detectPlatformDownload() {
+      const topBtn = document.getElementById('topbar-download-btn');
+      if (!topBtn) return;
+      const isMac = /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent);
+      if (isMac) {
+        topBtn.href = '/downloads/SubVisionAI-macOS.dmg';
+        topBtn.setAttribute('download', 'SubVisionAI-macOS.dmg');
+      }
+    })();
 
     function switchPreviewTab(tabIdx) {
       const img = document.getElementById('studio-preview-img');
@@ -778,8 +1169,19 @@
         img.style.opacity = '1';
       }, 100);
       const btns = document.querySelectorAll('.preview-tab-btn');
-      btns.forEach((b, i) => b.classList.toggle('active', i === tabIdx));
+      btns.forEach((b, i) => {
+        const active = i === tabIdx;
+        b.classList.toggle('active', active);
+        b.setAttribute('aria-selected', String(active));
+      });
     }
+
+    document.querySelectorAll('.preview-tab-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const idx = Number.parseInt(btn.getAttribute('data-tab') || '0', 10);
+        switchPreviewTab(idx);
+      });
+    });
 
     const SAMPLES = [
       {
@@ -796,14 +1198,11 @@
       }
     ];
     let sampleIdx = 0;
-    let demoPaused = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const pauseBtn = document.getElementById('btn-demo-pause');
-    if (pauseBtn && demoPaused) pauseBtn.textContent = 'Oynat';
 
-    function toggleDemoPlayback() {
+    pauseBtn?.addEventListener('click', () => {
       demoPaused = !demoPaused;
-      if (pauseBtn) pauseBtn.textContent = demoPaused ? 'Oynat' : 'Duraklat';
-    }
+      syncPauseButtonLabel();
+    });
 
     setInterval(() => {
       if (demoPaused) return;
@@ -822,6 +1221,8 @@
         trEl.classList.remove('changing');
       }, 260);
     }, 3600);
+
+    applyLanguage(detectClientLang(), false);
   </script>
 </body>
 </html>

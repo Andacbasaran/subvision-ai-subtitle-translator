@@ -12,9 +12,9 @@ SubVision AI — macOS (Apple Silicon arm64) .app & .dmg Kurulum Paketi Derleme 
    sıkıştırılmış .dmg kurulum dosyasını ve SHA-256 özetini üretir.
 
 Kullanım:
-    python build_macos.py
-    python build_macos.py --version 1.4.1
-    python build_macos.py --skip-dmg
+    python scripts/build_macos.py
+    python scripts/build_macos.py --version 1.5.0
+    python scripts/build_macos.py --skip-dmg
 """
 
 import argparse
@@ -292,7 +292,7 @@ def main() -> int:
         print("[HATA] build_macos.py yalnızca macOS üzerinde çalıştırılabilir.")
         return 1
 
-    base_dir = os.path.dirname(os.path.abspath(__file__))
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     parser = argparse.ArgumentParser(description="Build SubVision AI macOS .app and .dmg")
     parser.add_argument(
         "--version",

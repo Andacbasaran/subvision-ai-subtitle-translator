@@ -3,6 +3,29 @@
 All notable changes to **SubVision AI** are documented in this file.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+- **Repository Reorganization:** Consolidated core modules into `subvision/`, moved build and launcher scripts into `scripts/`, moved unit tests into `tests/`, relocated the Inno Setup script to `packaging/inno/installer.iss`, and stopped tracking the compiled `SubVisionAI.exe` binary in git.
+- **Unified CI/CD & Release Pipeline:** Added `.github/workflows/ci.yml` (Ruff lint + Windows/Linux/macOS Python 3.11 test matrix), replaced split release workflows with a single `.github/workflows/release.yml` publishing Windows & macOS assets together with a unified `SHA256SUMS.txt` and download table, and added `.github/release.yml` release note categories.
+
+### Added
+- **Homebrew Cask Formula:** Added `packaging/homebrew/subvision-ai.rb` for macOS Apple Silicon installation and updated Winget & Scoop manifests to `1.5.0`.
+
+## [1.5.0] — 2026-11-23
+
+### Added
+- **Studio 2.0 Redesign & Cinema Frame Brand Identity:** Redesigned the desktop application, overlay HUD, C# online installer wizard, and landing page around a flat **Studio Graphite** palette with a left-sidebar navigation architecture, new **Cinema Frame** vector logo (`assets/app_icon.svg`, `.ico`, `.png`, `.icns`), and refreshed UI preview screenshots.
+- **Dynamic Tight-Hugging Subtitle Overlay:** Added ROI-normalized OCR bounding-box tracking with tight subtitle backdrops and controlled box expansion when Turkish translations overflow the original English line width.
+- **Target Application / Window Capture Lock (`subvision/window_tracker.py`):** Lock translation capture to a specific game or media window with automatic Alt+Tab pause and overlay-hide protection.
+- **macOS Apple Silicon (`arm64`) Native DMG Release:** Added `build_macos.py`, macOS `.app` bundle & DMG packaging, and native Cocoa overlay & Retina HiDPI ROI coordinate support.
+- **Cross-Platform GitHub Releases Auto-Updater (`subvision/updater.py`):** Upgraded the in-app updater to detect, download, and launch platform-appropriate Windows and macOS releases directly from GitHub Releases.
+- **Expanded Unit Test Coverage:** Added automated tests covering `QFont` safety, tight-hugging overlay layout, OCR bounding-box outlier filtering, and Alt+Tab focus gating.
+
+### Fixed
+- **PyQt6 Crash & Stability Fixes:** Fixed `QFont` float `pointSize` crash in `ROISelectorOverlay`, missing `QCheckBox` import, Windows `F7`/`F8` hotkey double-triggering, `QPainter` lifecycle safety, and `QThread` shutdown cleanup.
+- **Packaging & CI Fixes:** Stripped duplicate UTF-8 BOM from `installer.iss` and updated the macOS release runner to `macos-latest`.
+
 ## [1.4.0] — 2026-11-22
 
 ### Added

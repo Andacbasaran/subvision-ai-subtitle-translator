@@ -15,7 +15,7 @@ import sys
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
-from hardware import get_app_base_dir, get_writable_data_dir
+from subvision.hardware import get_app_base_dir, get_writable_data_dir
 
 
 @dataclass

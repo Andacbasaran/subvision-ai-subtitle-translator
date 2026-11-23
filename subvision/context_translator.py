@@ -23,8 +23,8 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Deque, Dict, List, Optional, Tuple
 
-from glossary import extract_speaker_and_body
-from translator import LocalEnTrTranslator
+from subvision.glossary import extract_speaker_and_body
+from subvision.translator import LocalEnTrTranslator
 
 BACKEND_LOCAL_CT2 = "local_ct2"
 BACKEND_OLLAMA = "ollama"

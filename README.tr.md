@@ -2,99 +2,123 @@
 
 <img src="assets/app_icon.png" alt="SubVision AI Logo" width="96" height="96" />
 
-# ⚡ SubVision AI — Real-Time On-Screen & Live-Audio Subtitle Studio (EN ➔ TR)
+# ⚡ SubVision AI — Gerçek Zamanlı Ekran Üstü & Canlı Ses Altyazı Stüdyosu (EN ➔ TR)
 
-**🇬🇧 [English README](README.md)** · **🇹🇷 Türkçe (Aktif)** · **[🎮 Uyumluluk Matrisi](COMPATIBILITY.md)** · **[🤝 Katkıda Bulun](CONTRIBUTING.md)** · **[🛡️ Güvenlik](SECURITY.md)**
+**🇬🇧 [English README](README.md)** · **🇹🇷 Türkçe (Aktif)** · **[🎮 Uyumluluk Matrisi](COMPATIBILITY.md)** · **[🤝 Katkıda Bulun](CONTRIBUTING.md)** · **[🛡️ Güvenlik](SECURITY.md)** · **[📜 Değişiklik Günlüğü](CHANGELOG.md)**
 
-**Oyunlar, Diziler, Filmler ve Canlı Yayınlar İçin Ultra Düşük Gecikmeli, %100 Çevrimdışı Ekran Üstü & Canlı Ses Türkçe Altyazı Çevirici**
+**Oyunlar, Diziler, Filmler ve Canlı Yayınlar İçin Ultra Düşük Gecikmeli (~88 ms), %100 Çevrimdışı, 0 MB VRAM Ekran Üstü & Canlı Ses Türkçe Altyazı Çevirici — Windows x64 & macOS Apple Silicon (M1–M4) Yerel Desteğiyle**
 
-[![Website](https://img.shields.io/badge/🌐_Resmi_Web_Sitesi-subvisionai.andacbasaran.com-0EA5E9?style=for-the-badge)](https://subvisionai.andacbasaran.com/)
-[![Direct Download](https://img.shields.io/badge/⬇️_Hemen_İndir-SubVisionAI.exe_(v1.4.0)-2563EB?style=for-the-badge&logo=windows&logoColor=white)](https://subvisionai.andacbasaran.com/downloads/SubVisionAI.exe)
-[![GitHub Releases](https://img.shields.io/badge/📦_Tüm_Paketler-Setup_%26_Portable_ZIP-1D4ED8?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Andacbasaran/subvision-ai-subtitle-translator/releases/latest)
+[![Resmi Web Sitesi](https://img.shields.io/badge/🌐_Resmi_Web_Sitesi-subvisionai.andacbasaran.com-0EA5E9?style=for-the-badge)](https://subvisionai.andacbasaran.com/)
+[![Windows İndir](https://img.shields.io/badge/⬇️_Windows_x64-SubVisionAI.exe_(v1.5.0)-2563EB?style=for-the-badge&logo=windows&logoColor=white)](https://subvisionai.andacbasaran.com/downloads/SubVisionAI.exe)
+[![macOS İndir](https://img.shields.io/badge/⬇️_macOS_Apple_Silicon-SubVisionAI--macOS.dmg_(v1.5.0)-18181B?style=for-the-badge&logo=apple&logoColor=white)](https://subvisionai.andacbasaran.com/downloads/SubVisionAI-macOS.dmg)
+[![GitHub Releases](https://img.shields.io/badge/📦_Tüm_Paketler-Setup_%2F_Portable_%2F_DMG-1D4ED8?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Andacbasaran/subvision-ai-subtitle-translator/releases/latest)
 
 [![CI](https://github.com/Andacbasaran/subvision-ai-subtitle-translator/actions/workflows/ci.yml/badge.svg)](https://github.com/Andacbasaran/subvision-ai-subtitle-translator/actions/workflows/ci.yml)
-
-[![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
-[![PyQt6](https://img.shields.io/badge/UI-PyQt6_Studio_v1.3-41CD52?style=flat-square&logo=qt&logoColor=white)](https://pypi.org/project/PyQt6/)
+[![Release](https://img.shields.io/github/v/release/Andacbasaran/subvision-ai-subtitle-translator?style=flat-square&color=F59E0B)](https://github.com/Andacbasaran/subvision-ai-subtitle-translator/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/Andacbasaran/subvision-ai-subtitle-translator/total?style=flat-square&color=10B981)](https://github.com/Andacbasaran/subvision-ai-subtitle-translator/releases)
+[![Stars](https://img.shields.io/github/stars/Andacbasaran/subvision-ai-subtitle-translator?style=flat-square&color=EAB308)](https://github.com/Andacbasaran/subvision-ai-subtitle-translator/stargazers)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
+[![PyQt6](https://img.shields.io/badge/UI-Studio_2.0_(PyQt6)-41CD52?style=flat-square&logo=qt&logoColor=white)](https://pypi.org/project/PyQt6/)
 [![CTranslate2](https://img.shields.io/badge/NMT-CTranslate2_INT8-FACC15?style=flat-square)](https://github.com/OpenNMT/CTranslate2)
-[![RapidOCR](https://img.shields.io/badge/OCR-RapidOCR_ONNX-38BDF8?style=flat-square)](https://github.com/RapidAI/RapidOCR)
 [![VRAM](https://img.shields.io/badge/GPU_/_VRAM-0_MB_(%25100_CPU)-10B981?style=flat-square)](#)
 [![Defender](https://img.shields.io/badge/Authenticode_SHA--256-0_Threat_(Defender)-22C55E?style=flat-square)](#️-dijital-imza-authenticode-sha-256--windows-defender-güvenliği)
 [![License: MIT](https://img.shields.io/badge/License-MIT-A78BFA?style=flat-square)](LICENSE)
 
 <br/>
 
-[**✨ Neden SubVision AI?**](#-neden-subvision-ai-v13-yenilikleri) · [**🖥️ Uygulama Arayüzü**](#️-uygulama-arayüzü-subvision-ai-studio-v13) · [**🎮 2 Tuşla Kullanım**](#-2-tuşla-kullanım--global-kısayollar) · [**🚀 İndirme & Kurulum**](#-indirme-kurulum-ve-opsiyonel-kaldırma) · [**📊 Benchmark**](#-performans-testleri-ve-benchmark-analizi) · [**🧠 Mimari**](#-sistem-mimarisi-asenkron-pipeline-architecture)
+[**✨ Neden SubVision AI?**](#-neden-subvision-ai-v150-yenilikleri) · [**🖥️ Arayüz**](#️-uygulama-arayüzü-subvision-ai-studio-20) · [**⚖️ Karşılaştırma**](#️-alternatiflerle-karşılaştırma) · [**🚀 İndirme & Kurulum**](#-indirme-kurulum-ve-opsiyonel-kaldırma) · [**🎮 2 Tuşla Kullanım**](#-2-tuşla-kullanım--global-kısayollar) · [**📊 Benchmark**](#-performans-testleri-ve-benchmark-analizi) · [**🧠 Mimari**](#-sistem-mimarisi-asenkron-pipeline-architecture) · [**🗺️ Yol Haritası**](#️-yol-haritası-roadmap)
 
 </div>
 
 ---
 
-## ✨ Neden SubVision AI? (v1.3 Yenilikleri)
+## ✨ Neden SubVision AI? (v1.5.0 Yenilikleri)
 
 **SubVision AI**, ekranda açık olan herhangi bir **PC Oyunu** *(Spider-Man 2, RDR2, Baldur's Gate 3, Cyberpunk 2077 vb.)*, **Dizi / Film Platformu** *(Netflix, Prime Video, Disney+, VLC, Blu-ray)* veya **Canlı Yayın / Video** *(YouTube, Twitch, Udemy)* üzerindeki İngilizce altyazıları gerçek zamanlı okuyan, **tamamen kendi bilgisayarınızda (`%100 Çevrimdışı CPU`)** Türkçeye çeviren ve orijinal altyazının tam üzerine şeffaf bir **`Click-Through Overlay`** olarak yansıtan açık kaynak kodlu masaüstü stüdyosudur.
 
 <table>
   <tr>
     <td width="50%">
-      <b>🎨 Yeni 3 Sekmeli Sade Stüdyo Arayüzü</b><br/>
-      Karmaşık ayarlar yerine <b><code>Ana Ekran</code></b>, <b><code>Geçmiş</code></b> ve <b><code>Ayarlar</code></b> sekmelerinden oluşan modern tasarım. Ana ekranda yalnızca <b>1. Adım (<code>F7</code> Alan Seç)</b>, <b>2. Adım (<code>F8</code> Çeviriyi Başlat)</b>, canlı önizleme ve görünüm kontrolleri yer alır.
+      <b>🎨 Studio 2.0 & Sıkı Dinamik Hizalama (v1.5.0)</b><br/>
+      Yeni <b>Cinema Frame</b> logosu ve sadeleştirilmiş koyu stüdyo arayüzü. Orijinal İngilizce altyazının boyutunu ölçerek Türkçe çeviriyi kutudan taşmadan <b>sıkıca tam üstüne</b> oturtur.
     </td>
     <td width="50%">
-      <b>🎯 Hayalet Altyazısız Oyun Maskesi & Renkli İsimler</b><br/>
-      Parlak gökyüzü, bina kenarı veya far ışıklarından kendi kendine anlamsız kelimeler üretmez (<i>Anti-Phantom Filter</i>). <b>Renkli konuşmacı adlarını</b> (<code>Miles:</code>, <code>Peter:</code>) ve tek kelimelik kısa replikleri (<code>"Wait!"</code>, <code>"No!"</code>) eksiksiz yakalar.
-    </td>
-  </tr>
-  <tr>
-    <td width="50%">
-      <b>⚡ Asenkron Latest-Frame-Wins Pipeline (~88 ms)</b><br/>
-      OCR (okuma) ve NMT (çeviri) motorları birbirini bloklamadan ayrı iş parçacıklarında çalışır. Hızlı diyaloglarda eski cümleler kuyrukta birikmez; daima ekrandaki <b>en güncel replik</b> anında çevrilir.
-    </td>
-    <td width="50%">
-      <b>📐 Otomatik Yazı Boyutu (Auto-Fit Cover)</b><br/>
-      Orijinal İngilizce altyazının piksel yüksekliğini ölçer ve <code>QFontMetrics</code> ile uzun Türkçe cümlelerin boyutunu otomatik ayarlayarak <b>orijinal altyazının üstünü tam kapatır</b>, kutudan taşmaz.
+      <b>🍎 Yerel macOS Apple Silicon (M1–M4) & Windows x64</b><br/>
+      Windows'ta SHA-256 imzalı <code>.exe</code> / Portable <code>.zip</code> paketlerinin yanında artık yerel <b>macOS <code>.dmg</code></b> paketi, Cocoa click-through katmanı ve çapraz platform otomatik güncelleyici ile gelir.
     </td>
   </tr>
   <tr>
     <td width="50%">
-      <b>🛡️ Dijital İmzalı Kurulum & Opsiyonel Uninstaller</b><br/>
-      <code>SubVisionAI.exe</code> <b>SHA-256 Authenticode</b> imzalıdır. Kurulumda <b><code>SubVisionAI-Uninstaller.exe</code></b> otomatik oluşturulur; kaldırırken <code>227 MB</code> dil modelini koruma veya tüm bileşenleri seçerek silme imkanı sunar.
+      <b>⚡ Asenkron Latest-Frame-Wins Pipeline (~88 ms · 0 MB VRAM)</b><br/>
+      RapidOCR (<code>~20 ms</code>) ve CTranslate2 INT8 NMT (<code>~68 ms</code>) ayrı iş parçacıklarında çalışır. Hızlı diyaloglarda kuyruk birikmez; sabit sahnelerde <code>0.18 ms</code> (<code>%0.2 CPU</code>) ile sıfır FPS kaybı sağlar.
     </td>
     <td width="50%">
-      <b>🎮 0 MB VRAM (%100 CPU) & Sıfır FPS Kaybı</b><br/>
-      Ekran kartı belleğini (VRAM) hiç kullanmaz, oyunlarda FPS düşüşü yaratmaz. Altyazı ekranda sabit dururken <b>2 Aşamalı Kare Kilidi (<code>0.18 ms</code>)</b> ile işlemciyi <code>%0.2</code> uyku modunda tutar.
+      <b>🔒 Pencere Kilidi (Alt+Tab), Uygulama Profilleri & Oyun Sözlükleri</b><br/>
+      Oyundan <code>Alt+Tab</code> yaptığınızda altyazı otomatik gizlenir. Her oyun/oynatıcı için ayrı ROI ve görünüm profili kaydedilir; <code>glossaries/</code> altındaki JSON sözlüklerle özel isimler doğru korunur.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <b>🧠 Opsiyonel Bağlam Duyarlı LLM Katmanı</b><br/>
+      Varsayılan olarak <b>%100 çevrimdışı CTranslate2 INT8</b> kullanır; dilerseniz son 3 repliği hatırlayan bağlam modunu yerel <b>Ollama</b>, <b>Gemini</b>, <b>DeepL</b> veya <b>OpenAI uyumlu</b> API'lerle açabilirsiniz (anlık CT2 yedeklemeli).
+    </td>
+    <td width="50%">
+      <b>🎙️ Opsiyonel Canlı Ses (Whisper) & SRT / Anki Dışa Aktarım</b><br/>
+      Altyazısız Twitch veya YouTube yayınları için <b>faster-whisper</b> (INT8 CPU) ile canlı sesten Türkçe altyazı üretin; çevrilen diyalog geçmişini tek tıkla <b>SRT</b> veya <b>Anki CSV</b> olarak dışa aktarın.
     </td>
   </tr>
 </table>
 
 ---
 
-## 🖥️ Uygulama Arayüzü (SubVision AI Studio v1.3)
+## 🖥️ Uygulama Arayüzü (SubVision AI Studio 2.0)
 
 <div align="center">
-  <img src="assets/ui_preview.png" alt="SubVision AI Studio v1.3 — Ana Ekran" width="880" />
+  <img src="assets/ui_preview.png" alt="SubVision AI Studio 2.0 — Ana Ekran" width="880" />
 </div>
 
 <details>
-<summary><b>📸 Diğer Sekmelerin Ekran Görüntülerini Gör (2. Diyalog Geçmişi & 3. Ayarlar / Canlı Hız Ölçümü)</b></summary>
+<summary><b>📸 Diğer Sekmelerin Ekran Görüntülerini Gör (2. Diyalog Geçmişi & Dışa Aktarım · 3. Ayarlar & Canlı Telemetri)</b></summary>
 <br/>
 <div align="center">
-  <p><b>2. Sekme — Çevrilen Diyalog Geçmişi (Tıkla & Kopyala)</b></p>
-  <img src="assets/ui_preview_history.png" alt="SubVision AI Studio v1.3 — Diyalog Geçmişi" width="840" />
+  <p><b>2. Sekme — Çevrilen Diyalog Geçmişi (Tıkla & Kopyala · SRT / Anki CSV Dışa Aktar)</b></p>
+  <img src="assets/ui_preview_history.png" alt="SubVision AI Studio 2.0 — Diyalog Geçmişi" width="840" />
   <br/><br/>
-  <p><b>3. Sekme — Algılama, Performans Profili, Canlı Hız Ölçümü & Bileşen Yöneticisi</b></p>
-  <img src="assets/ui_preview_settings.png" alt="SubVision AI Studio v1.3 — Ayarlar ve Hız Ölçümü" width="840" />
+  <p><b>3. Sekme — Algılama, Performans Profili, Bağlam LLM, Canlı Hız Ölçümü & Bileşen Yöneticisi</b></p>
+  <img src="assets/ui_preview_settings.png" alt="SubVision AI Studio 2.0 — Ayarlar ve Hız Ölçümü" width="840" />
 </div>
 </details>
+
+<!-- Demo GIF alanı: assets/demo.gif eklendiğinde aşağıdaki bloğu açabilirsiniz
+<div align="center">
+  <img src="assets/demo.gif" alt="SubVision AI Oyun İçi Canlı Çeviri Demosu" width="880" />
+</div>
+-->
+
+> **🎬 Oyun İçi Canlı Demo GIF (`assets/demo.gif`):** Çok yakında! İnteraktif canlı altyazı önizlemesini hemen [resmi web sitesinde](https://subvisionai.andacbasaran.com/) inceleyebilirsiniz.
 
 <br/>
 
 | Sekme / Bileşen | Ne İşe Yarar? |
 | :--- | :--- |
-| **1. Ana Ekran** | **1. Adım (`F7` Altyazı Alanını Seç)** ve **2. Adım (`F8` Anlık Çeviriyi Başlat)** kartlarını, birleşik **Canlı Altyazı & Önizleme** kutusunu (`F9` Örnek Sahne Dene & Kopyala) ve **Altyazı Görünümü** ayarlarını (renk, konum, maksimum boyut, arka plan koyuluğu, hizalama çerçevesi, çift dilli mod ve otomatik sığdırma) kaydırmasız tek ekranda sunar. |
-| **2. Geçmiş (`Geçmiş`)** | Çevrilen tüm diyalogları zaman damgası, uçtan uca gecikme (`ms`) ve kaynak (`INT8` / `ÖNBELLEK`) bilgisiyle listeler. Herhangi bir satıra tıkladığınızda Türkçe çeviriyi panoya kopyalar. |
-| **3. Ayarlar (`Ayarlar`)** | Algılama modunu (`Kontürlü / Adaptif Maske — Önerilen`, `Akıllı Hibrit`, `Tam Kare Okuma`), işlemci hız profilini (`Otomatik`, `Eko 15 FPS`, `Dengeli 24 FPS`, `Performans 30 FPS`), canlı hız ölçüm kartlarını, **Donanım Hız Testi (Benchmark)** aracını ve **İndirilen Bileşenler / Uygulamayı Kaldır** yöneticisini barındırır. |
-| **🎯 Akıllı Alan Seçici (`F7`)** | `F7` tuşuna basıldığında ana pencere arkadaki oyunu veya videoyu kapatmamak için **otomatik gizlenir**; altın köşe vizörlü seçim çerçevesini bıraktığınız anda koordinatlar kaydedilir ve pencere geri gelir. |
+| **1. Ana Ekran** | **1. Adım (`F7` Altyazı Alanını Seç)** ve **2. Adım (`F8` Anlık Çeviriyi Başlat)** kartlarını, birleşik **Canlı Altyazı & Önizleme** kutusunu (`F9` Örnek Sahne Dene & Kopyala) ve **Altyazı Görünümü** ayarlarını (renk, konum, maksimum boyut, arka plan koyuluğu, çift dilli mod, sıkı dinamik sığdırma) tek ekranda sunar. |
+| **2. Geçmiş (`Geçmiş`)** | Çevrilen tüm diyalogları zaman damgası, uçtan uca gecikme (`ms`) ve kaynak (`INT8` / `LLM` / `ÖNBELLEK`) bilgisiyle listeler. Satıra tıklayarak kopyalayabilir, tüm listeyi **SRT** veya **Anki CSV** olarak dışa aktarabilirsiniz. |
+| **3. Ayarlar (`Ayarlar`)** | Algılama modunu, işlemci hız profilini (`Otomatik`, `Eko 15 FPS`, `Dengeli 24 FPS`, `Performans 30 FPS`), **Uygulama Profillerini**, **Özel JSON Sözlükleri**, **Bağlam LLM / Canlı Ses (Whisper)** ayarlarını, dil seçimini (`TR / EN`), **Donanım Hız Testi (Benchmark)** aracını ve **Bileşen / Kaldırma Yöneticisini** barındırır. |
+| **🎯 Akıllı Alan Seçici (`F7`)** | `F7` tuşuna basıldığında ana pencere arkadaki oyunu veya videoyu kapatmamak için **otomatik gizlenir**; çoklu monitör & 4K DPI destekli çerçeveyi bıraktığınız anda koordinatlar kaydedilir. |
+
+---
+
+## ⚖️ Alternatiflerle Karşılaştırma
+
+| Kriter | ⚡ SubVision AI v1.5.0 | Geleneksel OCR Çeviriciler *(Tesseract / PyTorch FP32)* | Bulut / Ücretli Ekran Çeviriciler |
+| :--- | :---: | :---: | :---: |
+| **Uçtan Uca Gecikme** | **`~88 ms`** *(Önbellekli ~20 ms)* | `300 – 800+ ms` *(Kuyruk birikmesi)* | `400 – 1.200 ms` *(Ağ gecikmesi)* |
+| **Ekran Kartı (VRAM) Kullanımı** | **`0 MB VRAM`** *(%100 CPU)* | `1.2 – 2.4 GB VRAM` | Düşük / Değişken |
+| **%100 Çevrimdışı & Gizli** | **Evet** *(Varsayılan CT2 INT8)* | Evet | Hayır *(Bulut API zorunlu)* |
+| **Platform Desteği** | **Windows x64 · macOS M1–M4 · Linux** | Çoğunlukla Windows | Windows / Web |
+| **Sıkı Hizalama & Alt+Tab Kilidi** | **Evet** *(Yerel Win32 & Cocoa)* | Basit kutu | Basit kutu |
+| **Bağlam LLM & Canlı Ses (Whisper)** | **Opsiyonel** *(Ollama/Gemini/DeepL/OpenAI)* | Yok | Yalnızca ücretli plan |
+| **Ücret & Lisans** | **%100 Ücretsiz & Açık Kaynak (MIT)** | Karışık | Abonelik / API Ücreti |
 
 ---
 
@@ -107,7 +131,7 @@
 | Global Kısayol | Aksiyon | Açıklama |
 | :---: | :--- | :--- |
 | **`F7`** | 🎯 **Altyazı Alanını Seç** | Oyun veya video içindeyken fare ile altyazı yakalama bölgesini (`ROI`) seçme ekranını açar. |
-| **`F8`** | ▶️ **Başlat / Durdur** | Gerçek zamanlı ekran yakalama ve Türkçe çeviri motorunu başlatır veya duraklatır. |
+| **`F8`** | ▶️ **Başlat / Durdur** | Gerçek zamanlı ekran yakalama veya Canlı Ses çeviri motorunu başlatır / duraklatır. |
 | **`F9`** | 🧪 **Örnek Sahne Dene** | Dizi, film ve oyunlardan örnek repliklerle hız ve ekran üstü görünüm testi yapar. |
 | **`ESC`** | ❌ **Seçimi İptal Et** | Alan seçici (`ROI`) açıkken mevcut seçimi iptal eder. |
 
@@ -115,43 +139,51 @@
 
 ## 🚀 İndirme, Kurulum ve Opsiyonel Kaldırma
 
-### Seçenek 1: Resmi Web Sitesi & Dijital İmzalı Hızlı Kurulum Yardımcısı (`SubVisionAI.exe`) — *Önerilen*
+### Seçenek 1: Windows x64 (Windows 10 / 11) — *Önerilen*
 1. [**🌐 subvisionai.andacbasaran.com**](https://subvisionai.andacbasaran.com/) adresinden veya doğrudan [**⬇️ SubVisionAI.exe**](https://subvisionai.andacbasaran.com/downloads/SubVisionAI.exe) bağlantısından kurulum yardımcısını indirin.
 2. **`SubVisionAI.exe`** dosyası **SHA-256 Authenticode dijital imzalı ve DigiCert zaman damgalıdır**. Kullanıcı onayı olmadan arka planda hiçbir dosya çıkartmaz (*Zero Silent-Dropper*).
-3. `İndirilenler` klasöründen çalıştırdığınızda dosyaları etrafa saçmadan temiz bir şekilde `%LOCALAPPDATA%\Programs\SubVisionAI` dizinine kurar, **Masaüstü** ve **Başlat Menüsü** kısayollarını oluşturur ve uygulamayı otomatik başlatır.
-4. İlk açılışta yalnızca `227 MB` boyutundaki yerel yapay zeka çeviri modeli indirilir; sonrasında internet bağlantısı olmadan **%100 çevrimdışı** çalışır.
+3. İlk açılışta yalnızca `227 MB` boyutundaki yerel yapay zeka çeviri modeli indirilir; sonrasında internet bağlantısı olmadan **%100 çevrimdışı** çalışır.
+4. Alternatif olarak [**📦 GitHub Releases**](https://github.com/Andacbasaran/subvision-ai-subtitle-translator/releases/latest) sayfasından `SubVisionAI-Setup-v1.5.0-Windows-x64.exe` veya `SubVisionAI-Portable-v1.5.0-Windows-x64.zip` paketlerini indirebilir, ayrıca [`packaging/winget/`](packaging/winget/) ve [`packaging/scoop/`](packaging/scoop/) manifestlerini kullanabilirsiniz.
 
-### Seçenek 2: Tam Kurulum Paketi (Inno Setup `.exe`) & Taşınabilir (`Portable .zip`)
-- [**📦 GitHub Releases**](https://github.com/Andacbasaran/subvision-ai-subtitle-translator/releases/latest) sayfasından:
-  - **`SubVisionAI-Setup-v1.3.0-Windows-x64.exe`** *(Python çalışma ortamı gömülü tam Windows kurulum paketi)*
-  - **`SubVisionAI-Portable-v1.3.0-Windows-x64.zip`** *(Kurulum gerektirmeyen taşınabilir arşiv)*
-  paketlerinden dilediğinizi indirebilirsiniz.
+### Seçenek 2: macOS Apple Silicon (M1 / M2 / M3 / M4)
+1. [**⬇️ SubVisionAI-macOS.dmg**](https://subvisionai.andacbasaran.com/downloads/SubVisionAI-macOS.dmg) paketini web sitesinden veya [**📦 GitHub Releases**](https://github.com/Andacbasaran/subvision-ai-subtitle-translator/releases/latest) üzerinden indirin.
+2. `.dmg` dosyasını açıp **SubVision AI** uygulamasını `Applications` (Uygulamalar) klasörüne sürükleyin.
+3. **Homebrew Cask** formülü [`packaging/homebrew/`](packaging/homebrew/) klasöründe yer alır.
+4. *İlk açılış notu:* Ekran yakalama ve global `F7`/`F8` kısayolları için *Sistem Ayarları ➔ Gizlilik ve Güvenlik* altında **Ekran Kaydı** ve **Erişilebilirlik** izinlerini onaylayın.
 
-### 🗑️ Otomatik Kurulan Opsiyonel Bileşen Seçimli Kaldırma Yardımcısı (`SubVisionAI-Uninstaller.exe`)
-Uygulamayı kurduğunuzda **`SubVisionAI-Uninstaller.exe`** kurulum dizinine, Başlat Menüsüne ve *Windows Ayarlar ➔ Uygulamalar ➔ Yüklü Uygulamalar* listesine **otomatik olarak** eklenir. Ayrıca uygulama içindeki **`Ayarlar ➔ İndirilen Bileşenler / Uygulamayı Kaldır`** butonu üzerinden hangi bileşenlerin silineceğini tek tek seçebilirsiniz:
-1. ☑️ **Ana Uygulama Dosyaları, Masaüstü / Başlat Menüsü Kısayolları ve Sistem Kaydı**
-2. ☑️ **Taşınabilir Python 3.11 Çalışma Ortamı ve Yapay Zeka Paketleri (`runtime/` — ~340 MB)**
-3. ☑️ **İndirilen Yapay Zeka Çeviri Modeli (`models/opus-en-tr-ct2` — ~227 MB)** *(İpucu: İleride tekrar kurduğunuzda ~227 MB modeli yeniden indirmemek için bu kutunun işaretini kaldırabilirsiniz)*
-4. ☑️ **Kişisel Kullanıcı Ayarları ve Alan Kalibrasyonu (`user_settings.json`)**
+### 🗑️ Otomatik Kurulan Opsiyonel Bileşen Seçimli Kaldırma Yardımcısı (Windows)
+Uygulamayı kurduğunuzda **`SubVisionAI-Uninstaller.exe`** kurulum dizinine, Başlat Menüsüne ve *Windows Ayarlar ➔ Uygulamalar* listesine **otomatik olarak** eklenir. Uygulama içindeki **`Ayarlar ➔ İndirilen Bileşenler / Uygulamayı Kaldır`** üzerinden hangi bileşenlerin silineceğini tek tek seçebilirsiniz:
+1. ☑️ **Ana Uygulama Dosyaları, Kısayollar ve Sistem Kaydı**
+2. ☑️ **Taşınabilir Python Çalışma Ortamı ve Yapay Zeka Paketleri (`runtime/`)**
+3. ☑️ **İndirilen Yapay Zeka Çeviri Modeli (`models/opus-en-tr-ct2` — ~227 MB)** *(İleride tekrar kurarken yeniden indirmemek için işaretini kaldırabilirsiniz)*
+4. ☑️ **Kişisel Kullanıcı Ayarları, Profiller ve Alan Kalibrasyonu**
 5. ☐ **Yayıncı Dijital İmza Sertifikası Kaydı (`SubVision AI Open Source`)**
 
-### Seçenek 3: Linux & macOS (Intel / Apple Silicon M1–M4) Tek Komutla Başlatma
+### Seçenek 3: Linux & Kaynak Koddan Çalıştırma *(Developer Setup)*
 
 ```bash
 git clone https://github.com/Andacbasaran/subvision-ai-subtitle-translator.git
 cd subvision-ai-subtitle-translator
-./start.sh
+
+# Linux / macOS hızlı başlatıcı
+./scripts/start.sh
 ```
 
-### Seçenek 4: Kaynak Koddan Manuel Çalıştırma *(Developer Setup)*
-
-```powershell
-git clone https://github.com/Andacbasaran/subvision-ai-subtitle-translator.git
-cd subvision-ai-subtitle-translator
+Veya sanal ortam ile manuel kurulum:
+```bash
 python -m venv .venv
-.\.venv\Scripts\activate
+# Windows: .\.venv\Scripts\activate  |  Linux/macOS: source .venv/bin/activate
 pip install -r requirements.txt
 python main.py
+```
+
+#### Opsiyonel: Canlı Ses Modunu (Whisper) Etkinleştirme
+```bash
+# Çapraz platform (mikrofon / loopback)
+pip install -e ".[audio]"
+
+# Windows WASAPI masaüstü ses yakalama
+pip install -e ".[audio-windows]"
 ```
 
 ---
@@ -167,19 +199,8 @@ python main.py
 Bir altyazı çeviricinin dizi izlerken veya oyun oynarken **"anlık (gecikmesiz)"** hissettirmesi için insan gözünün algı eşiği **`150 ms`** altıdır:
 
 1. **Yeni Bir Cümle Çıktığında (`~88 ms`):** Ekrana ilk kez düşen bir İngilizce replik, **`~20 ms`** içinde okunur ve arka plandaki NMT iş parçacığında dinamik uzunluk sınırı + tekrar freni (`repetition_penalty=1.15`) ile **`~68 ms`** içinde Türkçeye çevrilir.
-2. **Tekrar Eden veya Kalıp Diyaloglarda (`~20 ms`):** 4096 cümlelik `Thread-Safe LRU Cache` ve hazır diyalog sözlüğü, NMT kuyruğunu hiç beklemeden **`0.01 ms`** içinde anında yanıt verir.
+2. **Tekrar Eden veya Kalıp Diyaloglarda (`~20 ms`):** 4096 cümlelik `Thread-Safe LRU Cache` ve hazır diyalog sözlüğü, NMT kuyruğunu hiç beklemeden **`0.0045 ms`** içinde anında yanıt verir.
 3. **Altyazı Ekranda Sabit Dururken (`0.18 ms` — `%0.2 CPU`):** 2 aşamalı `Frame Diff Lock` algoritması sabit sahnelerde maskeleme ve OCR adımlarını tamamen atlar.
-
-### ⚖️ Geleneksel Yaklaşım vs. SubVision AI v1.3 Karşılaştırması
-
-| Karşılaştırma Kriteri | Geleneksel Yöntem (DBNet OCR + PyTorch FP32) | ⚡ SubVision AI v1.3 (Async Fast Mask + CT2 INT8) | Pratik Kazanım |
-| :--- | :---: | :---: | :--- |
-| **Tek Satır OCR Okuma Süresi** | `97.8 ms` – `350+ ms` | **`19.8 ms`** | **4.9x – 6.2x Daha Hızlı Okuma** |
-| **Yeni Cümle Uçtan Uca Gecikme** | `300 ms` – `800+ ms` *(Kuyruk birikmesi)* | **`87.9 ms`** *(Kısa)* / **`144.2 ms`** *(Uzun)* | **Latest-Frame-Wins — Sıfır Birikme** |
-| **Önbellekli Uçtan Uca Gecikme** | `100+ ms` | **`19.8 ms`** | **NMT Beklemesiz Anında Tepki (`0.01 ms`)** |
-| **Harcanan Ekran Kartı Belleği** | `1.2 GB – 2.4 GB VRAM` | **`0 MB VRAM`** | **Oyunlarda Sıfır FPS Kaybı** |
-| **Altyazı Sabitken CPU Kullanımı** | Sürekli OCR Taraması (`%25 – %45 CPU`) | **`%0.2 CPU`** (`0.18 ms` Frame Lock) | **Sessiz ve Serin Çalışma** |
-| **Model Disk Boyutu** | `~890 MB` (FP32) | **`227 MB`** (INT8 Quantized) | **%74 Daha Az Bellek Ayak İzi** |
 
 ### 🔬 Detaylı Pipeline Ölçüm Tablosu *(AMD Ryzen 12-Thread CPU / 6 Active NMT Threads)*
 
@@ -192,7 +213,11 @@ Bir altyazı çeviricinin dizi izlerken veya oyun oynarken **"anlık (gecikmesiz
 | **5. CTranslate2 INT8 NMT (Uzun Replik)** | **`124.42 ms`** | ~14–18 kelime | Çok cümleli uzun dizi/film repliklerinde arka plan iş parçacığında çıkarım. |
 | **6. Zero-Wait LRU Cache & Glossary** | **`0.0045 ms`** | `0.0032 ms` | OCR döngüsü içinde NMT kuyruğuna girmeden doğrudan önbellekten anında dönüş. |
 
-> 💡 **Kendi Sisteminizde Test Edin:** Uygulama içindeki **`Ayarlar ➔ Donanım Hız Testi Yap (Benchmark)`** butonuna tıklayarak, terminalden `python benchmark.py` komutunu çalıştırarak veya `python -m unittest test_pipeline.py -v` ile 22 birim/entegrasyon testini koşarak tüm pipeline'ı doğrulayabilirsiniz.
+> 💡 **Kendi Sisteminizde Test Edin:** Uygulama içindeki **`Ayarlar ➔ Donanım Hız Testi Yap (Benchmark)`** butonunu kullanabilir veya terminalden testleri çalıştırabilirsiniz:
+```bash
+python scripts/benchmark.py
+QT_QPA_PLATFORM=offscreen python -m unittest discover -s tests -v
+```
 
 ---
 
@@ -202,12 +227,12 @@ Bir altyazı çeviricinin dizi izlerken veya oyun oynarken **"anlık (gecikmesiz
 flowchart TD
     A["🖥️ Uyarlanabilir Regional Capture (MSS)"] --> B{"🔒 2 Aşamalı Frame Diff Lock"}
     B -- "Aynı Kare (0.18 ms)" --> Z["💤 %0.2 CPU Uyku Modu"]
-    B -- "Değişti" --> C["🎨 Yerel Kontrast + Renkli Konuşmacı Maskesi\n(Parlak Gökyüzü / Koyu Kontür / Peter & Miles Renkleri)"]
-    C --> D["✂️ Ink-Ratio Korumalı Satır Kesme + CRNN Batch\n(Anti-Phantom Güven & Dil Filtresi + Fade-In Koruması)"]
-    D --> E{"⚡ Zero-Wait Cache / Sözlük?"}
-    E -- "Hit (0.01 ms)" --> I["🪟 Auto-Fit Click-Through Overlay\n(QFontMetrics Otomatik Boyut + WDA_EXCLUDEFROMCAPTURE)"]
+    B -- "Değişti" --> C["🎨 Yerel Kontrast + Renkli Konuşmacı Maskesi"]
+    C --> D["✂️ Ink-Ratio Korumalı Satır Kesme + CRNN Batch\n(Anti-Phantom Güven & Dil Filtresi)"]
+    D --> E{"⚡ Zero-Wait Cache / JSON Sözlük?"}
+    E -- "Hit (0.0045 ms)" --> I["🪟 Tight-Hugging Click-Through Overlay\n(Win32 / Cocoa + Pencere Kilidi)"]
     E -- "Miss" --> F["📥 Latest-Frame-Wins Slot\n(Eski Bekleyen Cümleleri Anında At)"]
-    F --> H["🧠 Asenkron NMT Worker (CTranslate2 INT8)\n(Dinamik max_length + repetition_penalty)"]
+    F --> H["🧠 Asenkron NMT Worker (CTranslate2 INT8)\nveya Opsiyonel Bağlam LLM (Ollama/Gemini/DeepL)"]
     H --> I
 ```
 
@@ -215,49 +240,67 @@ flowchart TD
 
 ## 🧩 Evrensel İşlemci & Bilgisayar Uyumluluğu
 
-**SubVision AI**, farklı işlemci mimarilerine ve eski/yeni tüm bilgisayarlara (`Intel`, `AMD`, `Apple Silicon / ARM64`; 2 çekirdekli ofis laptoplarından çok çekirdekli oyun bilgisayarlarına) otomatik olarak uyum sağlar:
+**SubVision AI**, farklı işlemci mimarilerine (`Intel`, `AMD`, `Apple Silicon M1–M4 / ARM64`) otomatik uyum sağlar:
 
-- **Otomatik CPU & Komut Seti (ISA) Algılama (`hardware.py`):** Fiziksel/mantıksal çekirdek sayısı, mimari (`x86_64` / `ARM64`) ve SIMD özellikleri (`SSE4.2`, `AVX`, `AVX2`, `AVX-512`, `VNNI`, `NEON`) açılışta otomatik taranır.
-- **Akıllı Hesaplama Tipi Yedeklemesi (Fallback):** İşlemci `INT8` hızlandırmasını desteklemiyorsa uygulama çökmeden otomatik olarak `INT8_FLOAT32` ➔ `INT16` ➔ `FLOAT32` modlarından çalışan en hızlı seçeneğe geçer.
-- **4 Uyarlanabilir Performans Profili:** `Ayarlar` sekmesinden **Otomatik**, **Eko / Düşük CPU (15 FPS)**, **Dengeli (24 FPS)** ve **Performans (30 FPS)** profilleri seçilebilir; NMT, ONNX Runtime (`RapidOCR`) ve OpenCV iş parçacıkları (`thread`) otomatik sınırlandırılır.
-- **Platform, Ekran ve Klasör Yolu Koruması:** Windows 10/11, macOS ve Linux'ta çalışır; `WDA_EXCLUDEFROMCAPTURE` desteklemeyen sistemlerde kendi yazısını okuma döngüsünü önlemek için overlay otomatik ROI dışına konumlanır. Türkçe karakterli klasör yolları (`Masaüstü` vb.) ve küçük laptop ekranları (`1366×768` / `%150 DPI`) sorunsuz desteklenir.
+- **Otomatik CPU & Komut Seti (ISA) Algılama (`subvision/hardware.py`):** Çekirdek sayısı, mimari (`x86_64` / `ARM64`) ve SIMD özellikleri (`SSE4.2`, `AVX2`, `AVX-512`, `VNNI`, `NEON`) açılışta otomatik taranır.
+- **Akıllı Hesaplama Tipi Yedeklemesi:** İşlemci `INT8` hızlandırmasını desteklemiyorsa uygulama çökmeden otomatik olarak `INT8_FLOAT32` ➔ `INT16` ➔ `FLOAT32` moduna geçer.
+- **4 Uyarlanabilir Performans Profili:** **Otomatik**, **Eko (15 FPS)**, **Dengeli (24 FPS)** ve **Performans (30 FPS)**.
+- **Platform Koruması:** Windows 10/11 (`WDA_EXCLUDEFROMCAPTURE`), macOS Apple Silicon (yerel Cocoa click-through) ve Linux desteği; Türkçe karakterli klasör yolları ve 4K / `%150 DPI` ekranlar sorunsuz desteklenir.
 
 ---
 
 ## 🛡️ Dijital İmza (Authenticode SHA-256) & Windows Defender Güvenliği
 
-- **Authenticode SHA-256 + DigiCert RFC 3161 Zaman Damgası:** `build_exe.py` tarafından üretilen tüm çalıştırılabilir dosyalar (`SubVisionAI.exe`, `SubVisionAI-Uninstaller.exe` ve Inno Setup `SubVisionAI-Setup-*.exe`), **RSA-3072 SHA-256 X.509 Kod İmzalama Sertifikası** (`CN=SubVision AI Open Source`) ve **DigiCert RFC 3161 Timestamp** ile otomatik imzalanır.
-- **Sıfır Sezgisel (Heuristic) Virüs Uyarısı:**
-  - Kullanıcı "Kurulumu Başlat" butonuna tıklamadan önce `Main()` içerisinde diske hiçbir dosya yazılmaz (*Silent Dropper* davranışı tamamen kaldırıldı).
-  - Antivirüs motorlarının sezgisel olarak işaretlediği `WebClient.DownloadFileAsync`, `Process.Kill()`, `powershell -ExecutionPolicy Bypass` ve 32-bit `AnyCPU` PE başlıkları yerine saf 64-bit (`/platform:x64`) PE32+ mimarisi ve standart `HttpWebRequest` akışı kullanılır.
-  - Her derleme **Microsoft Windows Defender (`MpCmdRun.exe -Scan -ScanType 3`)** taramasından geçirilir (**`0 Threat`**).
-- **Özel / Ticari PFX Sertifika Desteği:** Harici bir `.pfx` sertifikanız varsa `SUBVISION_CERT_PFX` ve `SUBVISION_CERT_PASS` ortam değişkenlerini tanımlamanız yeterlidir; `build_exe.py` tüm paketleri otomatik olarak sertifikanızla imzalar.
+- **Authenticode SHA-256 + DigiCert RFC 3161 Zaman Damgası:** `scripts/build_exe.py` tarafından üretilen Windows paketleri RSA-3072 SHA-256 X.509 Kod İmzalama Sertifikası (`CN=SubVision AI Open Source`) ve DigiCert zaman damgasıyla imzalanır.
+- **Sıfır Sezgisel (Heuristic) Virüs Uyarısı:** Kullanıcı onayı olmadan diske hiçbir dosya yazılmaz (*Zero Silent-Dropper*); her derleme **Microsoft Windows Defender** taramasından `0 Threat` sonucuyla geçer.
+- **Özel PFX Sertifika Desteği:** `SUBVISION_CERT_PFX` ve `SUBVISION_CERT_PASS` ortam değişkenleriyle harici sertifika kullanılabilir.
 
 ---
 
 ## 📂 Proje Dizin Yapısı
 
 ```text
-├── SubVisionAI.exe                      # SHA-256 Authenticode imzalı Kurulum Yardımcısı & Başlatıcı (SubVisionAI-Uninstaller.exe'yi otomatik kurar)
-├── main.py                              # PyQt6 Studio v1.3 (Ana Ekran / Geçmiş / Ayarlar), asenkron Latest-Frame-Wins worker, Bileşen Yöneticisi
-├── hardware.py                          # Evrensel CPU/ISA algılama, uyarlanabilir thread/FPS profili ve platform yardımcıları
-├── ocr_engine.py                        # MSS regional capture, yerel kontrast/renkli konuşmacı maskesi, anti-phantom OCR
-├── translator.py                        # CTranslate2 (INT8/FP32) NMT, dinamik decoding limiti, repetition_penalty, LRU Cache
-├── overlay_ui.py                        # Auto-Fit QFontMetrics click-through overlay ve logolu multi-monitor 4K DPI ROI selector
-├── glossary.py                          # OCR noise cleanup, anti-gibberish plausibility filtresi, speaker parser ve sözlük
-├── benchmark.py                         # End-to-end latency benchmark suite ve infografik üretim aracı
-├── test_pipeline.py                     # Donanım uyumluluğu ve oyun senaryoları (22 birim & entegrasyon testi)
-├── build_exe.py                         # Authenticode imzalayıcı, WinForms Kurulum/Kaldırma Sihirbazı ve PyInstaller derleyici
-├── installer.iss                        # Inno Setup 6 Windows x64 kurulum ve opsiyonel model/ayar kaldırma betiği
-├── .github/workflows/release-windows.yml # Otomatik test, derleme ve GitHub Release iş akışı
-├── website/                             # Resmi web sitesi (subvisionai.andacbasaran.com) arayüzü ve Cloudflare Worker
-├── start.sh                             # Linux & macOS (Intel / Apple Silicon) otomatik kurulum ve başlatma script'i
-├── requirements.txt                     # Python bağımlılıkları
-└── assets/                              # Uygulama ikonu (.ico/.png), yayıncı sertifikası (.cer), UI ve benchmark görselleri
+├── main.py                              # PyQt6 Studio 2.0 giriş noktası ve MainWindow
+├── subvision/                           # Modüler çekirdek Python paketi
+│   ├── hardware.py                      # Evrensel CPU/ISA algılama ve uyarlanabilir thread/FPS profili
+│   ├── ocr_engine.py                    # MSS regional capture, adaptif maske ve anti-phantom RapidOCR
+│   ├── translator.py                    # %100 çevrimdışı CTranslate2 (INT8/FP32) EN -> TR motoru + LRU Cache
+│   ├── context_translator.py            # Opsiyonel 3-turlu bağlam LLM katmanı (Ollama/Gemini/DeepL/OpenAI) + CT2 yedeği
+│   ├── audio_whisper.py                 # Opsiyonel canlı ses yakalama (WASAPI/sounddevice) + faster-whisper VAD
+│   ├── glossary.py                      # OCR temizleyici, anti-gibberish filtresi ve konuşmacı ayrıştırıcı
+│   ├── custom_glossary.py               # Kullanıcı ve oyun bazlı JSON sözlük yükleyici
+│   ├── overlay_ui.py                    # Sıkı dinamik hizalamalı click-through overlay (Win32 / Cocoa) & ROI seçici
+│   ├── window_tracker.py                # Hedef pencere kilidi (Alt+Tab otomatik gizleme)
+│   ├── profiles.py                      # Uygulama/oyun bazlı ROI ve görünüm profilleri
+│   ├── exporters.py                     # Diyalog geçmişi dışa aktarıcıları (SRT & Anki CSV)
+│   ├── workers.py                       # Asenkron Latest-Frame-Wins iş parçacıkları ve benchmark worker
+│   ├── ui_widgets.py                    # HiDPI PyQt6 Studio 2.0 bileşenleri ve vektör ikonlar
+│   ├── updater.py                       # Çapraz platform GitHub Releases SemVer otomatik güncelleyici
+│   └── i18n.py                          # Hafif EN / TR arayüz yerelleştirme katmanı
+├── tests/
+│   └── test_pipeline.py                 # Otomatik birim ve entegrasyon test paketi
+├── scripts/                             # start.sh, baslat.bat, benchmark.py, build_exe.py, build_macos.py
+├── packaging/                           # Inno Setup (inno/installer.iss), Winget, Scoop, Homebrew Cask
+├── glossaries/                          # Hazır oyun sözlükleri (spiderman2.json, baldurs_gate3.json, cyberpunk2077.json)
+├── website/                             # Resmi web sitesi (subvisionai.andacbasaran.com) ve Cloudflare Worker
+├── docs/                                # Dokümantasyon ve lansman rehberleri
+├── assets/                              # Cinema Frame ikonları (.icns/.ico/.png/.svg), UI ve benchmark görselleri
+└── .github/workflows/                   # Çapraz platform CI (ci.yml) ve birleşik Windows + macOS Release (release.yml)
 ```
 
 ---
 
-## 📄 Lisans
+## 🗺️ Yol Haritası (Roadmap)
+
+- [ ] **Çoklu Hedef Dil Desteği (`EN ➔ ES / DE / PT / JA / FR / KO`)** — Seçilebilir CTranslate2 / OPUS-MT modelleriyle küresel dil çiftleri.
+- [ ] **Topluluk Oyun Sözlüğü Havuzu** — `glossaries/` altında RPG, JRPG ve bilim-kurgu oyunları için topluluk sözlükleri.
+- [ ] **Linux AppImage / Flatpak & Universal macOS Paketi** — Daha fazla platformda tek tıkla kurulum.
+- [ ] **İlk Açılış Kalibrasyon Sihirbazı** — Yeni kullanıcılar için 10 saniyede hazır kurulum rehberi.
+
+---
+
+## 🤝 Katkıda Bulunma & Lisans
+
+Katkılarınız, oyun uyumluluk bildirimleriniz ve yeni oyun sözlükleriniz her zaman değerlidir! [CONTRIBUTING.md](CONTRIBUTING.md) ve [COMPATIBILITY.md](COMPATIBILITY.md) dosyalarına göz atabilirsiniz. Projeyi beğendiyseniz GitHub'da **⭐ Star** vererek destek olabilirsiniz.
 
 Bu proje **[MIT License](LICENSE)** kapsamında açık kaynak olarak lisanslanmıştır.

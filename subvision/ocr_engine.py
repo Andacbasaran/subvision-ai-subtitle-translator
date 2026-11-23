@@ -25,8 +25,8 @@ import mss
 import numpy as np
 from rapidocr_onnxruntime import RapidOCR
 
-from glossary import clean_ocr_text, is_plausible_subtitle_text
-from hardware import (
+from subvision.glossary import clean_ocr_text, is_plausible_subtitle_text
+from subvision.hardware import (
     RuntimeTuning,
     apply_thread_env_defaults,
     compute_runtime_tuning,

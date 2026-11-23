@@ -22,12 +22,12 @@ from typing import Callable, Dict, List, Optional, Sequence, Tuple
 import ctranslate2
 import sentencepiece as spm
 
-from glossary import (
+from subvision.glossary import (
     extract_speaker_and_body,
     lookup_exact_phrase,
     normalize_slang_for_nmt,
 )
-from hardware import (
+from subvision.hardware import (
     compute_runtime_tuning,
     detect_hardware_profile,
     get_app_base_dir,

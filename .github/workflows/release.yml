@@ -1,0 +1,239 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g. 1.5.0)"
+        required: false
+        default: "1.5.0"
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Build Windows x64 Release
+    runs-on: windows-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+    env:
+      PYTHONUTF8: "1"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Determine release version
+        id: meta
+        shell: pwsh
+        run: |
+          if ("${{ github.ref_type }}" -eq "tag") {
+            $ver = "${{ github.ref_name }}".TrimStart("v")
+          } elseif ("${{ inputs.version }}" -ne "") {
+            $ver = "${{ inputs.version }}".TrimStart("v")
+          } else {
+            $ver = "1.5.0"
+          }
+          echo "version=$ver" >> $env:GITHUB_OUTPUT
+          echo "Building Windows release v$ver"
+
+      - name: Install dependencies and PyInstaller
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install --prefer-binary -r requirements.txt pyinstaller
+
+      - name: Run unit test suite
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          python -m unittest discover -s tests -v
+
+      - name: Build GUI Online Setup (SubVisionAI.exe)
+        shell: pwsh
+        run: |
+          python scripts/build_exe.py
+
+      - name: Build standalone PyInstaller --onedir bundle
+        shell: pwsh
+        run: |
+          python scripts/build_exe.py --only-pyinstaller
+
+      - name: Build Inno Setup Windows Installer (.exe)
+        shell: pwsh
+        run: |
+          $iscc = Get-Command iscc -ErrorAction SilentlyContinue
+          if (-not $iscc) {
+            $defaultIscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+            if (Test-Path $defaultIscc) {
+              $isccPath = $defaultIscc
+            } else {
+              choco install innosetup -y --no-progress
+              $isccPath = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+            }
+          } else {
+            $isccPath = $iscc.Source
+          }
+          & $isccPath "/DMyAppVersion=${{ steps.meta.outputs.version }}" packaging/inno/installer.iss
+
+      - name: Package Windows release assets
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.meta.outputs.version }}"
+          New-Item -ItemType Directory -Force -Path release_out | Out-Null
+
+          $setupExe = "dist\SubVisionAI-Setup-v$ver-Windows-x64.exe"
+          Copy-Item $setupExe "release_out\"
+
+          $portableZip = "release_out\SubVisionAI-Portable-v$ver-Windows-x64.zip"
+          Compress-Archive -Path "dist\SubVisionAI\*" -DestinationPath $portableZip -CompressionLevel Optimal
+
+          Copy-Item "SubVisionAI.exe" "release_out\SubVisionAI-OnlineSetup-v$ver.exe"
+
+          Get-ChildItem release_out
+
+      - name: Upload Windows release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          path: release_out/*
+          retention-days: 30
+
+  build-macos:
+    name: Build macOS Apple Silicon (arm64) Release
+    runs-on: macos-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+    env:
+      PYTHONUTF8: "1"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Determine release version
+        id: meta
+        shell: bash
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            VER="${{ github.ref_name }}"
+            VER="${VER#v}"
+          elif [ -n "${{ inputs.version }}" ]; then
+            VER="${{ inputs.version }}"
+            VER="${VER#v}"
+          else
+            VER="1.5.0"
+          fi
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "Building macOS release v$VER"
+
+      - name: Install dependencies and PyInstaller
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          pip install --prefer-binary -r requirements.txt pyinstaller
+
+      - name: Run unit test suite
+        shell: bash
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          python -m unittest discover -s tests -v
+
+      - name: Build SubVision AI.app & Apple Silicon DMG
+        shell: bash
+        run: |
+          python scripts/build_macos.py --version "${{ steps.meta.outputs.version }}" --arch arm64
+
+      - name: Upload macOS release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-release
+          path: dist/SubVisionAI-v${{ steps.meta.outputs.version }}-macOS-arm64.dmg
+          retention-days: 30
+
+  publish-release:
+    name: Publish Unified GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build-windows, build-macos]
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: Download Windows release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-release
+          path: release_assets
+
+      - name: Download macOS release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-release
+          path: release_assets
+
+      - name: Generate unified SHA256SUMS.txt
+        shell: bash
+        run: |
+          cd release_assets
+          find . -maxdepth 1 -type f ! -name 'SHA256SUMS.txt' -printf '%f\n' | sort | xargs sha256sum > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Build Release Body Markdown
+        shell: bash
+        env:
+          VER: ${{ needs.build-windows.outputs.version }}
+          REPO: ${{ github.repository }}
+        run: |
+          BASE_URL="https://github.com/${REPO}/releases/download/v${VER}"
+          cat <<EOF > release_body.md
+          ## Downloads — SubVision AI v${VER}
+
+          | Platform | Package | File |
+          | --- | --- | --- |
+          | **Windows (x64)** | Full Installer (Recommended) | [\`SubVisionAI-Setup-v${VER}-Windows-x64.exe\`](${BASE_URL}/SubVisionAI-Setup-v${VER}-Windows-x64.exe) |
+          | **Windows (x64)** | Portable ZIP (No Install) | [\`SubVisionAI-Portable-v${VER}-Windows-x64.zip\`](${BASE_URL}/SubVisionAI-Portable-v${VER}-Windows-x64.zip) |
+          | **Windows (x64)** | Lightweight Online Setup | [\`SubVisionAI-OnlineSetup-v${VER}.exe\`](${BASE_URL}/SubVisionAI-OnlineSetup-v${VER}.exe) |
+          | **macOS (Apple Silicon)** | Universal App DMG (\`arm64\`) | [\`SubVisionAI-v${VER}-macOS-arm64.dmg\`](${BASE_URL}/SubVisionAI-v${VER}-macOS-arm64.dmg) |
+          | **All Platforms** | SHA-256 Checksums | [\`SHA256SUMS.txt\`](${BASE_URL}/SHA256SUMS.txt) |
+
+          ### Verify Checksums (SHA-256)
+
+          - **Windows (PowerShell):**
+            \`\`\`powershell
+            Get-FileHash SubVisionAI-Setup-v${VER}-Windows-x64.exe -Algorithm SHA256
+            \`\`\`
+          - **macOS:**
+            \`\`\`bash
+            shasum -a 256 SubVisionAI-v${VER}-macOS-arm64.dmg
+            \`\`\`
+          - **Linux:**
+            \`\`\`bash
+            sha256sum -c --ignore-missing SHA256SUMS.txt
+            \`\`\`
+
+          ---
+          EOF
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          body_path: release_body.md
+          files: release_assets/*

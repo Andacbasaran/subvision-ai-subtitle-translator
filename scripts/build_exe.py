@@ -40,15 +40,13 @@ APP_VERSION = "1.5.0.0"
 
 EMBEDDED_FILES = [
     ("main.py", "main.py"),
-    ("hardware.py", "hardware.py"),
-    ("ocr_engine.py", "ocr_engine.py"),
-    ("translator.py", "translator.py"),
-    ("overlay_ui.py", "overlay_ui.py"),
-    ("glossary.py", "glossary.py"),
-    ("benchmark.py", "benchmark.py"),
-    ("test_pipeline.py", "test_pipeline.py"),
     ("requirements.txt", "requirements.txt"),
     ("subvision/__init__.py", "subvision/__init__.py"),
+    ("subvision/hardware.py", "subvision/hardware.py"),
+    ("subvision/ocr_engine.py", "subvision/ocr_engine.py"),
+    ("subvision/translator.py", "subvision/translator.py"),
+    ("subvision/overlay_ui.py", "subvision/overlay_ui.py"),
+    ("subvision/glossary.py", "subvision/glossary.py"),
     ("subvision/i18n.py", "subvision/i18n.py"),
     ("subvision/updater.py", "subvision/updater.py"),
     ("subvision/context_translator.py", "subvision/context_translator.py"),
@@ -59,6 +57,8 @@ EMBEDDED_FILES = [
     ("subvision/profiles.py", "subvision/profiles.py"),
     ("subvision/window_tracker.py", "subvision/window_tracker.py"),
     ("subvision/exporters.py", "subvision/exporters.py"),
+    ("scripts/benchmark.py", "scripts/benchmark.py"),
+    ("tests/test_pipeline.py", "tests/test_pipeline.py"),
     ("glossaries/spiderman2.json", "glossaries/spiderman2.json"),
     ("glossaries/cyberpunk2077.json", "glossaries/cyberpunk2077.json"),
     ("glossaries/baldurs_gate3.json", "glossaries/baldurs_gate3.json"),
@@ -217,15 +217,13 @@ namespace SubVisionAI
         private static readonly string[,] EmbeddedMap = new string[,]
         {
             { "res_main.py", "main.py" },
-            { "res_hardware.py", "hardware.py" },
-            { "res_ocr_engine.py", "ocr_engine.py" },
-            { "res_translator.py", "translator.py" },
-            { "res_overlay_ui.py", "overlay_ui.py" },
-            { "res_glossary.py", "glossary.py" },
-            { "res_benchmark.py", "benchmark.py" },
-            { "res_test_pipeline.py", "test_pipeline.py" },
             { "res_requirements.txt", "requirements.txt" },
             { "res___init__.py", "subvision\\__init__.py" },
+            { "res_hardware.py", "subvision\\hardware.py" },
+            { "res_ocr_engine.py", "subvision\\ocr_engine.py" },
+            { "res_translator.py", "subvision\\translator.py" },
+            { "res_overlay_ui.py", "subvision\\overlay_ui.py" },
+            { "res_glossary.py", "subvision\\glossary.py" },
             { "res_i18n.py", "subvision\\i18n.py" },
             { "res_updater.py", "subvision\\updater.py" },
             { "res_context_translator.py", "subvision\\context_translator.py" },
@@ -236,6 +234,8 @@ namespace SubVisionAI
             { "res_profiles.py", "subvision\\profiles.py" },
             { "res_window_tracker.py", "subvision\\window_tracker.py" },
             { "res_exporters.py", "subvision\\exporters.py" },
+            { "res_benchmark.py", "scripts\\benchmark.py" },
+            { "res_test_pipeline.py", "tests\\test_pipeline.py" },
             { "res_spiderman2.json", "glossaries\\spiderman2.json" },
             { "res_cyberpunk2077.json", "glossaries\\cyberpunk2077.json" },
             { "res_baldurs_gate3.json", "glossaries\\baldurs_gate3.json" },
@@ -1549,6 +1549,8 @@ namespace SubVisionAI
                         SafeDeleteFile(Path.Combine(_appDir, appFiles[i]));
                     }
                     SafeDeleteDir(Path.Combine(_appDir, "subvision"));
+                    SafeDeleteDir(Path.Combine(_appDir, "scripts"));
+                    SafeDeleteDir(Path.Combine(_appDir, "tests"));
                     SafeDeleteDir(Path.Combine(_appDir, "glossaries"));
                     SafeDeleteDir(Path.Combine(_appDir, "assets"));
                     SafeDeleteDir(Path.Combine(_appDir, "__pycache__"));
@@ -1968,7 +1970,7 @@ def build_pyinstaller_bundle(base_dir: str) -> None:
 
 
 if __name__ == "__main__":
-    root = os.path.dirname(os.path.abspath(__file__))
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     if "--sign" in sys.argv:
         targets = [arg for arg in sys.argv[1:] if not arg.startswith("-")]
         ensure_publisher_certificate_and_sign(root, targets)

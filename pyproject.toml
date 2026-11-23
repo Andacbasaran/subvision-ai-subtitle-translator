@@ -71,6 +71,9 @@ Changelog = "https://github.com/Andacbasaran/subvision-ai-subtitle-translator/bl
 [tool.setuptools.packages.find]
 include = ["subvision*"]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
 [tool.ruff]
 target-version = "py311"
 line-length = 110
@@ -79,6 +82,7 @@ exclude = [
     "build",
     "dist",
     "models",
+    "release_out",
     "website",
 ]
 
