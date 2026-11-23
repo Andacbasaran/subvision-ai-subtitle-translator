@@ -1,0 +1,51 @@
+{
+  "name": "The Witcher 3: Wild Hunt",
+  "description": "Kıta özel isimleri, canavar avcısı terimleri ve ikonik Geralt replikleri sözlüğü.",
+  "exact_phrases": {
+    "wind's howling": "Rüzgâr uluyor",
+    "place of power, gotta be": "Güç alanı, kesinlikle",
+    "how about a round of gwent?": "Bir el Gwent'e ne dersin?",
+    "damn, you're ugly": "Lanet olsun, ne çirkinsin",
+    "what now, you piece of filth?": "Şimdi ne olacak, pislik herif?",
+    "medallion's humming": "Madalyon titriyor",
+    "looks like rain": "Yağmur yağacak gibi",
+    "top notch swords!": "Birinci sınıf kılıçlar!",
+    "come on, roach": "Hadi, Roach",
+    "evil is evil": "Kötülük kötülüktür",
+    "quest completed": "Görev tamamlandı",
+    "quest updated": "Görev güncellendi"
+  },
+  "do_not_translate": [
+    "Geralt",
+    "Yennefer",
+    "Triss Merigold",
+    "Ciri",
+    "Vesemir",
+    "Dandelion",
+    "Zoltan",
+    "Avallac'h",
+    "Eredin",
+    "Novigrad",
+    "Velen",
+    "Skellige",
+    "Oxenfurt",
+    "Kaer Morhen",
+    "Toussaint",
+    "Nilfgaard"
+  ],
+  "term_replacements": {
+    "Witcher": "Witcher",
+    "Wild Hunt": "Vahşi Av",
+    "Roach": "Roach",
+    "Gwent": "Gwent",
+    "Elder Blood": "Kadim Kan",
+    "White Frost": "Beyaz Ayaz",
+    "Conjunction of the Spheres": "Kürelerin Birleşimi",
+    "Silver Sword": "Gümüş Kılıç",
+    "Steel Sword": "Çelik Kılıç",
+    "Witcher Senses": "Witcher Duyuları",
+    "Monster Contract": "Canavar Kontratı",
+    "Sign": "İşaret",
+    "Mutagen": "Mutajen"
+  }
+}

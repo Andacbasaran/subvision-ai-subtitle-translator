@@ -1,0 +1,51 @@
+{
+  "name": "The Elder Scrolls V: Skyrim",
+  "description": "Tamriel ve Skyrim özel isimleri, ejderha naraları ve lonca terimleri sözlüğü.",
+  "exact_phrases": {
+    "hey, you. you're finally awake.": "Hey, sen. Sonunda uyandın.",
+    "fus ro dah": "Fus Ro Dah!",
+    "never should have come here": "Buraya hiç gelmemeliydin",
+    "by the nine": "Dokuzlar aşkına",
+    "watch the skies, traveler": "Gökyüzüne dikkat et, gezgin",
+    "let me guess, someone stole your sweetroll?": "Tahmin edeyim, biri tatlı çöreğini mi çaldı?",
+    "i used to be an adventurer like you": "Bir zamanlar ben de senin gibi bir maceracıydım",
+    "must have been the wind": "Rüzgâr olmalı",
+    "dragon soul absorbed": "Ejderha ruhu emildi",
+    "word of power learned": "Güç Sözü öğrenildi",
+    "level up": "Seviye atlandı",
+    "quest started": "Görev başladı"
+  },
+  "do_not_translate": [
+    "Skyrim",
+    "Tamriel",
+    "Whiterun",
+    "Solitude",
+    "Windhelm",
+    "Riften",
+    "Markarth",
+    "Winterhold",
+    "Sovngarde",
+    "Alduin",
+    "Paarthurnax",
+    "Ulfric Stormcloak",
+    "Lydia",
+    "Tullius",
+    "Akatosh",
+    "Talos"
+  ],
+  "term_replacements": {
+    "Dragonborn": "Ejderdoğan",
+    "Thu'um": "Thu'um",
+    "Stormcloaks": "Fırtınapelerinliler",
+    "Imperial Legion": "İmparatorluk Lejyonu",
+    "Greybeards": "Kırsakallar",
+    "Dark Brotherhood": "Kara Kardeşlik",
+    "Thieves Guild": "Hırsızlar Loncası",
+    "Companions": "Yoldaşlar",
+    "Daedric": "Daedrik",
+    "Dwemer": "Dwemer",
+    "Soul Gem": "Ruh Taşı",
+    "Shout": "Nara",
+    "Jarl": "Jarl"
+  }
+}

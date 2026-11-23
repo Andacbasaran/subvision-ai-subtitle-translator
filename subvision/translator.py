@@ -10,6 +10,7 @@ Kararlılık ve Performans Özellikleri:
 """
 
 import os
+import platform
 import re
 import shutil
 import sys
@@ -36,6 +37,10 @@ from subvision.hardware import (
     query_ct2_supported_compute_types,
     select_compute_type_candidates,
 )
+from subvision.language_packs import (
+    DEFAULT_LANG_PAIR,
+    LanguagePackManager,
+)
 
 MODEL_REPO = "VoragoStudios/gct-opus-mt-tc-big-en-tr-ct2"
 
@@ -48,11 +53,30 @@ MODEL_FILES_MIN_SIZE: Dict[str, int] = {
     "model.bin": 210_000_000,  # ~227 MB
 }
 
+VALID_DEVICES = ("cpu", "mps", "auto")
+
+
+def detect_mps_available() -> bool:
+    """
+    Apple Silicon (macOS ARM64) üzerinde CTranslate2 MPS hızlandırmasının
+    güvenle kullanılabilir olup olmadığını kontrol eder.
+    """
+    if sys.platform != "darwin":
+        return False
+    if (platform.machine() or "").strip().lower() not in ("arm64", "aarch64"):
+        return False
+    try:
+        supported = ctranslate2.get_supported_compute_types("mps")
+        return bool(supported)
+    except Exception:
+        return False
+
 
 class LocalEnTrTranslator:
     """
     CTranslate2 + SentencePiece tabanlı, tüm işlemci mimarilerine (AVX2/AVX-512/SSE/ARM64)
-    otomatik uyum sağlayan ultra hızlı ve kararlı EN -> TR çeviri motoru.
+    ve isteğe bağlı Apple Silicon MPS hızlandırmasına otomatik uyum sağlayan ultra hızlı
+    ve kararlı çeviri motoru.
     """
 
     def __init__(
@@ -60,9 +84,25 @@ class LocalEnTrTranslator:
         model_dir: Optional[str] = None,
         cpu_threads: Optional[int] = None,
         compute_type_candidates: Optional[Sequence[str]] = None,
+        lang_pair: str = DEFAULT_LANG_PAIR,
+        device: str = "cpu",
     ):
-        data_dir = get_writable_data_dir()
-        self.model_dir = model_dir or os.path.join(data_dir, "models", "opus-en-tr-ct2")
+        self.lang_pair: str = (lang_pair or DEFAULT_LANG_PAIR).strip().lower()
+        requested = (device or "cpu").strip().lower()
+        self.requested_device: str = requested if requested in VALID_DEVICES else "cpu"
+        self.active_device: str = "cpu"
+
+        pack_manager = LanguagePackManager()
+        self.language_pack = pack_manager.get_pack(self.lang_pair)
+        self.model_dir = model_dir or pack_manager.get_pack_dir(self.lang_pair)
+        self.model_repo: str = (
+            self.language_pack.hf_repo if self.language_pack is not None else MODEL_REPO
+        )
+        self.model_files_min_size: Dict[str, int] = (
+            dict(self.language_pack.min_files)
+            if (self.language_pack is not None and self.language_pack.min_files)
+            else dict(MODEL_FILES_MIN_SIZE)
+        )
 
         if cpu_threads is None:
             hw = detect_hardware_profile(query_ct2=False)
@@ -102,7 +142,7 @@ class LocalEnTrTranslator:
             self.cache_hits = 0
 
     def is_model_downloaded(self) -> bool:
-        for fname, min_bytes in MODEL_FILES_MIN_SIZE.items():
+        for fname, min_bytes in self.model_files_min_size.items():
             fpath = os.path.join(self.model_dir, fname)
             if not os.path.exists(fpath) or os.path.getsize(fpath) < min_bytes:
                 return False
@@ -110,16 +150,16 @@ class LocalEnTrTranslator:
 
     def download_model(self, progress_callback: Optional[Callable[[str, int], None]] = None) -> None:
         """
-        Model dosyaları lokalde yoksa veya yarım kalmışsa HuggingFace üzerinden (~227 MB)
+        Model dosyaları lokalde yoksa veya yarım kalmışsa HuggingFace üzerinden
         otomatik yeniden deneme (retry) desteğiyle indirir.
         """
         os.makedirs(self.model_dir, exist_ok=True)
-        for fname, min_bytes in MODEL_FILES_MIN_SIZE.items():
+        for fname, min_bytes in self.model_files_min_size.items():
             dest_path = os.path.join(self.model_dir, fname)
             if os.path.exists(dest_path) and os.path.getsize(dest_path) >= min_bytes:
                 continue
 
-            url = f"https://huggingface.co/{MODEL_REPO}/resolve/main/{fname}"
+            url = f"https://huggingface.co/{self.model_repo}/resolve/main/{fname}"
             tmp_path = dest_path + ".part"
 
             last_err: Optional[Exception] = None
@@ -177,20 +217,43 @@ class LocalEnTrTranslator:
 
     def _create_ct2_translator(self, ct2_model_path: str) -> Tuple[ctranslate2.Translator, str]:
         """
-        İşlemcinin desteklediği en hızlı hesaplama tipini (int8 -> int8_float32 -> int16 -> float32 -> default)
-        sırayla dener ve ilk çalışan + doğrulanan motoru döndürür.
+        İsteğe bağlı olarak Apple Silicon MPS (float16 -> default) hızlandırmasını dener;
+        desteklenmezse veya herhangi bir hata oluşursa işlemcinin desteklediği en hızlı
+        CPU hesaplama tipine (int8 -> int8_float32 -> int16 -> float32 -> default) güvenle düşer.
         """
-        candidates = list(self.compute_type_candidates)
-        for fallback in ("int8", "int8_float32", "int16", "float32", "default", "auto"):
-            if fallback not in candidates:
-                candidates.append(fallback)
-
         errors: List[str] = []
         probe_tokens = (
             self.source_sp.encode("Hello.", out_type=str) + ["</s>"]
             if self.source_sp is not None
             else None
         )
+
+        # Apple Silicon MPS hızlandırması (yalnızca kullanıcı "mps" veya "auto" istediğinde)
+        if self.requested_device in ("mps", "auto") and detect_mps_available():
+            for mps_ctype in ("float16", "default"):
+                try:
+                    tr = ctranslate2.Translator(
+                        ct2_model_path,
+                        device="mps",
+                        compute_type=mps_ctype,
+                        intra_threads=self.cpu_threads,
+                        inter_threads=1,
+                    )
+                    if probe_tokens:
+                        tr.translate_batch(
+                            [probe_tokens],
+                            beam_size=1,
+                            max_decoding_length=16,
+                        )
+                    self.active_device = "mps"
+                    return tr, mps_ctype
+                except Exception as exc:
+                    errors.append(f"mps/{mps_ctype}: {exc}")
+
+        candidates = list(self.compute_type_candidates)
+        for fallback in ("int8", "int8_float32", "int16", "float32", "default", "auto"):
+            if fallback not in candidates:
+                candidates.append(fallback)
 
         for ctype in candidates:
             try:
@@ -207,6 +270,7 @@ class LocalEnTrTranslator:
                         beam_size=1,
                         max_decoding_length=16,
                     )
+                self.active_device = "cpu"
                 return tr, ctype
             except Exception as exc:
                 errors.append(f"{ctype}: {exc}")
@@ -417,3 +481,8 @@ class LocalEnTrTranslator:
         final_tr = f"{speaker}: {tr_body}" if speaker else tr_body
         elapsed_ms = (time.perf_counter() - t0) * 1000.0
         return final_tr, elapsed_ms, all_cached
+
+
+# Multi-language backwards-compatible alias
+LocalSubtitleTranslator = LocalEnTrTranslator
+

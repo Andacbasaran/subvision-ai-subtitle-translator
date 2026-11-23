@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+
+SELF="$(readlink -f "$0")"
+APPDIR="${APPDIR:-$(dirname "$SELF")}"
+
+export APPDIR
+export PATH="$APPDIR/usr/bin:$PATH"
+
+exec "$APPDIR/usr/bin/SubVisionAI" "$@"

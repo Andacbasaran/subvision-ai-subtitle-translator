@@ -1,0 +1,50 @@
+{
+  "name": "Elden Ring",
+  "description": "Ara Topraklar özel isimleri, boss uyarıları ve Soulsborne terimleri sözlüğü.",
+  "exact_phrases": {
+    "you died": "ÖLDÜN",
+    "lost grace discovered": "KAYIP LÜTUF KEŞFEDİLDİ",
+    "great enemy felled": "BÜYÜK DÜŞMAN ALT EDİLDİ",
+    "demigod felled": "YARI TANRI ALT EDİLDİ",
+    "legend felled": "EFSANE ALT EDİLDİ",
+    "god slain": "TANRI KATLEDİLDİ",
+    "foul tarnished": "Sefil Lekeli",
+    "put these foolish ambitions to rest": "Bu aptalca hırslarını bir kenara bırak",
+    "maidenless": "Hizmetkârsız",
+    "touch grace": "Lütfa dokun",
+    "bloody finger invaded": "Kanlı Parmak istila etti",
+    "returned to your world": "Kendi dünyana döndün"
+  },
+  "do_not_translate": [
+    "Elden Ring",
+    "Limgrave",
+    "Caelid",
+    "Liurnia",
+    "Altus Plateau",
+    "Leyndell",
+    "Stormveil",
+    "Malenia",
+    "Radahn",
+    "Margit",
+    "Godrick",
+    "Ranni",
+    "Melina",
+    "Marika",
+    "Radagon",
+    "Miquella"
+  ],
+  "term_replacements": {
+    "Tarnished": "Lekeli",
+    "Site of Grace": "Lütuf Noktası",
+    "Elden Lord": "Elden Lordu",
+    "Erdtree": "Erd Ağacı",
+    "Great Rune": "Büyük Rün",
+    "Flask of Crimson Tears": "Kızıl Gözyaşı Şişesi",
+    "Flask of Cerulean Tears": "Gök Mavisi Gözyaşı Şişesi",
+    "Ashes of War": "Savaş Külleri",
+    "Spirit Ashes": "Ruh Külleri",
+    "Lands Between": "Ara Topraklar",
+    "Roundtable Hold": "Yuvarlak Masa Kalesi",
+    "Two Fingers": "İki Parmak"
+  }
+}

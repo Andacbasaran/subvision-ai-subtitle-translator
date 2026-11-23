@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=SubVision AI
+GenericName=Real-Time Subtitle Translator
+Comment=Real-time offline OCR & AI subtitle translator for games, videos, and streams
+Comment[tr]=Oyunlar, videolar ve yayınlar için gerçek zamanlı çevrimdışı OCR ve yapay zeka altyazı çevirmeni
+Exec=SubVisionAI
+Icon=subvision-ai
+Terminal=false
+Categories=AudioVideo;Utility;
+Keywords=subtitle;translator;ocr;gaming;steam;overlay;turkish;
+StartupWMClass=SubVisionAI
+StartupNotify=true

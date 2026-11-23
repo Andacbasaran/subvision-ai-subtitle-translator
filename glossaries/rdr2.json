@@ -1,0 +1,50 @@
+{
+  "name": "Red Dead Redemption 2",
+  "description": "Vahşi Batı kasabaları, çete karakterleri ve kovboy jargon sözlüğü.",
+  "exact_phrases": {
+    "i have a plan": "Bir planım var",
+    "have some goddamn faith": "Birazcık inancın olsun be",
+    "you're alright, boah": "İyisin, oğlum",
+    "easy there, girl": "Sakin ol, kızım",
+    "lenny!": "Lenny!",
+    "outta the damn way": "Çekil şu lanet yoldan",
+    "we need more money": "Daha fazla paraya ihtiyacımız var",
+    "dead or alive": "Ölü ya da diri",
+    "wanted": "ARANIYOR",
+    "honor increased": "Onur arttı",
+    "bounty paid": "Ödül ödendi",
+    "tahiti": "Tahiti"
+  },
+  "do_not_translate": [
+    "Arthur Morgan",
+    "Dutch van der Linde",
+    "John Marston",
+    "Sadie Adler",
+    "Micah Bell",
+    "Hosea Matthews",
+    "Charles Smith",
+    "Javier Escuella",
+    "Bill Williamson",
+    "Valentine",
+    "Saint Denis",
+    "Blackwater",
+    "Strawberry",
+    "Rhodes",
+    "Annesburg",
+    "Guarma"
+  ],
+  "term_replacements": {
+    "Dead Eye": "Ölü Göz",
+    "O'Driscolls": "O'Driscoll Çetesi",
+    "Pinkertons": "Pinkertonlar",
+    "Bounty Hunter": "Ödül Avcısı",
+    "Outlaw": "Kanun Kaçağı",
+    "Stagecoach": "Posta Arabası",
+    "Saloon": "Salon",
+    "Camp Ledger": "Kamp Defteri",
+    "Horse Bonding": "At Bağı",
+    "Lawmen": "Kanun Adamları",
+    "Gunslinger": "Silahşor",
+    "Van der Linde Gang": "Van der Linde Çetesi"
+  }
+}

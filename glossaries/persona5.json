@@ -1,0 +1,50 @@
+{
+  "name": "Persona 5 Royal",
+  "description": "Hayalet Hırsızlar, Tokyo mekânları ve JRPG savaş terimleri sözlüğü.",
+  "exact_phrases": {
+    "looking cool, joker!": "Harika görünüyorsun, Joker!",
+    "take your time": "Acele etme",
+    "show me your true form!": "Gerçek yüzünü göster!",
+    "all-out attack!": "Topyekûn Saldırı!",
+    "one more!": "Bir tane daha!",
+    "baton pass": "Bayrak Devri",
+    "for real?!": "Ciddi misin?!",
+    "let's not do that today": "Bugün bunu yapmayalım",
+    "you must be tired after today": "Bugünden sonra yorulmuş olmalısın",
+    "i am thou, thou art i": "Ben senim, sen de bensin",
+    "confidant rank up": "Sırdaş seviyesi yükseldi",
+    "palace infiltrated": "Saraya sızıldı"
+  },
+  "do_not_translate": [
+    "Joker",
+    "Morgana",
+    "Ryuji",
+    "Ann",
+    "Yusuke",
+    "Makoto",
+    "Futaba",
+    "Haru",
+    "Akechi",
+    "Kasumi",
+    "Sojiro",
+    "Igor",
+    "Shibuya",
+    "Shinjuku",
+    "Yongen-Jaya",
+    "Leblanc"
+  ],
+  "term_replacements": {
+    "Phantom Thieves": "Hayalet Hırsızlar",
+    "Metaverse": "Metaverse",
+    "Palace": "Saray",
+    "Mementos": "Mementos",
+    "Velvet Room": "Kadife Oda",
+    "Confidant": "Sırdaş",
+    "Calling Card": "Meydan Okuma Kartı",
+    "Shadow": "Gölge",
+    "Persona": "Persona",
+    "All-Out Attack": "Topyekûn Saldırı",
+    "Baton Pass": "Bayrak Devri",
+    "Change of Heart": "Kalp Değişimi"
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "name": "Starfield",
+  "description": "Yerleşik Sistemler gezegenleri, fraksiyonlar ve uzay gemisi terimleri sözlüğü.",
+  "exact_phrases": {
+    "for all, into the starfield": "Herkes için, yıldızlara doğru",
+    "grav jump initiated": "Kütleçekim sıçraması başlatıldı",
+    "docking complete": "Kenetlenme tamamlandı",
+    "undocking": "Kenetlenme çözülüyor",
+    "shields down": "Kalkanlar devre dışı",
+    "entering orbit": "Yörüngeye giriliyor",
+    "planet surveyed": "Gezegen taraması tamamlandı",
+    "contraband detected": "Kaçak mal tespit edildi",
+    "scan complete": "Tarama tamamlandı",
+    "oxygen low": "Oksijen düşük",
+    "cargo hold full": "Kargo ambarı dolu",
+    "artifact acquired": "Eser elde edildi"
+  },
+  "do_not_translate": [
+    "New Atlantis",
+    "Akila City",
+    "Neon",
+    "Cydonia",
+    "Jemison",
+    "Sarah Morgan",
+    "Barrett",
+    "Sam Coe",
+    "Andreja",
+    "Vasco",
+    "Vladimir",
+    "Walter Stroud",
+    "Ryujin",
+    "House Va'ruun",
+    "The Lodge"
+  ],
+  "term_replacements": {
+    "Constellation": "Takımyıldız",
+    "Starborn": "Yıldızdoğan",
+    "Grav Drive": "Kütleçekim Sürücüsü",
+    "United Colonies": "Birleşik Koloniler",
+    "Freestar Collective": "Özgür Yıldız Kolektifi",
+    "Crimson Fleet": "Kızıl Filo",
+    "Artifact": "Eser",
+    "Boost Pack": "İtici Sırt Çantası",
+    "Digipick": "Dijital Maymuncuk",
+    "Outpost": "İleri Karakol",
+    "Settled Systems": "Yerleşik Sistemler",
+    "Credits": "Kredi"
+  }
+}
