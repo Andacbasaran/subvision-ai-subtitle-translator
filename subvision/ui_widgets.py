@@ -11,7 +11,6 @@ from typing import Optional
 from PyQt6.QtCore import QPointF, QRect, QRectF, QSize, Qt
 from PyQt6.QtGui import (
     QColor,
-    QFont,
     QIcon,
     QPainter,
     QPainterPath,
@@ -31,7 +30,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from subvision.hardware import get_app_base_dir, get_ui_font_family
+from subvision.hardware import get_app_base_dir
 
 
 def make_flat_icon(kind: str, color_hex: str = "#FAFAFA", size: int = 14) -> QIcon:

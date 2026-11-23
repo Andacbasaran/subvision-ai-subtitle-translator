@@ -8,10 +8,9 @@ tarafından görülmez. Oyunlar, Diziler, Filmler ve Yayınlar ile %100 uyumludu
 """
 
 import ctypes
-from dataclasses import dataclass, field
-import math
 import os
 import sys
+from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional, Tuple
 
 from PyQt6.QtCore import QPoint, QPointF, QRect, QRectF, Qt

@@ -7,13 +7,13 @@ glossaries directory. Uses only Python stdlib with strict timeouts and graceful
 offline fallback.
 """
 
-from dataclasses import dataclass
 import json
 import os
 import re
 import urllib.error
 import urllib.parse
 import urllib.request
+from dataclasses import dataclass
 from typing import Dict, List, Optional, Set, Union
 
 from subvision.hardware import get_app_base_dir, get_writable_data_dir

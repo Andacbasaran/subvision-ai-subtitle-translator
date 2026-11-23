@@ -10,9 +10,9 @@ browser/forum automatically pauses OCR and hides the overlay until the target
 window regains focus.
 """
 
-from dataclasses import dataclass
 import os
 import sys
+from dataclasses import dataclass
 from typing import Callable, List, Optional
 
 # Multi-window apps (browsers, UWP host) where two different windows share one .exe.

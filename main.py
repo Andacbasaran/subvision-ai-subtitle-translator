@@ -13,7 +13,7 @@ import webbrowser
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
-from PyQt6.QtCore import QRect, QSize, QThread, QTimer, Qt, pyqtSignal
+from PyQt6.QtCore import QRect, QSize, Qt, QThread, QTimer, pyqtSignal
 from PyQt6.QtGui import QAction, QFont, QGuiApplication, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QApplication,
@@ -42,7 +42,6 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from subvision import __version__
 from subvision.audio_whisper import AudioCaptureTranslateWorker, detect_audio_capabilities
 from subvision.context_translator import (
     BACKEND_DEEPL,
@@ -50,10 +49,10 @@ from subvision.context_translator import (
     BACKEND_LOCAL_CT2,
     BACKEND_OLLAMA,
     BACKEND_OPENAI_COMPAT,
-    ContextAwareTranslator,
-    ContextBackendConfig,
     DEFAULT_ENDPOINTS,
     DEFAULT_MODELS,
+    ContextAwareTranslator,
+    ContextBackendConfig,
 )
 from subvision.custom_glossary import CustomGlossaryManager
 from subvision.exporters import (
@@ -63,11 +62,11 @@ from subvision.exporters import (
 )
 from subvision.glossary_hub import CommunityGlossaryHub, RemoteGlossaryItem
 from subvision.hardware import (
-    HardwareProfile,
     PROFILE_AUTO,
     PROFILE_BALANCED,
     PROFILE_ECO,
     PROFILE_PERFORMANCE,
+    HardwareProfile,
     RuntimeTuning,
     apply_thread_env_defaults,
     compute_runtime_tuning,
@@ -102,14 +101,15 @@ from subvision.updater import (
 from subvision.vocab_learner import VocabNotebook, extract_study_words
 from subvision.window_tracker import (
     TargetWindowSpec,
-    WindowInfo,
     list_visible_windows,
 )
 from subvision.workers import (
     BenchmarkWorker,
     CaptureTranslateWorker,
-    LatestTextSlot,
     ModelLoaderThread,
+)
+from subvision.workers import (
+    LatestTextSlot as LatestTextSlot,
 )
 
 APP_VERSION = "1.6.0"

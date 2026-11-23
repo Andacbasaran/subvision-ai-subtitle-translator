@@ -31,9 +31,7 @@ from subvision.glossary import (
 from subvision.hardware import (
     compute_runtime_tuning,
     detect_hardware_profile,
-    get_app_base_dir,
     get_ct2_safe_path,
-    get_writable_data_dir,
     query_ct2_supported_compute_types,
     select_compute_type_candidates,
 )

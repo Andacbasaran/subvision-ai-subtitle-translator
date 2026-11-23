@@ -7,11 +7,11 @@ uygulamanın çökmeden ve yüksek verimlilikle çalışması için donanımı o
 optimum çalışma parametrelerini üretir.
 """
 
-from dataclasses import dataclass, field
 import os
 import platform
 import subprocess
 import sys
+from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 # CTranslate2 için öncelik sırası (hız + bellek verimliliği -> maksimum uyumluluk)

@@ -5,10 +5,10 @@ Manages downloadable CTranslate2/OPUS-MT neural translation language packs
 under the user's writable application data directory.
 """
 
-from dataclasses import dataclass, field
 import os
 import re
 import shutil
+from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 from subvision.hardware import get_writable_data_dir

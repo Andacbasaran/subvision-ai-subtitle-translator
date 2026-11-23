@@ -9,7 +9,7 @@ import os
 import tempfile
 import unittest
 import urllib.error
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from subvision.custom_glossary import CustomGlossaryManager
 from subvision.glossary_hub import (

@@ -233,6 +233,7 @@ try:
 
         def _run_sounddevice(self) -> None:
             import queue
+
             import sounddevice as sd
 
             audio_q: "queue.Queue[np.ndarray]" = queue.Queue(maxsize=64)

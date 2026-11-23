@@ -6,12 +6,12 @@ with their bilingual subtitle context, search/manage their personal notebook,
 and export rich HTML-formatted Anki TSV decks.
 """
 
-from dataclasses import dataclass
-from datetime import datetime, timezone
 import html
 import json
 import os
 import re
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
 from subvision.hardware import get_writable_data_dir

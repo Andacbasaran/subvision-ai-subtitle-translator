@@ -6,7 +6,6 @@ SubVision AI — Donanım & Uçtan Uca Gecikme Performans Testi (Benchmark Suite
 
 import json
 import os
-import platform
 import statistics
 import sys
 import time
@@ -70,9 +69,10 @@ def generate_visual_assets(bm: Dict) -> None:
     ve Anlaşılır Karşılaştırmalı Performans İnfografiğini (assets/benchmark_chart.png) üretir.
     """
     from PIL import Image
-    from PyQt6.QtCore import QRect, Qt
-    from PyQt6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPen, QPixmap
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtGui import QColor, QFont, QPainter, QPen, QPixmap
     from PyQt6.QtWidgets import QApplication
+
     import main as app_main
 
     base_dir = REPO_ROOT

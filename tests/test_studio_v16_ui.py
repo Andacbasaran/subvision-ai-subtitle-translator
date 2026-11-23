@@ -15,10 +15,9 @@ from PyQt6.QtWidgets import QApplication
 
 import main as studio_main
 from subvision.exporters import HistoryEntry
-from subvision.i18n import LanguageManager, TRANSLATIONS
+from subvision.i18n import TRANSLATIONS, LanguageManager
 from subvision.language_packs import LanguagePackManager
 from subvision.vocab_learner import VocabNotebook
-
 
 _REQUIRED_V16_I18N_KEYS = (
     "lang_pair_title",

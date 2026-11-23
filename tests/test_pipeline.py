@@ -26,11 +26,11 @@ from subvision.glossary import (
     normalize_slang_for_nmt,
 )
 from subvision.hardware import (
-    HardwareProfile,
     PROFILE_AUTO,
     PROFILE_BALANCED,
     PROFILE_ECO,
     PROFILE_PERFORMANCE,
+    HardwareProfile,
     classify_hardware_tier,
     compute_runtime_tuning,
     detect_hardware_profile,
@@ -375,6 +375,7 @@ class TestSubVisionPipeline(unittest.TestCase):
         """Auto-Fit font hesabının uzun Türkçe cümleyi kutuya sığdıracak şekilde otomatik küçülttüğünü doğrular."""
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
         from PyQt6.QtWidgets import QApplication
+
         from subvision.overlay_ui import compute_autofit_font_size
 
         app = QApplication.instance() or QApplication([])
@@ -436,9 +437,8 @@ class TestSubVisionV14Features(unittest.TestCase):
     def test_01_modular_package_backwards_compatibility(self) -> None:
         import main as app_main
         from subvision import __version__
-        from subvision.workers import LatestTextSlot
-
         from subvision.updater import parse_semver
+        from subvision.workers import LatestTextSlot
 
         self.assertGreaterEqual(parse_semver(__version__), (1, 4, 0, 0))
         self.assertIs(app_main.LatestTextSlot, LatestTextSlot)
@@ -456,6 +456,7 @@ class TestSubVisionV14Features(unittest.TestCase):
         import io
         import json
         import tempfile
+
         from subvision.updater import check_for_updates, is_newer_version, parse_semver
 
         self.assertTrue(is_newer_version("v1.5.0", "1.4.0"))
@@ -654,6 +655,7 @@ class TestSubVisionV14Features(unittest.TestCase):
 
     def test_08_srt_and_anki_csv_exporters(self) -> None:
         import tempfile
+
         from subvision.exporters import (
             HistoryEntry,
             export_history_to_anki_csv,
@@ -685,6 +687,7 @@ class TestSubVisionV14Features(unittest.TestCase):
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
         from PyQt6.QtCore import QPoint
         from PyQt6.QtWidgets import QApplication
+
         from subvision.overlay_ui import ROISelectorOverlay
 
         app = QApplication.instance() or QApplication([])
@@ -709,6 +712,7 @@ class TestSubVisionV14Features(unittest.TestCase):
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
         from PyQt6.QtCore import QRect
         from PyQt6.QtWidgets import QApplication
+
         from subvision.overlay_ui import SubtitleOverlayWindow, compute_dynamic_overlay_plan
 
         app = QApplication.instance() or QApplication([])
@@ -851,9 +855,11 @@ class TestSubVisionV14Features(unittest.TestCase):
         """CaptureTranslateWorker'ın Alt+Tab anında OCR'ı duraklatıp geri dönünce devam ettiğini ve paketlemeyi doğrular."""
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
         import time
+
         from PyQt6.QtWidgets import QApplication
-        from scripts import build_exe
+
         import main as app_main
+        from scripts import build_exe
         from subvision.window_tracker import TargetWindowSpec, WindowInfo
         from subvision.workers import CaptureTranslateWorker
 

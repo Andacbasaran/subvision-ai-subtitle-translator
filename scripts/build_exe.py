@@ -27,7 +27,7 @@ SubVision AI — Windows Dijital İmzalı Kurulum Yardımcısı, Uninstaller & S
 import os
 import subprocess
 import sys
-from typing import List, Optional
+from typing import List
 
 for _stream in (sys.stdout, sys.stderr):
     if hasattr(_stream, "reconfigure"):
@@ -1852,7 +1852,6 @@ def build_native_exe(base_dir: str) -> bool:
     cs_file = os.path.join(base_dir, "_launcher_tmp.cs")
     manifest_file = os.path.join(base_dir, "_launcher_tmp.manifest")
     exe_file = os.path.join(base_dir, "SubVisionAI.exe")
-    uninstaller_file = os.path.join(base_dir, "SubVisionAI-Uninstaller.exe")
     ico_file = os.path.join(base_dir, "assets", "app_icon.ico")
 
     with open(cs_file, "w", encoding="utf-8-sig") as f:
