@@ -32,6 +32,7 @@ from PyQt6.QtWidgets import (
     QMenu,
     QMessageBox,
     QProgressBar,
+    QProgressDialog,
     QPushButton,
     QScrollArea,
     QSlider,
@@ -94,7 +95,12 @@ from subvision.ui_widgets import (
     create_app_pixmap,
     make_flat_icon,
 )
-from subvision.updater import UpdateCheckerThread, UpdateInfo
+from subvision.updater import (
+    UpdateCheckerThread,
+    UpdateDownloadThread,
+    UpdateInfo,
+    apply_downloaded_update,
+)
 from subvision.workers import (
     BenchmarkWorker,
     CaptureTranslateWorker,
@@ -258,7 +264,7 @@ class MainWindow(QMainWindow):
 
     def _default_roi(self) -> Dict[str, int]:
         screen = QGuiApplication.primaryScreen()
-        dpr = screen.devicePixelRatio() if screen else 1.0
+        dpr = 1.0 if sys.platform == "darwin" else (screen.devicePixelRatio() if screen else 1.0)
         sg = screen.geometry() if screen else None
         sw = sg.width() if sg else 1920
         sh = sg.height() if sg else 1080
@@ -286,15 +292,23 @@ class MainWindow(QMainWindow):
             top = int(round(raw_roi["top"]))
             width = max(40, int(round(raw_roi["width"])))
             height = max(18, int(round(raw_roi["height"])))
+            qt_left = int(round(raw_roi.get("qt_left", left)))
+            qt_top = int(round(raw_roi.get("qt_top", top)))
+            qt_width = max(40, int(round(raw_roi.get("qt_width", width))))
+            qt_height = max(18, int(round(raw_roi.get("qt_height", height))))
+            if sys.platform == "darwin":
+                # macOS'ta MSS mantıksal nokta koordinatlarını kullanır;
+                # eski 2x Retina ölçekli kayıtları otomatik onar.
+                left, top, width, height = qt_left, qt_top, qt_width, qt_height
             return {
                 "left": left,
                 "top": top,
                 "width": width,
                 "height": height,
-                "qt_left": int(round(raw_roi.get("qt_left", left))),
-                "qt_top": int(round(raw_roi.get("qt_top", top))),
-                "qt_width": max(40, int(round(raw_roi.get("qt_width", width)))),
-                "qt_height": max(18, int(round(raw_roi.get("qt_height", height)))),
+                "qt_left": qt_left,
+                "qt_top": qt_top,
+                "qt_width": qt_width,
+                "qt_height": qt_height,
             }
         except Exception:
             return self._default_roi()
@@ -1531,7 +1545,7 @@ class MainWindow(QMainWindow):
         self.btn_open_release.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_open_release.setMinimumHeight(28)
         self.btn_open_release.setVisible(False)
-        self.btn_open_release.clicked.connect(self._open_latest_release_page)
+        self.btn_open_release.clicked.connect(self._start_auto_update)
         upd_row.addWidget(self.btn_open_release)
         meta_lay.addLayout(upd_row)
 
@@ -2138,6 +2152,7 @@ class MainWindow(QMainWindow):
                 self.lbl_update_status.setText(self.i18n.t("updates_error"))
             return
         if info.is_update_available:
+            self._latest_update_info = info
             self._latest_release_url = info.release_url
             msg = self.i18n.t(
                 "updates_available",
@@ -2148,12 +2163,142 @@ class MainWindow(QMainWindow):
                 self.lbl_update_status.setText(msg)
                 self.lbl_update_status.setStyleSheet("color: #FACC15; font-size: 8.2pt; font-weight: 700;")
             if hasattr(self, "btn_open_release"):
+                if info.has_direct_installer:
+                    self.btn_open_release.setText(f"Şimdi Güncelle (v{info.latest_version})")
+                else:
+                    self.btn_open_release.setText(self.i18n.t("updates_download"))
                 self.btn_open_release.setVisible(True)
+
+            # Aynı oturumda kullanıcıya yalnızca bir kez otomatik güncelleme önerisi göster
+            already_prompted = getattr(self, "_update_prompted_version", None) == info.latest_version
+            if (not already_prompted) or (not silent):
+                self._update_prompted_version = info.latest_version
+                self._prompt_install_update(info)
         elif not silent and hasattr(self, "lbl_update_status"):
             self.lbl_update_status.setText(
                 self.i18n.t("updates_up_to_date", version=info.current_version)
             )
             self.lbl_update_status.setStyleSheet("color: #34D399; font-size: 8.2pt;")
+
+    def _prompt_install_update(self, info: UpdateInfo) -> None:
+        box = QMessageBox(self)
+        box.setWindowTitle("SubVision AI — Yeni Sürüm Mevcut")
+        box.setIcon(QMessageBox.Icon.Information)
+        size_mb = f" ({info.asset_size / (1024 * 1024):.1f} MB)" if info.asset_size > 0 else ""
+        notes_preview = (info.release_notes or "").strip()
+        if len(notes_preview) > 360:
+            notes_preview = notes_preview[:360].rstrip() + "..."
+        body = (
+            f"Yeni SubVision AI v{info.latest_version} sürümü hazır (mevcut: v{info.current_version}).\n\n"
+            f"Uygulama GitHub Releases üzerinden yeni paketi indirip otomatik olarak güncelleyebilir{size_mb}."
+        )
+        if notes_preview:
+            body += f"\n\nSürüm Notları:\n{notes_preview}"
+        box.setText(body)
+
+        btn_install = None
+        if info.has_direct_installer and UpdateDownloadThread is not None:
+            btn_install = box.addButton("Şimdi Güncelle", QMessageBox.ButtonRole.AcceptRole)
+        btn_web = box.addButton("GitHub'da Aç", QMessageBox.ButtonRole.ActionRole)
+        box.addButton("Daha Sonra", QMessageBox.ButtonRole.RejectRole)
+        box.exec()
+
+        clicked = box.clickedButton()
+        if btn_install is not None and clicked == btn_install:
+            self._start_auto_update()
+        elif clicked == btn_web:
+            self._open_latest_release_page()
+
+    def _start_auto_update(self) -> None:
+        info: Optional[UpdateInfo] = getattr(self, "_latest_update_info", None)
+        if not info or not info.has_direct_installer or UpdateDownloadThread is None:
+            self._open_latest_release_page()
+            return
+
+        dl_thread: Optional[UpdateDownloadThread] = getattr(self, "_update_download_thread", None)
+        if dl_thread and dl_thread.isRunning():
+            return
+
+        updates_dir = os.path.join(DATA_DIR, "updates")
+        progress = QProgressDialog(
+            f"SubVision AI v{info.latest_version} indiriliyor...",
+            "İptal",
+            0,
+            100,
+            self,
+        )
+        progress.setWindowTitle("SubVision AI — Otomatik Güncelleme")
+        progress.setWindowModality(Qt.WindowModality.WindowModal)
+        progress.setMinimumDuration(0)
+        progress.setMinimumWidth(420)
+        progress.setValue(0)
+        self._update_progress_dlg = progress
+
+        thread = UpdateDownloadThread(info=info, dest_dir=updates_dir, parent=self)
+        self._update_download_thread = thread
+
+        def _on_progress(downloaded: int, total: int) -> None:
+            if not progress.isVisible():
+                return
+            if total > 0:
+                pct = max(0, min(100, int(downloaded * 100 / total)))
+                progress.setMaximum(100)
+                progress.setValue(pct)
+                progress.setLabelText(
+                    f"SubVision AI v{info.latest_version} indiriliyor...\n"
+                    f"{downloaded / (1024 * 1024):.1f} MB / {total / (1024 * 1024):.1f} MB (%{pct})"
+                )
+            else:
+                progress.setMaximum(0)
+                progress.setLabelText(
+                    f"SubVision AI v{info.latest_version} indiriliyor... "
+                    f"({downloaded / (1024 * 1024):.1f} MB)"
+                )
+
+        def _on_status(msg: str) -> None:
+            if progress.isVisible():
+                progress.setLabelText(msg)
+
+        def _on_finished(installer_path: str, error_msg: str) -> None:
+            progress.close()
+            self._update_progress_dlg = None
+            if error_msg:
+                if "iptal" in error_msg.lower():
+                    return
+                res = QMessageBox.warning(
+                    self,
+                    "Güncelleme Hatası",
+                    f"Otomatik güncelleme indirilemedi:\n{error_msg}\n\n"
+                    "GitHub sürüm sayfasını tarayıcıda açmak ister misiniz?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                )
+                if res == QMessageBox.StandardButton.Yes:
+                    self._open_latest_release_page()
+                return
+
+            try:
+                should_exit, status_msg = apply_downloaded_update(installer_path)
+            except Exception as exc:
+                QMessageBox.warning(
+                    self,
+                    "Güncelleme Başlatılamadı",
+                    f"Kurulum başlatılırken hata oluştu:\n{exc}",
+                )
+                return
+
+            if should_exit:
+                if self.worker and self.worker.isRunning():
+                    self.stop_translation()
+                self._force_quit = True
+                QTimer.singleShot(150, QApplication.quit)
+            else:
+                QMessageBox.information(self, "SubVision AI Güncelleme", status_msg)
+
+        progress.canceled.connect(thread.cancel)
+        thread.progress_changed.connect(_on_progress)
+        thread.status_changed.connect(_on_status)
+        thread.download_finished.connect(_on_finished)
+        thread.start()
 
     def _open_latest_release_page(self) -> None:
         if self._latest_release_url:

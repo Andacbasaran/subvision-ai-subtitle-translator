@@ -84,6 +84,63 @@ def _load_brand_logo_pixmap(size: int = 32) -> Optional[QPixmap]:
     return None
 
 
+def _configure_macos_overlay_window(widget: QWidget) -> None:
+    """
+    macOS (Cocoa) üzerinde altyazı overlay penceresinin:
+    - Başka bir uygulamaya (tarayıcı/oyun/VLC) geçildiğinde gizlenmemesini (hidesOnDeactivate=NO)
+    - Tıklamaları tamamen arkaya geçirmesini (ignoresMouseEvents=YES)
+    - Tam ekran video ve diğer pencerelerin üstünde kalmasını (NSStatusWindowLevel + FullScreenAuxiliary)
+    sağlar.
+    """
+    if sys.platform != "darwin":
+        return
+    try:
+        if QGuiApplication.platformName() != "cocoa":
+            return
+        import ctypes.util
+
+        objc_path = ctypes.util.find_library("objc")
+        if not objc_path:
+            return
+        objc = ctypes.cdll.LoadLibrary(objc_path)
+        objc.sel_registerName.argtypes = [ctypes.c_char_p]
+        objc.sel_registerName.restype = ctypes.c_void_p
+
+        msg_id = ctypes.cast(
+            objc.objc_msgSend,
+            ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p),
+        )
+        msg_void_bool = ctypes.cast(
+            objc.objc_msgSend,
+            ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_bool),
+        )
+        msg_void_long = ctypes.cast(
+            objc.objc_msgSend,
+            ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_long),
+        )
+        msg_void_ulong = ctypes.cast(
+            objc.objc_msgSend,
+            ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_ulong),
+        )
+
+        ns_view = int(widget.winId())
+        if not ns_view:
+            return
+        ns_win = msg_id(ns_view, objc.sel_registerName(b"window"))
+        if not ns_win:
+            return
+
+        msg_void_bool(ns_win, objc.sel_registerName(b"setHidesOnDeactivate:"), False)
+        msg_void_bool(ns_win, objc.sel_registerName(b"setIgnoresMouseEvents:"), True)
+        msg_void_bool(ns_win, objc.sel_registerName(b"setHasShadow:"), False)
+        # NSStatusWindowLevel (25): normal pencerelerin ve tam ekran oynatıcıların üstünde
+        msg_void_long(ns_win, objc.sel_registerName(b"setLevel:"), 25)
+        # CanJoinAllSpaces (1) | FullScreenAuxiliary (256)
+        msg_void_ulong(ns_win, objc.sel_registerName(b"setCollectionBehavior:"), 1 | 256)
+    except Exception:
+        pass
+
+
 def set_window_exclude_from_capture(widget: QWidget, exclude: bool = True) -> bool:
     """
     Windows 10 (2004 / Build 19041+) / Windows 11 API:
@@ -322,16 +379,25 @@ class ROISelectorOverlay(QWidget):
                             phys_height = max(18, ph)
 
                     if phys_left is None or phys_top is None or phys_width is None or phys_height is None:
-                        if sys.platform == "win32":
+                        if sys.platform == "darwin":
+                            # macOS'ta CoreGraphics / MSS ekran yakalama doğrudan mantıksal nokta (point)
+                            # koordinatlarını kullanır; Retina DPR ile çarpmak yakalamayı ekran dışına kaydırır.
+                            phys_left = qt_left
+                            phys_top = qt_top
+                            phys_width = max(40, qt_width)
+                            phys_height = max(18, qt_height)
+                        elif sys.platform == "win32":
                             # Qt6 Windows'ta sg.left()/sg.top() monitör sanal başlangıcıdır;
                             # yalnızca monitör içi göreli ofset DPR ile çarpılır.
                             phys_left = int(sg.left()) + int(round(rect.left() * dpr))
                             phys_top = int(sg.top()) + int(round(rect.top() * dpr))
+                            phys_width = max(40, int(round(qt_width * dpr)))
+                            phys_height = max(18, int(round(qt_height * dpr)))
                         else:
                             phys_left = int(round(qt_left * dpr))
                             phys_top = int(round(qt_top * dpr))
-                        phys_width = max(40, int(round(qt_width * dpr)))
-                        phys_height = max(18, int(round(qt_height * dpr)))
+                            phys_width = max(40, int(round(qt_width * dpr)))
+                            phys_height = max(18, int(round(qt_height * dpr)))
 
                     roi = {
                         "left": phys_left,
@@ -779,12 +845,22 @@ class SubtitleOverlayWindow(QWidget):
         self._local_roi_rect = QRect(0, 0, 800, 105)
         self._render_plan: Optional[DynamicOverlayPlan] = None
 
-        self.setWindowFlags(
-            Qt.WindowType.FramelessWindowHint
-            | Qt.WindowType.WindowStaysOnTopHint
-            | Qt.WindowType.Tool
-            | Qt.WindowType.WindowTransparentForInput
-        )
+        if sys.platform == "darwin":
+            # macOS'ta Qt.WindowType.Tool pencereyi uygulama odak kaybedince gizler;
+            # bunun yerine odak almayan, her zaman üstte duran çerçevesiz pencere kullanılır.
+            self.setWindowFlags(
+                Qt.WindowType.FramelessWindowHint
+                | Qt.WindowType.WindowStaysOnTopHint
+                | Qt.WindowType.WindowTransparentForInput
+                | Qt.WindowType.WindowDoesNotAcceptFocus
+            )
+        else:
+            self.setWindowFlags(
+                Qt.WindowType.FramelessWindowHint
+                | Qt.WindowType.WindowStaysOnTopHint
+                | Qt.WindowType.Tool
+                | Qt.WindowType.WindowTransparentForInput
+            )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
 
@@ -802,6 +878,7 @@ class SubtitleOverlayWindow(QWidget):
 
     def showEvent(self, event) -> None:
         super().showEvent(event)
+        _configure_macos_overlay_window(self)
         self.capture_excluded = set_window_exclude_from_capture(self, True)
 
     def _smooth_layout_if_same_sentence(

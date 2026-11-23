@@ -11,6 +11,7 @@ for specific games, TV shows, or domains. Each pack can define:
 import json
 import os
 import re
+import sys
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
@@ -70,11 +71,14 @@ class CustomGlossaryManager:
 
     def __init__(self, extra_dirs: Optional[List[str]] = None):
         self.search_dirs: List[str] = []
-        for d in (
+        candidates = [
             os.path.join(get_app_base_dir(), "glossaries"),
             os.path.join(get_writable_data_dir(), "glossaries"),
-            *(extra_dirs or []),
-        ):
+        ]
+        meipass = getattr(sys, "_MEIPASS", None)
+        if meipass:
+            candidates.insert(1, os.path.join(meipass, "glossaries"))
+        for d in (*candidates, *(extra_dirs or [])):
             norm = os.path.abspath(d)
             if norm not in self.search_dirs:
                 self.search_dirs.append(norm)

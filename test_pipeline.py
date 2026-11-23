@@ -433,7 +433,9 @@ class TestSubVisionV14Features(unittest.TestCase):
         from subvision import __version__
         from subvision.workers import LatestTextSlot
 
-        self.assertTrue(__version__.startswith("1.4"))
+        from subvision.updater import parse_semver
+
+        self.assertGreaterEqual(parse_semver(__version__), (1, 4, 0, 0))
         self.assertIs(app_main.LatestTextSlot, LatestTextSlot)
 
     def test_02_i18n_tr_and_en_switching(self) -> None:
@@ -448,6 +450,7 @@ class TestSubVisionV14Features(unittest.TestCase):
     def test_03_updater_semver_and_mocked_release_check(self) -> None:
         import io
         import json
+        import tempfile
         from subvision.updater import check_for_updates, is_newer_version, parse_semver
 
         self.assertTrue(is_newer_version("v1.5.0", "1.4.0"))
@@ -475,6 +478,60 @@ class TestSubVisionV14Features(unittest.TestCase):
         self.assertTrue(info.is_update_available)
         self.assertEqual(info.latest_version, "1.5.0")
         self.assertIsNone(info.error)
+
+        from subvision.updater import (
+            compute_file_sha256,
+            parse_sha256sums,
+            select_platform_asset,
+            verify_file_sha256,
+        )
+
+        mock_assets = [
+            {
+                "name": "SubVisionAI-OnlineSetup-v1.5.0.exe",
+                "browser_download_url": "https://example.com/online.exe",
+                "size": 900000,
+            },
+            {
+                "name": "SubVisionAI-Setup-v1.5.0-Windows-x64.exe",
+                "browser_download_url": "https://example.com/setup.exe",
+                "size": 85000000,
+            },
+            {
+                "name": "SubVisionAI-v1.5.0-macOS-arm64.dmg",
+                "browser_download_url": "https://example.com/macos-arm64.dmg",
+                "size": 110000000,
+            },
+            {
+                "name": "SHA256SUMS.txt",
+                "browser_download_url": "https://example.com/SHA256SUMS.txt",
+                "size": 300,
+            },
+            {
+                "name": "SHA256SUMS-macOS.txt",
+                "browser_download_url": "https://example.com/SHA256SUMS-macOS.txt",
+                "size": 120,
+            },
+        ]
+        win_name, win_url, _, win_cs = select_platform_asset(mock_assets, "win32", "AMD64")
+        self.assertEqual(win_name, "SubVisionAI-Setup-v1.5.0-Windows-x64.exe")
+        self.assertEqual(win_url, "https://example.com/setup.exe")
+        self.assertEqual(win_cs, "https://example.com/SHA256SUMS.txt")
+
+        mac_name, mac_url, _, mac_cs = select_platform_asset(mock_assets, "darwin", "arm64")
+        self.assertEqual(mac_name, "SubVisionAI-v1.5.0-macOS-arm64.dmg")
+        self.assertEqual(mac_url, "https://example.com/macos-arm64.dmg")
+        self.assertEqual(mac_cs, "https://example.com/SHA256SUMS-macOS.txt")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sample = os.path.join(tmpdir, "SubVisionAI-v1.5.0-macOS-arm64.dmg")
+            with open(sample, "wb") as f:
+                f.write(b"subvision-release-payload")
+            digest = compute_file_sha256(sample)
+            sums = f"{digest}  SubVisionAI-v1.5.0-macOS-arm64.dmg\n"
+            self.assertEqual(parse_sha256sums(sums, "SubVisionAI-v1.5.0-macOS-arm64.dmg"), digest)
+            self.assertTrue(verify_file_sha256(sample, digest))
+            self.assertFalse(verify_file_sha256(sample, "0" * 64))
 
     def test_04_context_aware_translator_and_safe_fallback(self) -> None:
         from subvision.context_translator import (

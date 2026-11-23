@@ -6,11 +6,11 @@
 ;
 ; Derleme komutu:
 ;   python build_exe.py --only-pyinstaller
-;   iscc /DMyAppVersion=1.4.0 installer.iss
-;   python build_exe.py --sign dist\SubVisionAI-Setup-v1.4.0-Windows-x64.exe
+;   iscc /DMyAppVersion=1.5.0 installer.iss
+;   python build_exe.py --sign dist\SubVisionAI-Setup-v1.5.0-Windows-x64.exe
 
 #ifndef MyAppVersion
-  #define MyAppVersion "1.4.0"
+  #define MyAppVersion "1.5.0"
 #endif
 
 #define MyAppName "SubVision AI"
@@ -45,7 +45,8 @@ PrivilegesRequiredOverridesAllowed=dialog
 ArchitecturesAllowed=x64
 ArchitecturesInstallIn64BitMode=x64
 DisableProgramGroupPage=yes
-CloseApplications=yes
+CloseApplications=force
+RestartApplications=yes
 VersionInfoVersion={#MyAppVersion}.0
 VersionInfoCompany={#MyAppPublisher}
 VersionInfoDescription={#MyAppName} Kurulum ve Kaldırma Yardımcısı
@@ -69,6 +70,7 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Flags: nowait skipifnotsilent
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\__pycache__"

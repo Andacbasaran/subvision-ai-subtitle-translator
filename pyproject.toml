@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "subvision-ai"
-version = "1.4.0"
+version = "1.5.0"
 description = "Ultra-low-latency, 100% offline real-time on-screen & live-audio English-to-Turkish subtitle translator studio."
 readme = "README.md"
 license = { file = "LICENSE" }

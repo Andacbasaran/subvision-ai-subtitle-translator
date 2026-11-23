@@ -36,7 +36,7 @@ for _stream in (sys.stdout, sys.stderr):
         except Exception:
             pass
 
-APP_VERSION = "1.4.0.0"
+APP_VERSION = "1.5.0.0"
 
 EMBEDDED_FILES = [
     ("main.py", "main.py"),
@@ -69,7 +69,7 @@ EMBEDDED_FILES = [
 AppManifestXml = r"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
   <assemblyIdentity
-    version="1.4.0.0"
+    version="1.5.0.0"
     processorArchitecture="amd64"
     name="SubVisionAI.Studio"
     type="win32"
@@ -130,8 +130,8 @@ using Microsoft.Win32;
 [assembly: AssemblyCopyright("Copyright (c) 2026 Andac Basaran & SubVision AI Contributors (MIT License)")]
 [assembly: AssemblyTrademark("SubVision AI")]
 [assembly: AssemblyCulture("")]
-[assembly: AssemblyVersion("1.4.0.0")]
-[assembly: AssemblyFileVersion("1.4.0.0")]
+[assembly: AssemblyVersion("1.5.0.0")]
+[assembly: AssemblyFileVersion("1.5.0.0")]
 
 namespace SubVisionAI
 {
@@ -456,7 +456,7 @@ namespace SubVisionAI
                         if (key != null)
                         {
                             key.SetValue("DisplayName", "SubVision AI — Real-Time Subtitle Studio");
-                            key.SetValue("DisplayVersion", "1.4.0");
+                            key.SetValue("DisplayVersion", "1.5.0");
                             key.SetValue("Publisher", "SubVision AI Open Source");
                             key.SetValue("DisplayIcon", File.Exists(iconPath) ? iconPath : mainExe);
                             key.SetValue("InstallLocation", appDir);
@@ -1188,7 +1188,7 @@ namespace SubVisionAI
                     throw new Exception("Paket kurulumu sırasında hata oluştu (Çıkış kodu: " + rcDeps + ").");
                 }
 
-                File.WriteAllText(markerFile, "1.4.0", Encoding.UTF8);
+                File.WriteAllText(markerFile, "1.5.0", Encoding.UTF8);
 
                 // ADIM 4: Kısayolları ve Uninstaller Kaydını Oluştur
                 UpdateProgress("Kısayollar ve Kaldırma Yardımcısı kaydediliyor...", 97, "Sistem entegrasyonu tamamlanıyor...");

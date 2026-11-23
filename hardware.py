@@ -530,8 +530,14 @@ def _is_dir_writable(path: str) -> bool:
 def get_writable_data_dir(preferred_dir: Optional[str] = None) -> str:
     """
     Uygulama dizini yazılabilir ise taşınabilir (portable) modu korur;
-    salt-okunur (örn. Program Files) dizinde çalışıyorsa kullanıcı veri dizinine düşer.
+    salt-okunur (örn. Program Files) veya macOS .app paketi içinden çalışıyorsa
+    kullanıcı veri dizinine yönlendirir.
     """
+    if preferred_dir is None and sys.platform == "darwin" and getattr(sys, "frozen", False):
+        fallback = os.path.expanduser("~/Library/Application Support/SubVisionAI")
+        os.makedirs(fallback, exist_ok=True)
+        return fallback
+
     base = preferred_dir or get_app_base_dir()
     if _is_dir_writable(base):
         return base
