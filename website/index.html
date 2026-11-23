@@ -1554,22 +1554,57 @@
     }
 
     @media (max-width: 860px) {
+      #scene-2 {
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        justify-content: flex-start;
+        padding-top: 72px;
+        padding-bottom: 84px;
+      }
+
       .studio-showcase {
         grid-template-columns: 1fr;
-        max-width: 640px;
+        max-width: 560px;
         gap: 10px;
+        margin-bottom: 12px;
       }
 
       .studio-inspector {
-        flex-direction: row;
-        overflow-x: auto;
-        gap: 8px;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+        overflow: visible;
       }
 
       .inspector-card {
-        min-width: 170px;
-        flex: 1;
-        padding: 9px 11px;
+        min-width: 0;
+        padding: 8px 6px 9px;
+        align-items: center;
+        text-align: center;
+        gap: 4px;
+        border-radius: 10px;
+      }
+
+      .inspector-card::before {
+        left: 14px;
+        right: 14px;
+        top: auto;
+        bottom: 0;
+        width: auto;
+        height: 2.5px;
+        border-radius: 3px 3px 0 0;
+      }
+
+      .inspector-card-head {
+        justify-content: center;
+        width: 100%;
+      }
+
+      .inspector-card-title {
+        flex-direction: column;
+        gap: 4px;
+        font-size: 0.73rem;
+        line-height: 1.2;
       }
 
       .inspector-card-desc,
@@ -1578,8 +1613,27 @@
         display: none;
       }
 
+      .window-chrome {
+        padding: 7px 10px;
+        gap: 6px;
+      }
+
+      .window-title {
+        font-size: 0.67rem;
+      }
+
+      .studio-media-wrap {
+        padding: 6px;
+      }
+
       .studio-media-wrap img {
-        max-height: 29dvh;
+        max-height: 30dvh;
+      }
+
+      .hotspot-callout {
+        padding: 8px 10px;
+        font-size: 0.72rem;
+        line-height: 1.35;
       }
     }
 
@@ -1599,7 +1653,20 @@
       }
 
       .scene {
-        padding: 66px 16px 78px;
+        padding: 64px 14px 78px;
+      }
+
+      #scene-2 {
+        padding: 64px 14px 82px;
+      }
+
+      #scene-2 .eyebrow {
+        margin-bottom: 6px;
+      }
+
+      #scene-2 .headline--sm {
+        font-size: clamp(1.18rem, 5.2vw, 1.55rem);
+        margin-bottom: 10px;
       }
 
       .logo-showcase img {
@@ -1621,6 +1688,67 @@
         font-size: 0.88rem;
       }
 
+      /* Side-by-side compact CTAs on Scene 2 mobile */
+      #scene-2 .cta-group {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        max-width: 420px;
+      }
+
+      #scene-2 .btn-download,
+      #scene-2 .btn-download-secondary {
+        max-width: none;
+        padding: 10px 10px;
+        font-size: 0.8rem;
+        gap: 6px;
+      }
+
+      .window-dots {
+        display: none;
+      }
+
+      .hotspot-pin {
+        width: 24px;
+        height: 24px;
+        font-size: 0.68rem;
+      }
+
+      .studio-media-wrap img {
+        max-height: 26dvh;
+      }
+
+      .studio-lightbox {
+        width: 96vw;
+        border-radius: 12px;
+      }
+
+      .lightbox-bar {
+        flex-wrap: wrap;
+        padding: 10px 12px;
+        gap: 8px;
+      }
+
+      .lightbox-title {
+        font-size: 0.8rem;
+      }
+
+      .lightbox-actions {
+        width: 100%;
+        justify-content: space-between;
+      }
+
+      .lightbox-btn {
+        flex: 1;
+        text-align: center;
+        font-size: 0.74rem;
+        padding: 6px 8px;
+      }
+
+      .lightbox-body {
+        padding: 8px;
+      }
+
       .demo-card {
         padding: 14px 12px;
       }
@@ -1632,10 +1760,6 @@
 
       .telemetry-strip {
         display: none;
-      }
-
-      .studio-frame img {
-        max-height: 30dvh;
       }
     }
   </style>
@@ -2282,7 +2406,15 @@
     }, { passive: true });
 
     window.addEventListener('touchend', (e) => {
-      if (isTransitioning || e.changedTouches.length === 0) return;
+      if (isTransitioning || studioLightbox?.open || e.changedTouches.length === 0) return;
+      const activeSceneEl = document.getElementById('scene-' + currentScene);
+      if (activeSceneEl && activeSceneEl.scrollHeight > activeSceneEl.clientHeight + 8) {
+        const atTop = activeSceneEl.scrollTop <= 2;
+        const atBottom = activeSceneEl.scrollTop + activeSceneEl.clientHeight >= activeSceneEl.scrollHeight - 2;
+        const dy = touchStartY - e.changedTouches[0].clientY;
+        if (dy > 45 && !atBottom) return;
+        if (dy < -45 && !atTop) return;
+      }
       const dy = touchStartY - e.changedTouches[0].clientY;
       if (Math.abs(dy) > 45) {
         if (dy > 0 && currentScene < totalScenes - 1) goScene(currentScene + 1);
