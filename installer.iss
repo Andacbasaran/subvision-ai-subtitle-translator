@@ -1,4 +1,4 @@
-﻿﻿; SubVision AI — Inno Setup 6 Windows Kurulum ve Opsiyonel Kaldırma Betiği (v1.3)
+﻿; SubVision AI — Inno Setup 6 Windows Kurulum ve Opsiyonel Kaldırma Betiği (v1.3)
 ; PyInstaller --onedir çıktısını (dist\SubVisionAI\*) tek bir profesyonel,
 ; dijital imzalı ve Windows Defender dostu Windows kurulum paketine dönüştürür.
 ; Kaldırma (Uninstall) sırasında indirilen 227 MB yapay zeka modelini ve kullanıcı
