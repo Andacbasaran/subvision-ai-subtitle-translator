@@ -11,8 +11,11 @@ import os
 import platform
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Sequence, Set, Tuple
+
+_CACHED_WRITABLE_DATA_DIR: Optional[str] = None
 
 # CTranslate2 için öncelik sırası (hız + bellek verimliliği -> maksimum uyumluluk)
 CT2_COMPUTE_PRIORITY: Tuple[str, ...] = (
@@ -214,16 +217,15 @@ def detect_physical_cores(logical_cores: int) -> int:
             from ctypes import wintypes
 
             kernel32 = ctypes.windll.kernel32
+            get_lpi_ex = kernel32.GetLogicalProcessorInformationEx
+            get_lpi_ex.argtypes = [wintypes.DWORD, ctypes.c_void_p, ctypes.POINTER(wintypes.DWORD)]
+            get_lpi_ex.restype = wintypes.BOOL
             relation_processor_core = 0
             buf_len = wintypes.DWORD(0)
-            kernel32.GetLogicalProcessorInformationEx(
-                relation_processor_core, None, ctypes.byref(buf_len)
-            )
+            get_lpi_ex(relation_processor_core, None, ctypes.byref(buf_len))
             if buf_len.value > 0:
                 buf = ctypes.create_string_buffer(buf_len.value)
-                ok = kernel32.GetLogicalProcessorInformationEx(
-                    relation_processor_core, buf, ctypes.byref(buf_len)
-                )
+                ok = get_lpi_ex(relation_processor_core, buf, ctypes.byref(buf_len))
                 if ok:
                     raw = buf.raw
                     offset = 0
@@ -254,8 +256,11 @@ def detect_isa_features(arch: Optional[str] = None) -> Tuple[str, ...]:
     if sys.platform == "win32":
         try:
             import ctypes
+            from ctypes import wintypes
 
             is_feat = ctypes.windll.kernel32.IsProcessorFeaturePresent
+            is_feat.argtypes = [wintypes.DWORD]
+            is_feat.restype = wintypes.BOOL
             win_flags = (
                 (10, "sse2"),
                 (37, "sse4_1"),
@@ -263,7 +268,7 @@ def detect_isa_features(arch: Optional[str] = None) -> Tuple[str, ...]:
                 (39, "avx"),
                 (40, "avx2"),
                 (41, "avx512f"),
-                (29, "neon"),
+                (19, "neon"),  # PF_ARM_NEON_INSTRUCTIONS_AVAILABLE
                 (43, "dotprod"),
             )
             for code, name in win_flags:
@@ -531,15 +536,32 @@ def get_writable_data_dir(preferred_dir: Optional[str] = None) -> str:
     """
     Uygulama dizini yazılabilir ise taşınabilir (portable) modu korur;
     salt-okunur (örn. Program Files) veya macOS .app paketi içinden çalışıyorsa
-    kullanıcı veri dizinine yönlendirir.
+    kullanıcı veri dizinine (gerekirse geçici dizine) yönlendirir.
     """
+    global _CACHED_WRITABLE_DATA_DIR
+    if preferred_dir is None and _CACHED_WRITABLE_DATA_DIR:
+        return _CACHED_WRITABLE_DATA_DIR
+
+    def _ensure_fallback(path: str) -> str:
+        try:
+            os.makedirs(path, exist_ok=True)
+            if _is_dir_writable(path):
+                return path
+        except OSError:
+            pass
+        tmp_dir = os.path.join(tempfile.gettempdir(), "SubVisionAI")
+        os.makedirs(tmp_dir, exist_ok=True)
+        return tmp_dir
+
     if preferred_dir is None and sys.platform == "darwin" and getattr(sys, "frozen", False):
-        fallback = os.path.expanduser("~/Library/Application Support/SubVisionAI")
-        os.makedirs(fallback, exist_ok=True)
-        return fallback
+        resolved = _ensure_fallback(os.path.expanduser("~/Library/Application Support/SubVisionAI"))
+        _CACHED_WRITABLE_DATA_DIR = resolved
+        return resolved
 
     base = preferred_dir or get_app_base_dir()
     if _is_dir_writable(base):
+        if preferred_dir is None:
+            _CACHED_WRITABLE_DATA_DIR = base
         return base
 
     if sys.platform == "win32":
@@ -551,8 +573,10 @@ def get_writable_data_dir(preferred_dir: Optional[str] = None) -> str:
         xdg = os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
         fallback = os.path.join(xdg, "SubVisionAI")
 
-    os.makedirs(fallback, exist_ok=True)
-    return fallback
+    resolved = _ensure_fallback(fallback)
+    if preferred_dir is None:
+        _CACHED_WRITABLE_DATA_DIR = resolved
+    return resolved
 
 
 def get_ct2_safe_path(model_dir: str) -> str:

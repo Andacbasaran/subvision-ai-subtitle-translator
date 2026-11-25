@@ -265,8 +265,8 @@ class CommunityGlossaryHub:
             raise ValueError("item_or_url must be a RemoteGlossaryItem or URL string.")
 
         parsed = urllib.parse.urlparse(url)
-        if parsed.scheme not in ("http", "https") or not parsed.netloc:
-            raise ValueError(f"Invalid glossary download URL: {url!r}")
+        if parsed.scheme.lower() != "https" or not parsed.netloc:
+            raise ValueError(f"Invalid glossary download URL (HTTPS required): {url!r}")
 
         req = urllib.request.Request(
             url,

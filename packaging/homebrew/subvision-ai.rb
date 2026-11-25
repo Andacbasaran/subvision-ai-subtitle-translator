@@ -29,12 +29,12 @@ cask "subvision-ai" do
   end
 
   depends_on arch: :arm64
-  depends_on macos: ">= :ventura"
+  depends_on macos: ">= :monterey"
 
   app "SubVision AI.app"
 
   zap trash: [
-    "~/Library/Application Support/SubVision AI",
+    "~/Library/Application Support/SubVisionAI",
     "~/Library/Caches/SubVision AI",
     "~/Library/Preferences/com.andacbasaran.subvisionai.plist",
     "~/Library/Saved Application State/com.andacbasaran.subvisionai.savedState",

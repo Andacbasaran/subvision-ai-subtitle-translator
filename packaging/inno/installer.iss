@@ -6,12 +6,14 @@
 ;
 ; Derleme komutu:
 ;   python scripts/build_exe.py --only-pyinstaller
-;   iscc /DMyAppVersion=1.5.0 packaging\inno\installer.iss
-;   python scripts/build_exe.py --sign dist\SubVisionAI-Setup-v1.5.0-Windows-x64.exe
+;   iscc /DMyAppVersion=1.6.0 packaging\inno\installer.iss
+;   python scripts/build_exe.py --sign dist\SubVisionAI-Setup-v1.6.0-Windows-x64.exe
 
 #ifndef MyAppVersion
-  #define MyAppVersion "1.5.0"
+  #define MyAppVersion "1.6.0"
 #endif
+#define MyAppVersionNoPre Pos("-", MyAppVersion) > 0 ? Copy(MyAppVersion, 1, Pos("-", MyAppVersion) - 1) : MyAppVersion
+#define MyAppNumericVersion Pos("+", MyAppVersionNoPre) > 0 ? Copy(MyAppVersionNoPre, 1, Pos("+", MyAppVersionNoPre) - 1) : MyAppVersionNoPre
 
 #define MyAppName "SubVision AI"
 #define MyAppPublisher "SubVision AI Open Source"
@@ -47,7 +49,7 @@ ArchitecturesInstallIn64BitMode=x64
 DisableProgramGroupPage=yes
 CloseApplications=force
 RestartApplications=yes
-VersionInfoVersion={#MyAppVersion}.0
+VersionInfoVersion={#MyAppNumericVersion}.0
 VersionInfoCompany={#MyAppPublisher}
 VersionInfoDescription={#MyAppName} Kurulum ve Kaldırma Yardımcısı
 VersionInfoProductName={#MyAppName}
@@ -120,8 +122,11 @@ begin
     if DeleteUserSettings then
     begin
       DeleteFile(ExpandConstant('{app}\user_settings.json'));
+      DeleteFile(ExpandConstant('{app}\vocab_notebook.json'));
       DeleteFile(ExpandConstant('{app}\benchmark_results.json'));
       DeleteFile(LocalDataDir + '\user_settings.json');
+      DeleteFile(LocalDataDir + '\vocab_notebook.json');
+      DelTree(LocalDataDir + '\glossaries', True, True, True);
     end;
 
     if DeleteModelsAndRuntime and DeleteUserSettings then

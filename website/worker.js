@@ -186,24 +186,33 @@ ${entries}
 `;
 }
 
-async function getLatestReleaseAssetUrls() {
+function buildGithubHeaders(env, accept) {
+  const headers = {
+    "Accept": accept,
+    "User-Agent": "SubVisionAI-Cloudflare-Worker"
+  };
+  if (env?.GITHUB_TOKEN) {
+    headers["Authorization"] = `Bearer ${env.GITHUB_TOKEN}`;
+  }
+  return headers;
+}
+
+async function getLatestReleaseAssetUrls(env) {
   const now = Date.now();
   if (cachedReleaseAssets && (now - cachedReleaseAtMs) < RELEASE_CACHE_TTL_MS) {
     return cachedReleaseAssets;
   }
+  const releaseDownloadBase = `https://github.com/${GITHUB_REPO}/releases/download/v${APP_VERSION}`;
   const result = {
-    windowsUrl: RELEASES_FALLBACK_URL,
-    macosUrl: RELEASES_FALLBACK_URL,
-    linuxUrl: RELEASES_FALLBACK_URL
+    windowsUrl: `${releaseDownloadBase}/SubVisionAI-Setup-v${APP_VERSION}-Windows-x64.exe`,
+    macosUrl: `${releaseDownloadBase}/SubVisionAI-v${APP_VERSION}-macOS-arm64.dmg`,
+    linuxUrl: `${releaseDownloadBase}/SubVisionAI-v${APP_VERSION}-Linux-x86_64.tar.gz`
   };
   try {
     const resp = await fetch(
       `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
       {
-        headers: {
-          "Accept": "application/vnd.github+json",
-          "User-Agent": "SubVisionAI-Cloudflare-Worker"
-        },
+        headers: buildGithubHeaders(env, "application/vnd.github+json"),
         cf: {
           cacheEverything: true,
           cacheTtl: 300
@@ -235,12 +244,12 @@ async function getLatestReleaseAssetUrls() {
       cachedReleaseAtMs = now;
     }
   } catch (_) {
-    // Fallback to GitHub Releases latest page if API is unreachable
+    // Fallback to versioned GitHub Releases download URLs if API is unreachable
   }
   return result;
 }
 
-async function getLatestGithubRawBase() {
+async function getLatestGithubRawBase(env) {
   const now = Date.now();
   if (cachedCommitSha && (now - cachedAtMs) < SHA_CACHE_TTL_MS) {
     return `https://raw.githubusercontent.com/${GITHUB_REPO}/${cachedCommitSha}`;
@@ -249,10 +258,7 @@ async function getLatestGithubRawBase() {
     const resp = await fetch(
       `https://api.github.com/repos/${GITHUB_REPO}/commits/${GITHUB_BRANCH}`,
       {
-        headers: {
-          "Accept": "application/vnd.github.VERSION.sha",
-          "User-Agent": "SubVisionAI-Cloudflare-Worker"
-        },
+        headers: buildGithubHeaders(env, "application/vnd.github.VERSION.sha"),
         cf: {
           cacheEverything: true,
           cacheTtl: 60
@@ -318,11 +324,29 @@ const STATIC_ROUTES = {
   }
 };
 
-function withSecurityHeaders(headersInit = {}) {
+const HTML_CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com",
+  "img-src 'self' data:",
+  "connect-src 'self'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'self'"
+].join("; ");
+
+function withSecurityHeaders(headersInit = {}, { isHtml = false } = {}) {
   const headers = new Headers(headersInit);
   headers.set("X-Content-Type-Options", "nosniff");
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   headers.set("X-Frame-Options", "SAMEORIGIN");
+  headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
+  headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
+  headers.set("Cross-Origin-Opener-Policy", "same-origin");
+  if (isHtml) {
+    headers.set("Content-Security-Policy", HTML_CSP);
+  }
   return headers;
 }
 
@@ -331,6 +355,17 @@ export default {
     const url = new URL(request.url);
     const pathname = url.pathname;
     const normalizedPath = pathname.replace(/\/+$/, "") || "/";
+    const isHead = request.method === "HEAD";
+
+    if (request.method !== "GET" && request.method !== "HEAD") {
+      return new Response("Method Not Allowed", {
+        status: 405,
+        headers: withSecurityHeaders({
+          "Allow": "GET, HEAD",
+          "Content-Type": "text/plain; charset=utf-8"
+        })
+      });
+    }
 
     try {
       console.log(JSON.stringify({
@@ -348,17 +383,20 @@ export default {
       ) {
         const { lang, canonicalPath, isExplicitPath } = resolveRequestLang(request, url);
         const html = renderLocalizedHtml(lang, canonicalPath);
-        const headers = withSecurityHeaders({
-          "Content-Type": "text/html; charset=utf-8",
-          "Content-Language": lang,
-          "Cache-Control": isExplicitPath
-            ? "public, max-age=120, must-revalidate"
-            : "private, max-age=60, must-revalidate"
-        });
+        const headers = withSecurityHeaders(
+          {
+            "Content-Type": "text/html; charset=utf-8",
+            "Content-Language": lang,
+            "Cache-Control": isExplicitPath
+              ? "public, max-age=120, must-revalidate"
+              : "private, max-age=60, must-revalidate"
+          },
+          { isHtml: true }
+        );
         if (!isExplicitPath) {
           headers.set("Vary", "Accept-Language, Cookie");
         }
-        return new Response(html, { status: 200, headers });
+        return new Response(isHead ? null : html, { status: 200, headers });
       }
 
       if (pathname === "/robots.txt") {
@@ -367,7 +405,7 @@ export default {
           "Cache-Control": "public, max-age=86400"
         });
         return new Response(
-          `User-agent: *\nAllow: /\nSitemap: ${SITE_ORIGIN}/sitemap.xml\n`,
+          isHead ? null : `User-agent: *\nAllow: /\nSitemap: ${SITE_ORIGIN}/sitemap.xml\n`,
           { status: 200, headers }
         );
       }
@@ -377,27 +415,27 @@ export default {
           "Content-Type": "application/xml; charset=utf-8",
           "Cache-Control": "public, max-age=3600"
         });
-        return new Response(buildSitemapXml(), { status: 200, headers });
+        return new Response(isHead ? null : buildSitemapXml(), { status: 200, headers });
       }
 
       if (pathname === "/downloads/SubVisionAI.exe" || pathname === "/SubVisionAI.exe") {
-        const { windowsUrl } = await getLatestReleaseAssetUrls();
+        const { windowsUrl } = await getLatestReleaseAssetUrls(env);
         return Response.redirect(windowsUrl || RELEASES_FALLBACK_URL, 302);
       }
 
       if (pathname === "/downloads/SubVisionAI-macOS.dmg") {
-        const { macosUrl } = await getLatestReleaseAssetUrls();
+        const { macosUrl } = await getLatestReleaseAssetUrls(env);
         return Response.redirect(macosUrl || RELEASES_FALLBACK_URL, 302);
       }
 
       if (pathname === "/downloads/SubVisionAI-Linux.tar.gz") {
-        const { linuxUrl } = await getLatestReleaseAssetUrls();
+        const { linuxUrl } = await getLatestReleaseAssetUrls(env);
         return Response.redirect(linuxUrl || RELEASES_FALLBACK_URL, 302);
       }
 
       const route = STATIC_ROUTES[pathname];
       if (route) {
-        const rawBase = await getLatestGithubRawBase();
+        const rawBase = await getLatestGithubRawBase(env);
         const upstreamUrl = `${rawBase}${route.repoPath}`;
         const upstreamResp = await fetch(upstreamUrl, {
           cf: {
@@ -431,13 +469,19 @@ export default {
           headers.set("Content-Length", contentLength);
         }
 
-        return new Response(upstreamResp.body, {
-          status: request.method === "HEAD" ? 200 : upstreamResp.status,
+        return new Response(isHead ? null : upstreamResp.body, {
+          status: isHead ? 200 : upstreamResp.status,
           headers
         });
       }
 
-      return Response.redirect(`${url.origin}/`, 302);
+      return new Response(isHead ? null : "Not Found", {
+        status: 404,
+        headers: withSecurityHeaders({
+          "Content-Type": "text/plain; charset=utf-8",
+          "Cache-Control": "no-store"
+        })
+      });
     } catch (error) {
       const errMessage = error instanceof Error ? error.message : String(error);
       console.error(JSON.stringify({

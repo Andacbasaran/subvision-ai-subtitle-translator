@@ -17,6 +17,8 @@
     ],
     "persist": [
         "user_settings.json",
+        "vocab_notebook.json",
+        "glossaries",
         "models"
     ],
     "checkver": {

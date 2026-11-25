@@ -246,6 +246,11 @@ SLANG_PATTERNS = [
 # OCR hatalarını ve Dizi/Film SDH (İşitme Engelli Ses Betimlemeleri) etiketlerini temizlemek için Regex kuralları
 RE_MULTISPACE = re.compile(r"\s+")
 RE_OCR_NOISE = re.compile(r"[^a-zA-Z0-9\s.,!?'\":;\-\(\)\[\]]")
+# Çok dilli (Aksanlı Latin, Kiril, Japonca/CJK) altyazılar için güvenli Unicode temizleme
+RE_OCR_NOISE_UNICODE = re.compile(
+    r"[^\w\s.,!?'\":;\-\(\)\[\]¡¿«»„‚…—–。、「」『』！？・〜ー（）【】《》：；]",
+    re.UNICODE,
+)
 
 # Netflix / Prime Video / Blu-ray SDH ses efekti parantezleri: [sighs], (dramatic music), [laughs], (gunshot) vb.
 RE_SDH_SOUND_TAGS = re.compile(
@@ -265,7 +270,28 @@ RE_ZERO_IN_WORD = re.compile(r"(?<=[A-Za-z])0(?=[A-Za-z])|(?<=[A-Z])0\b|\b0(?=[A
 RE_STANDALONE_I_CONTRACT = re.compile(r"\bi('m|'ve|'ll|'d)?\b")
 
 
-def normalize_all_caps_text(text: str) -> str:
+def _normalize_source_lang(source_lang: Optional[str]) -> str:
+    raw = (source_lang or "en").strip().lower()
+    if not raw:
+        return "en"
+    return raw.split("-")[0].split("_")[0] or "en"
+
+
+def _has_cjk_or_kana(text: str) -> bool:
+    for ch in text:
+        code = ord(ch)
+        if (
+            0x3040 <= code <= 0x30FF  # Hiragana & Katakana
+            or 0x3400 <= code <= 0x4DBF  # CJK Unified Ideographs Extension A
+            or 0x4E00 <= code <= 0x9FFF  # CJK Unified Ideographs
+            or 0xAC00 <= code <= 0xD7AF  # Hangul Syllables
+            or 0xF900 <= code <= 0xFAFF  # CJK Compatibility Ideographs
+        ):
+            return True
+    return False
+
+
+def normalize_all_caps_text(text: str, source_lang: str = "en") -> str:
     """
     Bazı oyun ve filmler altyazıları tamamen BÜYÜK HARFLE (ALL CAPS) yazar.
     SentencePiece tokenizer tamamen büyük harfli kelimeleri alt-hecelere böldüğü için
@@ -293,34 +319,39 @@ def normalize_all_caps_text(text: str) -> str:
         res = res[0].upper() + res[1:]
 
     # İngilizce 'I', 'I'm', 'I'll', 'I've', 'I'd' zamirlerini büyük 'I' yap
-    res = RE_STANDALONE_I_CONTRACT.sub(lambda m: "I" + (m.group(1) or ""), res)
+    if _normalize_source_lang(source_lang) == "en":
+        res = RE_STANDALONE_I_CONTRACT.sub(lambda m: "I" + (m.group(1) or ""), res)
     return res
 
 
-def clean_ocr_text(raw_text: str) -> str:
+def clean_ocr_text(raw_text: str, source_lang: str = "en") -> str:
     """
-    OCR'dan gelen ham İngilizce altyazıyı temizler, SDH ses efektlerini çıkarır,
-    harf/rakam karışıklıklarını düzeltir ve ALL-CAPS altyazıları normalize eder.
+    OCR'dan gelen ham altyazıyı kaynak dile (`source_lang`) uygun biçimde temizler,
+    SDH ses efektlerini çıkarır ve İngilizce OCR harf/rakam karışıklıklarını düzeltir.
+    Aksanlı Latin (ES/DE/FR/PT/IT), Kiril (RU) ve Japonca/CJK (JA) karakterlerini korur.
     """
     if not raw_text:
         return ""
 
+    lang = _normalize_source_lang(source_lang)
     text = raw_text.replace("\n", " ").replace("\r", " ")
-    text = text.replace("|", "I").replace("—", "-").replace("–", "-")
+    text = text.replace("—", "-").replace("–", "-")
     text = text.replace("“", '"').replace("”", '"').replace("’", "'").replace("‘", "'")
 
-    # İzin verilen İngilizce karakterler dışındaki parazitleri sil
-    text = RE_OCR_NOISE.sub("", text)
-
-    # Dizi/Filmlerdeki [dramatic music], [sighs], (laughs) gibi işitme engelli ses etiketlerini temizle
-    text = RE_SDH_SOUND_TAGS.sub(" ", text)
-
-    # Kelime içindeki '0' (sıfır) rakamını 'O' harfine düzelt (örn. "H0LD 0N" -> "HOLD ON")
-    text = RE_ZERO_IN_WORD.sub("O", text)
-
-    # OCR'ın 'I' harfini küçük 'l' olarak okuma hatasını düzelt ("l'm" -> "I'm", " l " -> " I ")
-    text = RE_OCR_L_TO_I.sub(r"I'\1", text)
-    text = RE_OCR_STANDALONE_L.sub("I", text)
+    if lang == "en":
+        text = text.replace("|", "I")
+        # İzin verilen İngilizce karakterler dışındaki parazitleri sil
+        text = RE_OCR_NOISE.sub("", text)
+        # Dizi/Filmlerdeki [dramatic music], [sighs], (laughs) gibi işitme engelli ses etiketlerini temizle
+        text = RE_SDH_SOUND_TAGS.sub(" ", text)
+        # Kelime içindeki '0' (sıfır) rakamını 'O' harfine düzelt (örn. "H0LD 0N" -> "HOLD ON")
+        text = RE_ZERO_IN_WORD.sub("O", text)
+        # OCR'ın 'I' harfini küçük 'l' olarak okuma hatasını düzelt ("l'm" -> "I'm", " l " -> " I ")
+        text = RE_OCR_L_TO_I.sub(r"I'\1", text)
+        text = RE_OCR_STANDALONE_L.sub("I", text)
+    else:
+        text = RE_SDH_SOUND_TAGS.sub(" ", text)
+        text = RE_OCR_NOISE_UNICODE.sub("", text)
 
     # Fazla boşlukları teke indir
     text = RE_MULTISPACE.sub(" ", text).strip()
@@ -328,13 +359,16 @@ def clean_ocr_text(raw_text: str) -> str:
 
     # Çok kısa parazitleri (tek harf, sadece rakam/noktalama vb.) yoksay
     alpha_count = sum(1 for c in text if c.isalpha())
-    if len(text) < 2 or alpha_count < 2:
+    if lang in ("ja", "zh", "ko") or _has_cjk_or_kana(text):
+        if len(text) < 1 or alpha_count < 1:
+            return ""
+    elif len(text) < 2 or alpha_count < 2:
         return ""
 
     return text
 
 
-def extract_speaker_and_body(text: str) -> Tuple[Optional[str], str]:
+def extract_speaker_and_body(text: str, source_lang: str = "en") -> Tuple[Optional[str], str]:
     """
     Altyazıda konuşmacı adı varsa ('Arthur: Hold on!' veya '[Narrator] Wait!') ayırır
     ve gövde metninde ALL-CAPS normalizasyonu uygular.
@@ -344,16 +378,16 @@ def extract_speaker_and_body(text: str) -> Tuple[Optional[str], str]:
         speaker = m1.group(1).strip()
         if speaker.isupper() and len(speaker) > 2:
             speaker = speaker.title()
-        return speaker, normalize_all_caps_text(m1.group(2).strip())
+        return speaker, normalize_all_caps_text(m1.group(2).strip(), source_lang=source_lang)
 
     m2 = RE_SPEAKER_BRACKET.match(text)
     if m2:
         speaker = m2.group(1).strip()
         if speaker.isupper() and len(speaker) > 2:
             speaker = speaker.title()
-        return speaker, normalize_all_caps_text(m2.group(2).strip())
+        return speaker, normalize_all_caps_text(m2.group(2).strip(), source_lang=source_lang)
 
-    return None, normalize_all_caps_text(text)
+    return None, normalize_all_caps_text(text, source_lang=source_lang)
 
 
 def lookup_exact_phrase(text: str) -> Optional[str]:
@@ -402,20 +436,50 @@ SHORT_VALID_WORDS = frozenset(
     }
 )
 _VOWELS = frozenset("aeiouyAEIOUY")
+_UNICODE_VOWELS = frozenset(
+    "aeiouyAEIOUY"
+    "áéíóúàèìòùâêîôûäëïöüãõåæœøýÿıİ"
+    "ÁÉÍÓÚÀÈÌÒÙÂÊÎÔÛÄËÏÖÜÃÕÅÆŒØÝŸ"
+    "аеёиоуыэюяАЕЁИОУЫЭЮЯ"
+)
 _RE_REPEATED_RUN = re.compile(r"(.)\1{3,}")
+_RE_REPEATED_RUN_CJK = re.compile(r"(.)\1{5,}")
 _RE_ALPHA_WORDS = re.compile(r"[A-Za-z]+(?:'[A-Za-z]+)?")
+_RE_UNICODE_WORDS = re.compile(r"[^\W\d_]+(?:'[^\W\d_]+)?", re.UNICODE)
 
 
-def is_plausible_subtitle_text(text: str, avg_confidence: float = 1.0) -> bool:
+def is_plausible_subtitle_text(
+    text: str,
+    avg_confidence: float = 1.0,
+    source_lang: str = "en",
+) -> bool:
     """
-    OCR'dan gelen temizlenmiş metnin gerçek bir İngilizce altyazı olup olmadığını
-    doğrular. Oyun arka planı, far, pencere kenarı veya HUD parazitlerinden doğan
-    anlamsız harf yığınlarını (örn. 'IIl', 'rrt', 'oo0', '---I') sıfır maliyetle eler.
+    OCR'dan gelen temizlenmiş metnin gerçek bir altyazı olup olmadığını doğrular.
+    Oyun arka planı, far, pencere kenarı veya HUD parazitlerinden doğan anlamsız harf
+    yığınlarını sıfır maliyetle elerken çok dilli (ES/DE/FR/PT/IT/RU/JA) altyazıları korur.
     """
     if not text:
         return False
 
     stripped = text.strip()
+    lang = _normalize_source_lang(source_lang)
+    is_cjk = lang in ("ja", "zh", "ko") or _has_cjk_or_kana(stripped)
+
+    if is_cjk:
+        if len(stripped) < 1:
+            return False
+        if _RE_REPEATED_RUN_CJK.search(stripped):
+            return False
+        non_space = [c for c in stripped if not c.isspace()]
+        if not non_space:
+            return False
+        alpha_chars = [c for c in non_space if c.isalpha()]
+        if len(alpha_chars) < 1:
+            return False
+        if (len(alpha_chars) / len(non_space)) < 0.35:
+            return False
+        return avg_confidence >= 0.50
+
     if len(stripped) < 2:
         return False
 
@@ -432,6 +496,28 @@ def is_plausible_subtitle_text(text: str, avg_confidence: float = 1.0) -> bool:
         return False
     if (len(alpha_chars) / len(non_space)) < 0.45:
         return False
+
+    if lang != "en":
+        words = _RE_UNICODE_WORDS.findall(stripped)
+        if not words:
+            return False
+        if len(words) == 1:
+            wl = words[0].lower()
+            if not any(ch in _UNICODE_VOWELS for ch in wl):
+                return False
+            return avg_confidence >= (0.65 if len(wl) <= 3 else 0.62)
+
+        plausible_words = 0
+        for w in words:
+            wl = w.lower()
+            if len(wl) == 1:
+                plausible_words += 1
+            elif any(ch in _UNICODE_VOWELS for ch in wl):
+                plausible_words += 1
+
+        if (plausible_words / len(words)) < 0.50:
+            return False
+        return avg_confidence >= 0.55
 
     words = _RE_ALPHA_WORDS.findall(stripped)
     if not words:

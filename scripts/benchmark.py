@@ -133,13 +133,13 @@ def generate_visual_assets(bm: Dict) -> None:
     ui_pix = win.grab()
     ui_pix.save(os.path.join(assets_dir, "ui_preview.png"), "PNG")
 
-    win._switch_tab(1)
+    win._switch_tab(2)
     win.repaint()
     app.processEvents()
     hist_pix = win.grab()
     hist_pix.save(os.path.join(assets_dir, "ui_preview_history.png"), "PNG")
 
-    win._switch_tab(2)
+    win._switch_tab(3)
     win.repaint()
     app.processEvents()
     set_pix = win.grab()

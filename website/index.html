@@ -20,8 +20,8 @@
   <meta property="og:description" content="Oyunlar ve videolar için Windows, macOS Apple Silicon ve Linux / Steam Deck'te 0 MB VRAM ve sıfır FPS kaybıyla çalışan açık kaynak kodlu anlık altyazı çevirici." />
   <meta property="og:image" content="https://subvisionai.andacbasaran.com/assets/ui_preview.png?v=1.6.0" />
   <meta property="og:image:alt" content="SubVision AI Studio v1.6.0 — Gerçek Zamanlı Ekran Üstü Altyazı Çevirici Arayüzü" />
-  <meta property="og:image:width" content="1200" />
-  <meta property="og:image:height" content="750" />
+  <meta property="og:image:width" content="1040" />
+  <meta property="og:image:height" content="680" />
 
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="SubVision AI — Ekrandaki Her Altyazı. Anında Türkçe." />
@@ -1654,11 +1654,19 @@
       }
 
       .scene {
-        padding: 64px 14px 78px;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        justify-content: flex-start;
+        padding: 66px 14px calc(86px + env(safe-area-inset-bottom, 0px));
       }
 
       #scene-2 {
-        padding: 64px 14px 82px;
+        padding: 64px 14px calc(90px + env(safe-area-inset-bottom, 0px));
+      }
+
+      .bottom-dock {
+        max-width: calc(100vw - 24px);
+        overflow-x: auto;
       }
 
       #scene-2 .eyebrow {
@@ -1689,16 +1697,19 @@
         font-size: 0.88rem;
       }
 
-      /* Side-by-side compact CTAs on Scene 2 mobile */
+      /* Compact responsive CTAs on Scene 2 mobile */
       #scene-2 .cta-group {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
         gap: 8px;
-        max-width: 420px;
+        max-width: 460px;
       }
 
       #scene-2 .btn-download,
       #scene-2 .btn-download-secondary {
+        width: auto;
+        flex: 1 1 130px;
         max-width: none;
         padding: 10px 10px;
         font-size: 0.8rem;
@@ -1761,6 +1772,16 @@
 
       .telemetry-strip {
         display: none;
+      }
+    }
+
+    @media (max-height: 700px) {
+      .scene {
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        justify-content: flex-start;
+        padding-top: 72px;
+        padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
       }
     }
   </style>
@@ -1830,6 +1851,10 @@
         <a href="/downloads/SubVisionAI-macOS.dmg" class="btn-download-secondary" download="SubVisionAI-macOS.dmg">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.33c.64-.78 1.08-1.86.96-2.94-.93.04-2.06.62-2.72 1.4-.58.68-1.1 1.79-.96 2.84 1.04.08 2.09-.52 2.72-1.3z"/></svg>
           <span data-i18n="heroMacBtn">macOS (Apple Silicon)</span>
+        </a>
+        <a href="/downloads/SubVisionAI-Linux.tar.gz" class="btn-download-secondary" download="SubVisionAI-Linux.tar.gz">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3M7 9l3 2.5L7 14M12 14h4"/></svg>
+          <span data-i18n="heroLinuxBtn">Linux / Steam Deck</span>
         </a>
       </div>
 
@@ -1958,7 +1983,7 @@
             </div>
 
             <div class="studio-media-wrap">
-              <img id="studio-preview-img" src="/assets/ui_preview.png?v=1.6.0" alt="SubVision AI Studio Uygulama Arayüzü" width="1200" height="750" loading="lazy" />
+              <img id="studio-preview-img" src="/assets/ui_preview.png?v=1.6.0" alt="SubVision AI Studio Uygulama Arayüzü" width="1040" height="680" loading="lazy" />
               <div class="hotspot-layer" id="hotspot-layer">
                 <button type="button" class="hotspot-pin" data-pin="0" style="--x: 28%; --y: 34%;" aria-pressed="true" aria-label="Feature 1">1</button>
                 <button type="button" class="hotspot-pin" data-pin="1" style="--x: 72%; --y: 66%;" aria-pressed="false" aria-label="Feature 2">2</button>
@@ -2032,6 +2057,10 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.33c.64-.78 1.08-1.86.96-2.94-.93.04-2.06.62-2.72 1.4-.58.68-1.1 1.79-.96 2.84 1.04.08 2.09-.52 2.72-1.3z"/></svg>
           <span>macOS (.dmg)</span>
         </a>
+        <a href="/downloads/SubVisionAI-Linux.tar.gz" class="btn-download-secondary" download="SubVisionAI-Linux.tar.gz">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3M7 9l3 2.5L7 14M12 14h4"/></svg>
+          <span>Linux (.tar.gz)</span>
+        </a>
       </div>
       <div class="caption-small" data-reveal="5">
         <span data-i18n="studioCaptionPrefix">En güncel v1.6.0 sürümünü doğrudan indirir ·</span>
@@ -2044,7 +2073,7 @@
   <!-- Native Fullscreen Studio Lightbox -->
   <dialog id="studio-lightbox" class="studio-lightbox" aria-labelledby="lightbox-title">
     <div class="lightbox-bar">
-      <span class="lightbox-title" id="lightbox-title">SubVision AI Studio · 1. Ana Ekran</span>
+      <h2 class="lightbox-title" id="lightbox-title">SubVision AI Studio · 1. Ana Ekran</h2>
       <div class="lightbox-actions">
         <button type="button" class="lightbox-btn" id="lightbox-prev" data-i18n="lightboxPrev">← Önceki</button>
         <button type="button" class="lightbox-btn" id="lightbox-next" data-i18n="lightboxNext">Sonraki →</button>
@@ -2052,7 +2081,7 @@
       </div>
     </div>
     <div class="lightbox-body">
-      <img id="lightbox-img" src="/assets/ui_preview.png?v=1.6.0" alt="SubVision AI Studio" width="1200" height="750" />
+      <img id="lightbox-img" src="/assets/ui_preview.png?v=1.6.0" alt="SubVision AI Studio" width="1040" height="680" />
     </div>
   </dialog>
 
@@ -2078,6 +2107,7 @@
         heroSubhead: "Oyunlar, diziler ve videolar üzerindeki İngilizce altyazıları orijinal boyutunda sıkıca kapatıp kendi bilgisayarınızda anlık Türkçeye çevirir.",
         heroWinBtn: "Windows İçin İndir",
         heroMacBtn: "macOS (Apple Silicon)",
+        heroLinuxBtn: "Linux / Steam Deck",
         heroCaptionPrefix: "v1.6.0 · Windows 10/11, macOS M1–M4 & Linux / Steam Deck · %100 Ücretsiz ve",
         heroCaptionLink: "Açık Kaynak (MIT)",
         specLatency: "Gecikme",
@@ -2132,6 +2162,7 @@
         heroSubhead: "Reads English subtitles from games, movies, and streams and renders tight-hugging Turkish translations locally on your CPU in ~88 ms.",
         heroWinBtn: "Download for Windows",
         heroMacBtn: "macOS (Apple Silicon)",
+        heroLinuxBtn: "Linux / Steam Deck",
         heroCaptionPrefix: "v1.6.0 · Windows 10/11, macOS M1–M4 & Linux / Steam Deck · 100% Free &",
         heroCaptionLink: "Open Source (MIT)",
         specLatency: "Latency",
@@ -2267,7 +2298,8 @@
 
       if (persist) {
         try { localStorage.setItem("sv_lang", normalized); } catch (_) {}
-        document.cookie = `sv_lang=${normalized}; path=/; max-age=31536000; SameSite=Lax`;
+        const secureAttr = window.location.protocol === "https:" ? "; Secure" : "";
+        document.cookie = `sv_lang=${normalized}; path=/; max-age=31536000; SameSite=Lax${secureAttr}`;
 
         const currentPath = window.location.pathname.replace(/\/+$/, "");
         if (currentPath === "/tr" || currentPath === "/en") {
@@ -2375,6 +2407,13 @@
     window.addEventListener('wheel', (e) => {
       if (isTransitioning || studioLightbox?.open) return;
       if (Math.abs(e.deltaY) < 18) return;
+      const activeSceneEl = document.getElementById('scene-' + currentScene);
+      if (activeSceneEl && activeSceneEl.scrollHeight > activeSceneEl.clientHeight + 8) {
+        const atTop = activeSceneEl.scrollTop <= 2;
+        const atBottom = activeSceneEl.scrollTop + activeSceneEl.clientHeight >= activeSceneEl.scrollHeight - 2;
+        if (e.deltaY > 0 && !atBottom) return;
+        if (e.deltaY < 0 && !atTop) return;
+      }
       if (e.deltaY > 0 && currentScene < totalScenes - 1) goScene(currentScene + 1);
       else if (e.deltaY < 0 && currentScene > 0) goScene(currentScene - 1);
     }, { passive: true });
@@ -2427,9 +2466,12 @@
     (function detectPlatformDownload() {
       const topBtn = document.getElementById('topbar-download-btn');
       if (!topBtn) return;
-      const ua = navigator.platform || navigator.userAgent;
-      const isMac = /Mac|iPhone|iPad/i.test(ua);
-      const isLinux = /Linux|X11/i.test(ua) && !/Android/i.test(navigator.userAgent || '');
+      const plat = navigator.platform || "";
+      const ua = navigator.userAgent || "";
+      const isIOS = /iPhone|iPad|iPod/i.test(ua) || (/Mac/i.test(plat) && (navigator.maxTouchPoints || 0) > 1);
+      const isAndroid = /Android/i.test(ua);
+      const isMac = !isIOS && /Mac/i.test(plat || ua);
+      const isLinux = !isAndroid && /Linux|X11/i.test(plat || ua);
       if (isMac) {
         topBtn.href = '/downloads/SubVisionAI-macOS.dmg';
         topBtn.setAttribute('download', 'SubVisionAI-macOS.dmg');

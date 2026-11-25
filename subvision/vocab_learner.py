@@ -111,6 +111,11 @@ class VocabCard:
 
     @classmethod
     def from_dict(cls, data: Dict[str, object]) -> "VocabCard":
+        raw_seen = data.get("seen_count", 1)
+        try:
+            seen_count = max(1, int(raw_seen)) if raw_seen is not None else 1
+        except (TypeError, ValueError):
+            seen_count = 1
         return cls(
             word=str(data.get("word") or ""),
             translation=str(data.get("translation") or ""),
@@ -118,7 +123,7 @@ class VocabCard:
             context_tr=str(data.get("context_tr") or ""),
             source=str(data.get("source") or ""),
             added_at=str(data.get("added_at") or ""),
-            seen_count=int(data.get("seen_count") or 1),
+            seen_count=seen_count,
         )
 
 
@@ -234,12 +239,21 @@ class VocabNotebook:
             "cards": [card.to_dict() for card in self._cards.values()],
         }
         tmp_path = f"{self.storage_path}.tmp"
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump(payload, f, ensure_ascii=False, indent=2)
-            f.flush()
-        os.replace(tmp_path, self.storage_path)
+        try:
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump(payload, f, ensure_ascii=False, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp_path, self.storage_path)
+        except Exception:
+            if os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
+            raise
 
-    def add_card(
+    def _upsert_card_no_save(
         self,
         word: str,
         translation: str,
@@ -268,7 +282,6 @@ class VocabNotebook:
                 existing.context_tr = clean_context_tr
             if clean_source:
                 existing.source = clean_source
-            self.save()
             return existing
 
         card = VocabCard(
@@ -279,8 +292,51 @@ class VocabNotebook:
             source=clean_source,
         )
         self._cards[key] = card
+        return card
+
+    def add_card(
+        self,
+        word: str,
+        translation: str,
+        context_en: str,
+        context_tr: str,
+        source: str = "",
+    ) -> VocabCard:
+        card = self._upsert_card_no_save(
+            word=word,
+            translation=translation,
+            context_en=context_en,
+            context_tr=context_tr,
+            source=source,
+        )
         self.save()
         return card
+
+    def add_cards_batch(
+        self,
+        words: List[str],
+        translation: str,
+        context_en: str,
+        context_tr: str,
+        source: str = "",
+    ) -> List[VocabCard]:
+        """Adds or updates multiple vocabulary cards with a single atomic disk write."""
+        added: List[VocabCard] = []
+        for word in words:
+            if not (word or "").strip():
+                continue
+            added.append(
+                self._upsert_card_no_save(
+                    word=word,
+                    translation=translation,
+                    context_en=context_en,
+                    context_tr=context_tr,
+                    source=source,
+                )
+            )
+        if added:
+            self.save()
+        return added
 
     def remove_card(self, word: str) -> bool:
         key = (word or "").strip().lower()
@@ -301,6 +357,7 @@ class VocabNotebook:
                 needle in card.word.lower()
                 or needle in card.translation.lower()
                 or needle in card.context_en.lower()
+                or needle in card.context_tr.lower()
                 or needle in card.source.lower()
             ):
                 matches.append(card)

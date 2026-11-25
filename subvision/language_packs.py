@@ -18,6 +18,7 @@ DEFAULT_LANG_PAIR = "en-tr"
 # Default minimum file sizes (bytes) for standard OPUS-MT CTranslate2 packs
 _DEFAULT_CT2_MIN_FILES: Dict[str, int] = {
     "config.json": 200,
+    "shared_vocabulary.json": 100_000,
     "source.spm": 100_000,
     "target.spm": 100_000,
     "model.bin": 10_000_000,
@@ -31,6 +32,35 @@ _EN_TR_MIN_FILES: Dict[str, int] = {
     "target.spm": 400_000,
     "model.bin": 210_000_000,
 }
+
+
+def has_valid_ct2_vocabulary(pack_dir: str, shared_min_bytes: int = 100_000) -> bool:
+    """
+    Validates CTranslate2 vocabulary files inside `pack_dir`.
+    Accepts either `shared_vocabulary.json` or the split pair
+    `source_vocabulary.json` + `target_vocabulary.json`.
+    """
+    shared_path = os.path.join(pack_dir, "shared_vocabulary.json")
+    try:
+        if os.path.isfile(shared_path) and os.path.getsize(shared_path) >= shared_min_bytes:
+            return True
+    except OSError:
+        pass
+
+    split_min = max(1, min(50_000, shared_min_bytes // 2))
+    src_vocab = os.path.join(pack_dir, "source_vocabulary.json")
+    tgt_vocab = os.path.join(pack_dir, "target_vocabulary.json")
+    try:
+        if (
+            os.path.isfile(src_vocab)
+            and os.path.isfile(tgt_vocab)
+            and os.path.getsize(src_vocab) >= split_min
+            and os.path.getsize(tgt_vocab) >= split_min
+        ):
+            return True
+    except OSError:
+        pass
+    return False
 
 
 @dataclass(frozen=True)
@@ -181,6 +211,10 @@ class LanguagePackManager:
             required_files = {**required_files, "model.bin": 1}
 
         for fname, min_bytes in required_files.items():
+            if fname == "shared_vocabulary.json":
+                if not has_valid_ct2_vocabulary(pack_dir, shared_min_bytes=min_bytes):
+                    return False
+                continue
             fpath = os.path.join(pack_dir, fname)
             if not os.path.isfile(fpath):
                 return False

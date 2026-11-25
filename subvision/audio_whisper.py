@@ -12,11 +12,37 @@ Design goals:
 """
 
 import importlib.util
+import sys
 import time
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
 import numpy as np
+
+
+def _downsample_to_16k(arr: np.ndarray, src_rate: int) -> np.ndarray:
+    """Anti-aliased boxcar/FIR decimation + linear interpolation to 16 kHz float32."""
+    if arr.size == 0 or src_rate <= 0 or src_rate == 16000:
+        return np.asarray(arr, dtype=np.float32)
+    samples = np.asarray(arr, dtype=np.float32)
+    if src_rate > 16000:
+        ratio = src_rate / 16000.0
+        # Exact integer factor (e.g. 48000 -> 16000 = 3x): block average avoids aliasing cleanly
+        int_factor = int(round(ratio))
+        if abs(ratio - int_factor) < 1e-3 and int_factor >= 2 and samples.size >= int_factor:
+            trimmed = (samples.size // int_factor) * int_factor
+            return samples[:trimmed].reshape(-1, int_factor).mean(axis=1).astype(np.float32)
+        # Non-integer factor (e.g. 44100 -> 16000): apply moving-average low-pass before interp
+        k = max(3, int(round(ratio)))
+        if k % 2 == 0:
+            k += 1
+        if samples.size >= k:
+            kernel = np.ones(k, dtype=np.float32) / float(k)
+            samples = np.convolve(samples, kernel, mode="same").astype(np.float32)
+    target_len = max(1, int(round(samples.size * 16000.0 / float(src_rate))))
+    x_old = np.linspace(0.0, 1.0, samples.size, endpoint=False)
+    x_new = np.linspace(0.0, 1.0, target_len, endpoint=False)
+    return np.interp(x_new, x_old, samples).astype(np.float32)
 
 
 @dataclass(frozen=True)
@@ -125,8 +151,14 @@ class LiveAudioTranscriber:
         model_size: str = "tiny.en",
         cpu_threads: int = 4,
         compute_type: str = "int8",
+        source_lang: str = "en",
     ):
-        self.model_size = model_size
+        self.source_lang = (source_lang or "en").strip().lower()
+        # Strip English-only ".en" suffix when transcribing non-English source audio (e.g. ja-en)
+        normalized_size = (model_size or "tiny.en").strip()
+        if self.source_lang != "en" and normalized_size.endswith(".en"):
+            normalized_size = normalized_size[:-3]
+        self.model_size = normalized_size
         self.cpu_threads = max(1, int(cpu_threads))
         self.compute_type = compute_type
         self._model = None
@@ -151,13 +183,16 @@ class LiveAudioTranscriber:
             cpu_threads=self.cpu_threads,
         )
 
-    def transcribe(self, audio_float32: np.ndarray) -> Tuple[str, float]:
+    def transcribe(
+        self, audio_float32: np.ndarray, language: Optional[str] = None
+    ) -> Tuple[str, float]:
         if self._model is None:
             self.load()
         t0 = time.perf_counter()
+        lang_code = (language or self.source_lang or "en").strip().lower()
         segments, _info = self._model.transcribe(
             audio_float32,
-            language="en",
+            language=lang_code,
             beam_size=1,
             vad_filter=True,
             condition_on_previous_text=False,
@@ -187,13 +222,21 @@ try:
             translator,
             model_size: str = "tiny.en",
             cpu_threads: int = 4,
+            source_lang: Optional[str] = None,
             parent=None,
         ):
             super().__init__(parent)
             self.translator = translator
+            inferred_lang = (
+                source_lang
+                or getattr(translator, "source_lang", None)
+                or getattr(getattr(translator, "local", None), "source_lang", None)
+                or "en"
+            )
             self.transcriber = LiveAudioTranscriber(
                 model_size=model_size,
                 cpu_threads=cpu_threads,
+                source_lang=str(inferred_lang),
             )
             self.segmenter = SpeechSegmenter()
             self._running = True
@@ -226,7 +269,9 @@ try:
                 self.error_occurred.emit(f"Whisper yükleme hatası: {exc}")
                 return
 
-            if caps.has_sounddevice:
+            if sys.platform == "win32" and caps.has_pyaudiowpatch:
+                self._run_pyaudiowpatch()
+            elif caps.has_sounddevice:
                 self._run_sounddevice()
             elif caps.has_pyaudiowpatch:
                 self._run_pyaudiowpatch()
@@ -278,6 +323,10 @@ try:
                         if default_speakers["name"] in loopback["name"]:
                             default_speakers = loopback
                             break
+                if not default_speakers.get("isLoopbackDevice"):
+                    raise RuntimeError(
+                        "Varsayılan ses çıkışı için WASAPI loopback aygıtı bulunamadı."
+                    )
                 src_rate = int(default_speakers["defaultSampleRate"])
                 channels = max(1, int(default_speakers["maxInputChannels"]))
                 stream = pa.open(
@@ -292,12 +341,10 @@ try:
                     raw = stream.read(int(src_rate * 0.1), exception_on_overflow=False)
                     arr = np.frombuffer(raw, dtype=np.float32)
                     if channels > 1:
-                        arr = arr.reshape(-1, channels).mean(axis=1)
+                        usable = (arr.size // channels) * channels
+                        arr = arr[:usable].reshape(-1, channels).mean(axis=1)
                     if src_rate != 16000 and arr.size > 0:
-                        target_len = max(1, int(arr.size * 16000 / src_rate))
-                        x_old = np.linspace(0.0, 1.0, arr.size, endpoint=False)
-                        x_new = np.linspace(0.0, 1.0, target_len, endpoint=False)
-                        arr = np.interp(x_new, x_old, arr).astype(np.float32)
+                        arr = _downsample_to_16k(arr, src_rate)
                     seg = self.segmenter.push_frame(arr)
                     if seg is not None and self._running:
                         self._process_segment(seg)

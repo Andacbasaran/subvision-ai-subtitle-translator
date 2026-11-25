@@ -393,8 +393,9 @@ class ROISelectorOverlay(QWidget):
                             phys_width = max(40, int(round(qt_width * dpr)))
                             phys_height = max(18, int(round(qt_height * dpr)))
                         else:
-                            phys_left = int(round(qt_left * dpr))
-                            phys_top = int(round(qt_top * dpr))
+                            # Linux/X11/Wayland: yalnızca monitör içi göreli ofset DPR ile çarpılır
+                            phys_left = int(sg.left()) + int(round(rect.left() * dpr))
+                            phys_top = int(sg.top()) + int(round(rect.top() * dpr))
                             phys_width = max(40, int(round(qt_width * dpr)))
                             phys_height = max(18, int(round(qt_height * dpr)))
 
@@ -946,6 +947,10 @@ class SubtitleOverlayWindow(QWidget):
             self.bg_alpha = max(0, min(255, int(round(bg_alpha))))
         if overlay_mode is not None:
             self.overlay_mode = str(overlay_mode)
+            effective_mode = self.overlay_mode
+            if effective_mode == "cover" and not self.capture_excluded:
+                effective_mode = "above"
+            self._effective_mode = effective_mode
         if show_bilingual is not None:
             self.show_bilingual = bool(show_bilingual)
         if auto_fit_font is not None:

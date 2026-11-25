@@ -13,8 +13,8 @@ Features:
 
 Usage:
     python scripts/build_linux.py
-    python scripts/build_linux.py --version 1.5.0 --arch x86_64
-    python scripts/build_linux.py --version 1.5.0 --skip-appimage
+    python scripts/build_linux.py --version 1.6.0 --arch x86_64
+    python scripts/build_linux.py --version 1.6.0 --skip-appimage
 """
 
 import argparse
@@ -31,7 +31,7 @@ from typing import List, Optional
 APP_NAME = "SubVisionAI"
 DESKTOP_ID = "com.andacbasaran.SubVisionAI.desktop"
 ICON_NAME = "subvision-ai"
-DEFAULT_VERSION = "1.5.0"
+DEFAULT_VERSION = "1.6.0"
 
 SUBVISION_HIDDEN_IMPORTS = [
     "subvision",
@@ -40,14 +40,17 @@ SUBVISION_HIDDEN_IMPORTS = [
     "subvision.custom_glossary",
     "subvision.exporters",
     "subvision.glossary",
+    "subvision.glossary_hub",
     "subvision.hardware",
     "subvision.i18n",
+    "subvision.language_packs",
     "subvision.ocr_engine",
     "subvision.overlay_ui",
     "subvision.profiles",
     "subvision.translator",
     "subvision.ui_widgets",
     "subvision.updater",
+    "subvision.vocab_learner",
     "subvision.window_tracker",
     "subvision.workers",
     "rapidocr_onnxruntime",
@@ -225,7 +228,7 @@ def main() -> int:
     parser.add_argument(
         "--version",
         default=read_project_version(base_dir),
-        help="Release version (default: read from pyproject.toml or 1.5.0)",
+        help="Release version (default: read from pyproject.toml or 1.6.0)",
     )
     parser.add_argument(
         "--arch",

@@ -247,9 +247,18 @@ class CaptureTranslateWorker(QThread):
         self._slot = LatestTextSlot()
         self._nmt_thread: Optional[threading.Thread] = None
         self._filter_lock = threading.Lock()
+        self._roi_lock = threading.Lock()
         self._target_filter: Optional[TargetWindowSpec] = target_filter
         self._filter_dirty: bool = True
         self._foreground_provider = foreground_provider
+
+    def update_roi(self, new_roi: Dict[str, int]) -> None:
+        with self._roi_lock:
+            self.roi = dict(new_roi)
+
+    def _get_roi_snapshot(self) -> Dict[str, int]:
+        with self._roi_lock:
+            return dict(self.roi)
 
     def update_timing(self, scan_interval_sec: float, idle_scan_interval_sec: float) -> None:
         self.scan_interval_sec = max(0.025, float(scan_interval_sec))
@@ -330,7 +339,7 @@ class CaptureTranslateWorker(QThread):
                         time.sleep(0.12)
                         continue
 
-                    roi_snap = dict(self.roi)
+                    roi_snap = self._get_roi_snapshot()
                     capture_box = {
                         "left": int(roi_snap["left"]),
                         "top": int(roi_snap["top"]),

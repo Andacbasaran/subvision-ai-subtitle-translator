@@ -819,6 +819,7 @@ class SubtitleOCREngine:
             self._empty_frames_count += 1
             if self._empty_frames_count >= 4:
                 self._last_clean_text = ""
+                self._prev_thumb = None
                 self.last_subtitle_layout = None
                 return "EMPTY", "", elapsed
             return "UNCHANGED", self._last_clean_text, elapsed

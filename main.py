@@ -97,6 +97,7 @@ from subvision.updater import (
     UpdateDownloadThread,
     UpdateInfo,
     apply_downloaded_update,
+    is_trusted_update_url,
 )
 from subvision.vocab_learner import VocabNotebook, extract_study_words
 from subvision.window_tracker import (
@@ -246,7 +247,12 @@ class MainWindow(QMainWindow):
         self.audio_worker: Optional[AudioCaptureTranslateWorker] = None
         self.bench_worker: Optional[BenchmarkWorker] = None
         self.update_thread: Optional[UpdateCheckerThread] = None
+        self._update_download_thread: Optional[UpdateDownloadThread] = None
         self._latest_release_url: str = ""
+        self._prev_tr_backend: str = str(
+            self.settings.get("translation_backend", BACKEND_LOCAL_CT2)
+        )
+        self._initializing: bool = True
 
         self.overlay = SubtitleOverlayWindow()
         self.roi_selector = ROISelectorOverlay(
@@ -289,6 +295,7 @@ class MainWindow(QMainWindow):
 
         self._build_ui()
         self._apply_saved_appearance()
+        self._initializing = False
         self.overlay.show()
         self.overlay.align_to_roi(self.roi)
 
@@ -369,6 +376,8 @@ class MainWindow(QMainWindow):
         defaults = {
             "lang_pair": DEFAULT_LANG_PAIR,
             "nmt_device": "cpu",
+            "context_window": 3,
+            "context_timeout_sec": 3.0,
         }
         if os.path.exists(CONFIG_PATH):
             try:
@@ -376,52 +385,82 @@ class MainWindow(QMainWindow):
                     loaded = json.load(f)
                 if isinstance(loaded, dict):
                     defaults.update(loaded)
+                else:
+                    raise ValueError("Settings root is not a JSON object")
             except Exception:
-                pass
+                try:
+                    backup = f"{CONFIG_PATH}.corrupt.{int(time.time())}"
+                    os.replace(CONFIG_PATH, backup)
+                except OSError:
+                    pass
         return defaults
 
     def _save_settings(self) -> None:
-        data = {
-            "roi": self.roi,
-            "font_size": self.slider_font.value(),
-            "bg_alpha": self.slider_alpha.value(),
-            "text_color": self._selected_color,
-            "overlay_mode": self._selected_overlay_mode,
-            "ocr_mode": self.combo_ocr_mode.currentData(),
-            "performance_profile": self.combo_perf_profile.currentData(),
-            "lang_pair": (
-                self.lang_pair_combo.currentData()
-                if hasattr(self, "lang_pair_combo")
-                else self.settings.get("lang_pair", DEFAULT_LANG_PAIR)
-            ),
-            "nmt_device": (
-                "mps"
-                if (hasattr(self, "chk_mps_accel") and self.chk_mps_accel.isChecked())
-                else "cpu"
-            ),
-            "show_bilingual": self.chk_bilingual.isChecked(),
-            "auto_fit_font": self.chk_autofit.isChecked(),
-            "ui_language": self.combo_ui_lang.currentData() if hasattr(self, "combo_ui_lang") else self.i18n.lang,
-            "translation_backend": self.combo_tr_backend.currentData() if hasattr(self, "combo_tr_backend") else BACKEND_LOCAL_CT2,
-            "translation_endpoint": self.edit_tr_endpoint.text().strip() if hasattr(self, "edit_tr_endpoint") else "",
-            "translation_model": self.edit_tr_model.text().strip() if hasattr(self, "edit_tr_model") else "",
-            "translation_api_key": self.edit_tr_apikey.text().strip() if hasattr(self, "edit_tr_apikey") else "",
-            "input_source": self.combo_input_source.currentData() if hasattr(self, "combo_input_source") else "ocr",
-            "whisper_model": self.combo_whisper_model.currentData() if hasattr(self, "combo_whisper_model") else "tiny.en",
-            "check_updates_on_startup": self.chk_auto_update.isChecked() if hasattr(self, "chk_auto_update") else True,
-            "glossary_pack": self.combo_glossary_pack.currentData() if hasattr(self, "combo_glossary_pack") else self.custom_glossary.active_pack_id,
-            "profiles": self.profile_manager.to_dict(),
-            "auto_switch_profiles": self.chk_auto_profile.isChecked() if hasattr(self, "chk_auto_profile") else False,
-            "hotkeys": dict(self._hotkeys),
-            "minimize_to_tray": self.chk_minimize_tray.isChecked() if hasattr(self, "chk_minimize_tray") else False,
-            "target_app_process": self._target_window.process_name if self._target_window else "",
-            "target_app_title": self._target_window.title if self._target_window else "",
-        }
+        if getattr(self, "_initializing", False):
+            return
+        data = dict(self.settings)
+        data.update(
+            {
+                "roi": self.roi,
+                "font_size": self.slider_font.value(),
+                "bg_alpha": self.slider_alpha.value(),
+                "text_color": self._selected_color,
+                "overlay_mode": self._selected_overlay_mode,
+                "ocr_mode": self.combo_ocr_mode.currentData(),
+                "performance_profile": self.combo_perf_profile.currentData(),
+                "lang_pair": (
+                    self.lang_pair_combo.currentData()
+                    if hasattr(self, "lang_pair_combo")
+                    else self.settings.get("lang_pair", DEFAULT_LANG_PAIR)
+                ),
+                "nmt_device": (
+                    "mps"
+                    if (hasattr(self, "chk_mps_accel") and self.chk_mps_accel.isChecked())
+                    else "cpu"
+                ),
+                "show_bilingual": self.chk_bilingual.isChecked(),
+                "auto_fit_font": self.chk_autofit.isChecked(),
+                "ui_language": self.combo_ui_lang.currentData() if hasattr(self, "combo_ui_lang") else self.i18n.lang,
+                "translation_backend": self.combo_tr_backend.currentData() if hasattr(self, "combo_tr_backend") else BACKEND_LOCAL_CT2,
+                "translation_endpoint": self.edit_tr_endpoint.text().strip() if hasattr(self, "edit_tr_endpoint") else "",
+                "translation_model": self.edit_tr_model.text().strip() if hasattr(self, "edit_tr_model") else "",
+                "translation_api_key": self.edit_tr_apikey.text().strip() if hasattr(self, "edit_tr_apikey") else "",
+                "context_window": int(self.settings.get("context_window", 3)),
+                "context_timeout_sec": float(self.settings.get("context_timeout_sec", 3.0)),
+                "input_source": self.combo_input_source.currentData() if hasattr(self, "combo_input_source") else "ocr",
+                "whisper_model": self.combo_whisper_model.currentData() if hasattr(self, "combo_whisper_model") else "tiny.en",
+                "check_updates_on_startup": self.chk_auto_update.isChecked() if hasattr(self, "chk_auto_update") else True,
+                "glossary_pack": self.combo_glossary_pack.currentData() if hasattr(self, "combo_glossary_pack") else self.custom_glossary.active_pack_id,
+                "profiles": self.profile_manager.to_dict(),
+                "auto_switch_profiles": self.chk_auto_profile.isChecked() if hasattr(self, "chk_auto_profile") else False,
+                "hotkeys": dict(self._hotkeys),
+                "minimize_to_tray": self.chk_minimize_tray.isChecked() if hasattr(self, "chk_minimize_tray") else False,
+                "target_app_process": self._target_window.process_name if self._target_window else "",
+                "target_app_title": self._target_window.title if self._target_window else "",
+            }
+        )
+        self.settings = data
+        tmp_path = f"{CONFIG_PATH}.tmp"
         try:
-            with open(CONFIG_PATH, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2)
+            parent = os.path.dirname(os.path.abspath(CONFIG_PATH))
+            if parent:
+                os.makedirs(parent, exist_ok=True)
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+                f.flush()
+                os.fsync(f.fileno())
+            if os.name != "nt":
+                try:
+                    os.chmod(tmp_path, 0o600)
+                except OSError:
+                    pass
+            os.replace(tmp_path, CONFIG_PATH)
         except Exception:
-            pass
+            if os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
 
     def _format_hw_badge_text(self) -> str:
         ctype = self.translator.active_compute_type.upper()
@@ -1809,16 +1848,14 @@ class MainWindow(QMainWindow):
         elif hasattr(self, "combo_profile") and self.combo_profile.currentData():
             source_label = str(self.combo_profile.currentData())
 
-        added = 0
-        for w in words:
-            self.vocab_notebook.add_card(
-                word=w,
-                translation=entry.tr_text,
-                context_en=entry.en_text,
-                context_tr=entry.tr_text,
-                source=source_label,
-            )
-            added += 1
+        added_cards = self.vocab_notebook.add_cards_batch(
+            words=words,
+            translation=entry.tr_text,
+            context_en=entry.en_text,
+            context_tr=entry.tr_text,
+            source=source_label,
+        )
+        added = len(added_cards)
 
         self._refresh_vocab_status()
         if not silent:
@@ -1984,13 +2021,10 @@ class MainWindow(QMainWindow):
         self.tuning = compute_runtime_tuning(self.hw_profile, selected_profile)
         self.ocr_engine.apply_tuning(self.tuning)
 
-        if self.translator.is_ready and self.translator.cpu_threads != self.tuning.nmt_threads:
-            try:
-                self.translator.reconfigure_threads(self.tuning.nmt_threads)
-            except Exception:
-                pass
-        else:
-            self.translator.cpu_threads = self.tuning.nmt_threads
+        try:
+            self.translator.set_cpu_threads(self.tuning.nmt_threads)
+        except Exception:
+            pass
 
         if self.worker and self.worker.running:
             self.worker.update_timing(
@@ -2186,12 +2220,31 @@ class MainWindow(QMainWindow):
                 self.edit_tr_model.setPlaceholderText(DEFAULT_MODELS.get(backend, ""))
 
     def _on_translation_backend_changed(self) -> None:
+        new_backend = str(self.combo_tr_backend.currentData() or BACKEND_LOCAL_CT2)
+        prev_backend = getattr(self, "_prev_tr_backend", new_backend)
+        if new_backend != prev_backend:
+            known_default_eps = set(DEFAULT_ENDPOINTS.values())
+            known_default_models = set(DEFAULT_MODELS.values())
+            cur_ep = self.edit_tr_endpoint.text().strip()
+            cur_mdl = self.edit_tr_model.text().strip()
+            if cur_ep in known_default_eps:
+                self.edit_tr_endpoint.blockSignals(True)
+                self.edit_tr_endpoint.setText(DEFAULT_ENDPOINTS.get(new_backend, ""))
+                self.edit_tr_endpoint.blockSignals(False)
+            if cur_mdl in known_default_models:
+                self.edit_tr_model.blockSignals(True)
+                self.edit_tr_model.setText(DEFAULT_MODELS.get(new_backend, ""))
+                self.edit_tr_model.blockSignals(False)
+            self._prev_tr_backend = new_backend
+
         self._sync_backend_inputs_visibility()
         cfg = ContextBackendConfig(
-            backend=str(self.combo_tr_backend.currentData() or BACKEND_LOCAL_CT2),
+            backend=new_backend,
             endpoint=self.edit_tr_endpoint.text().strip(),
             model=self.edit_tr_model.text().strip(),
             api_key=self.edit_tr_apikey.text().strip(),
+            context_window=int(self.settings.get("context_window", 3)),
+            timeout_sec=float(self.settings.get("context_timeout_sec", 3.0)),
         )
         self.translator.update_config(cfg)
         self._save_settings()
@@ -2505,8 +2558,7 @@ class MainWindow(QMainWindow):
                 return
 
             if should_exit:
-                if self.worker and self.worker.isRunning():
-                    self.stop_translation()
+                self.stop_translation(reset_ui=False)
                 self._force_quit = True
                 QTimer.singleShot(150, QApplication.quit)
             else:
@@ -2519,7 +2571,7 @@ class MainWindow(QMainWindow):
         thread.start()
 
     def _open_latest_release_page(self) -> None:
-        if self._latest_release_url:
+        if self._latest_release_url and is_trusted_update_url(self._latest_release_url):
             webbrowser.open(self._latest_release_url)
 
     def _refresh_profile_combo(self) -> None:
@@ -2598,7 +2650,12 @@ class MainWindow(QMainWindow):
         self._save_settings()
 
     def _on_mps_accel_toggled(self, checked: bool) -> None:
-        self.settings["nmt_device"] = "mps" if checked else "cpu"
+        is_checked = bool(checked)
+        if hasattr(self, "chk_mps_accel") and self.chk_mps_accel.isChecked() != is_checked:
+            self.chk_mps_accel.blockSignals(True)
+            self.chk_mps_accel.setChecked(is_checked)
+            self.chk_mps_accel.blockSignals(False)
+        self.settings["nmt_device"] = "mps" if is_checked else "cpu"
         self._save_settings()
 
     def _open_glossary_hub_dialog(self) -> None:
@@ -2752,10 +2809,10 @@ class MainWindow(QMainWindow):
         if not cfg:
             return
         if isinstance(cfg.get("roi"), dict):
-            self.roi = dict(cfg["roi"])
+            self.roi = self._validate_roi(cfg["roi"])
             self.overlay.align_to_roi(self.roi)
             if self.worker and self.worker.running:
-                self.worker.roi = self.roi
+                self.worker.update_roi(self.roi)
         if cfg.get("ocr_mode"):
             idx = self.combo_ocr_mode.findData(cfg["ocr_mode"])
             if idx >= 0:
@@ -2849,7 +2906,11 @@ class MainWindow(QMainWindow):
 
     def _copy_current_translation(self) -> None:
         tr = self.lbl_tr_preview.text().strip()
-        if tr and not tr.startswith("Türkçe çeviri burada"):
+        if (
+            tr
+            and not tr.startswith("Türkçe çeviri burada")
+            and not tr.startswith("Türkçe çeviri orijinal altyazı boyutunda")
+        ):
             QGuiApplication.clipboard().setText(tr)
 
     def _on_history_item_clicked(self, item: QListWidgetItem) -> None:
@@ -2901,6 +2962,22 @@ class MainWindow(QMainWindow):
         self._reset_ui_to_stopped_state(f"Canlı ses başlatılamadı: {err}")
         QMessageBox.warning(self, "Canlı Ses (Whisper)", err)
 
+    def stop_translation(self, reset_ui: bool = True) -> None:
+        """Stops any active OCR or Live Audio translation worker safely."""
+        if self.worker is not None:
+            w_ref = self.worker
+            self.worker = None
+            w_ref.stop()
+            self._retire_worker(w_ref)
+        if self.audio_worker is not None:
+            a_ref = self.audio_worker
+            self.audio_worker = None
+            a_ref.stop()
+            a_ref.wait(1500)
+            self._retire_worker(a_ref)
+        if reset_ui:
+            self._reset_ui_to_stopped_state()
+
     def toggle_translation(self) -> None:
         if not self.translator.is_ready:
             return
@@ -2909,18 +2986,7 @@ class MainWindow(QMainWindow):
         is_audio_active = bool(self.audio_worker and self.audio_worker.isRunning())
 
         if is_ocr_active or is_audio_active:
-            if self.worker is not None:
-                w_ref = self.worker
-                self.worker = None
-                w_ref.stop()
-                self._retire_worker(w_ref)
-            if self.audio_worker is not None:
-                a_ref = self.audio_worker
-                self.audio_worker = None
-                a_ref.stop()
-                a_ref.wait(1500)
-                self._retire_worker(a_ref)
-            self._reset_ui_to_stopped_state()
+            self.stop_translation(reset_ui=True)
         else:
             input_source = (
                 self.combo_input_source.currentData()
@@ -3299,14 +3365,8 @@ class MainWindow(QMainWindow):
                 cleaned_items.append("Kullanıcı ayarları (user_settings.json)")
 
             if chk_model.isChecked():
-                if (self.worker and self.worker.running) or (
-                    self.audio_worker and self.audio_worker.isRunning()
-                ):
-                    self.toggle_translation()
-                self.translator.translator = None
-                self.translator.source_sp = None
-                self.translator.target_sp = None
-                self.translator.is_ready = False
+                self.stop_translation(reset_ui=True)
+                self.translator.unload()
                 import shutil
 
                 shutil.rmtree(self.translator.model_dir, ignore_errors=True)
@@ -3432,11 +3492,10 @@ class MainWindow(QMainWindow):
             self._glossary_hub_thread.wait(1500)
         if self.bench_worker and self.bench_worker.isRunning():
             self.bench_worker.wait(2000)
-        if self.worker and self.worker.running:
-            self.worker.stop()
-        if self.audio_worker and self.audio_worker.isRunning():
-            self.audio_worker.stop()
-            self.audio_worker.wait(1500)
+        if self._update_download_thread and self._update_download_thread.isRunning():
+            self._update_download_thread.cancel()
+            self._update_download_thread.wait(2000)
+        self.stop_translation(reset_ui=False)
         for retired in list(self._retired_workers):
             if retired.isRunning():
                 retired.wait(1200)
@@ -3507,17 +3566,25 @@ def _acquire_single_instance() -> Tuple[bool, object]:
     try:
         from PyQt6.QtNetwork import QLocalServer, QLocalSocket
 
-        server_name = "SubVisionAI_SingleInstance_IPC_v2"
+        uid_suffix = f"_{os.getuid()}" if hasattr(os, "getuid") else ""
+        server_name = f"SubVisionAI_SingleInstance_IPC_v2{uid_suffix}"
         probe = QLocalSocket()
         probe.connectToServer(server_name)
         if probe.waitForConnected(150):
+            probe.write(b"SHOW\n")
+            probe.flush()
+            probe.waitForBytesWritten(150)
             probe.disconnectFromServer()
             return False, None
 
-        QLocalServer.removeServer(server_name)
         server = QLocalServer()
-        if server.listen(server_name):
-            return True, ("qt_ipc", server)
+        if hasattr(QLocalServer, "SocketOption"):
+            server.setSocketOptions(QLocalServer.SocketOption.UserAccessOption)
+        if not server.listen(server_name):
+            QLocalServer.removeServer(server_name)
+            if not server.listen(server_name):
+                return True, None
+        return True, ("qt_ipc", server)
     except Exception:
         pass
     return True, None
@@ -3545,6 +3612,19 @@ def main():
         sys.exit(0)
 
     window = MainWindow()
+    if isinstance(lock_handle, tuple) and lock_handle[0] == "qt_ipc" and lock_handle[1] is not None:
+        ipc_server = lock_handle[1]
+
+        def _on_ipc_wake() -> None:
+            while ipc_server.hasPendingConnections():
+                conn = ipc_server.nextPendingConnection()
+                if conn is not None:
+                    conn.close()
+                    conn.deleteLater()
+            window._restore_from_tray()
+
+        ipc_server.newConnection.connect(_on_ipc_wake)
+
     window.show()
     ret = app.exec()
     _release_single_instance(lock_handle)

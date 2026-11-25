@@ -24,9 +24,11 @@ import platform
 import re
 import shlex
 import shutil
+import ssl
 import subprocess
 import sys
 import tempfile
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional, Tuple
@@ -34,6 +36,72 @@ from typing import Callable, Dict, List, Optional, Tuple
 from subvision import __repo__, __version__
 
 GITHUB_LATEST_RELEASE_URL = f"https://api.github.com/repos/{__repo__}/releases/latest"
+
+TRUSTED_UPDATE_HOSTS = frozenset(
+    {
+        "api.github.com",
+        "github.com",
+        "objects.githubusercontent.com",
+        "release-assets.githubusercontent.com",
+        "github-releases.githubusercontent.com",
+        "codeload.github.com",
+        "raw.githubusercontent.com",
+    }
+)
+
+_STDLIB_URLOPEN = urllib.request.urlopen
+
+
+def is_trusted_update_url(url: str) -> bool:
+    """Returns True only for HTTPS URLs hosted on GitHub release domains."""
+    try:
+        parsed = urllib.parse.urlparse((url or "").strip())
+    except Exception:
+        return False
+    if parsed.scheme.lower() != "https":
+        return False
+    host = (parsed.hostname or "").lower()
+    if not host:
+        return False
+    if host in TRUSTED_UPDATE_HOSTS:
+        return True
+    return host.endswith(".githubusercontent.com")
+
+
+def validate_trusted_update_url(url: str) -> str:
+    cleaned = (url or "").strip()
+    if not is_trusted_update_url(cleaned):
+        raise ValueError(f"Güvenilmeyen güncelleme adresi reddedildi: {cleaned!r}")
+    return cleaned
+
+
+class _TrustedRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        resolved = urllib.parse.urljoin(req.full_url, newurl)
+        if not is_trusted_update_url(resolved):
+            raise ValueError(f"Güvenilmeyen güncelleme yönlendirmesi reddedildi: {resolved!r}")
+        return super().redirect_request(req, fp, code, msg, headers, resolved)
+
+
+def _ssl_context() -> ssl.SSLContext:
+    try:
+        import certifi
+
+        return ssl.create_default_context(cafile=certifi.where())
+    except Exception:
+        return ssl.create_default_context()
+
+
+def _open_trusted_url(req: urllib.request.Request, timeout: float):
+    validate_trusted_update_url(req.full_url)
+    # Preserve monkeypatch compatibility for unit tests patching urllib.request.urlopen
+    if urllib.request.urlopen is not _STDLIB_URLOPEN:
+        return urllib.request.urlopen(req, timeout=timeout)
+    opener = urllib.request.build_opener(
+        _TrustedRedirectHandler(),
+        urllib.request.HTTPSHandler(context=_ssl_context()),
+    )
+    return opener.open(req, timeout=timeout)
 
 
 @dataclass(frozen=True)
@@ -70,9 +138,46 @@ def parse_semver(version_str: str) -> Tuple[int, int, int, int]:
     return (major, minor, patch, is_stable)
 
 
+def parse_semver_key(
+    version_str: str,
+) -> Tuple[int, int, int, int, Tuple[Tuple[int, object], ...]]:
+    """
+    Full SemVer 2.0 comparison key including pre-release identifiers so
+    '1.6.0-beta.2' > '1.6.0-beta.1' and '1.6.0' > '1.6.0-rc.1'.
+    """
+    cleaned = (version_str or "").strip().lstrip("vV")
+    base = cleaned.split("+", 1)[0]
+    match = re.match(r"^(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:-([0-9A-Za-z.-]+))?$", base)
+    if not match:
+        return (0, 0, 0, 0, ())
+    major = int(match.group(1) or 0)
+    minor = int(match.group(2) or 0)
+    patch = int(match.group(3) or 0)
+    pre_raw = match.group(4)
+    if not pre_raw:
+        return (major, minor, patch, 1, ())
+    pre_parts: List[Tuple[int, object]] = []
+    for part in pre_raw.split("."):
+        if part.isdigit():
+            pre_parts.append((0, int(part)))
+        else:
+            pre_parts.append((1, part.lower()))
+    return (major, minor, patch, 0, tuple(pre_parts))
+
+
 def is_newer_version(latest: str, current: str) -> bool:
     """Returns True if `latest` is strictly newer than `current`."""
-    return parse_semver(latest) > parse_semver(current)
+    return parse_semver_key(latest) > parse_semver_key(current)
+
+
+def _asset_arch_tag(lower_name: str) -> str:
+    if any(tok in lower_name for tok in ("universal", "universal2")):
+        return "universal"
+    if any(tok in lower_name for tok in ("arm64", "aarch64", "apple-silicon", "applesilicon")):
+        return "arm64"
+    if any(tok in lower_name for tok in ("x86_64", "x64", "amd64", "intel", "win64")):
+        return "x86_64"
+    return "unspecified"
 
 
 def select_platform_asset(
@@ -82,7 +187,7 @@ def select_platform_asset(
 ) -> Tuple[str, str, int, str]:
     """
     Selects the best installer asset and matching SHA256SUMS URL from GitHub Release
-    `assets` list for the given OS/architecture.
+    `assets` list for the given OS/architecture (rejecting wrong-architecture binaries).
 
     Returns: (asset_name, asset_url, asset_size, checksum_url)
     """
@@ -92,10 +197,13 @@ def select_platform_asset(
     plat = (platform_name or sys.platform).lower()
     arch = (machine or platform.machine() or "").lower()
     is_arm64 = arch in ("arm64", "aarch64")
+    host_arch = "arm64" if is_arm64 else "x86_64"
 
     best_asset: Optional[Dict] = None
     best_score = -1
     checksum_macos = ""
+    checksum_linux = ""
+    checksum_windows = ""
     checksum_generic = ""
 
     for item in assets:
@@ -110,20 +218,27 @@ def select_platform_asset(
         if "sha256" in low and low.endswith(".txt"):
             if "macos" in low or "darwin" in low:
                 checksum_macos = url
+            elif "linux" in low:
+                checksum_linux = url
+            elif "win" in low:
+                checksum_windows = url
             else:
                 checksum_generic = url
+            continue
+
+        arch_tag = _asset_arch_tag(low)
+        if arch_tag in ("arm64", "x86_64") and arch_tag != host_arch:
             continue
 
         score = -1
         if plat == "darwin":
             if low.endswith(".dmg"):
-                score = 10
-                if is_arm64 and ("arm64" in low or "apple-silicon" in low):
+                if arch_tag == host_arch:
                     score = 30
-                elif (not is_arm64) and ("x86_64" in low or "x64" in low or "intel" in low):
-                    score = 30
-                elif "universal" in low:
+                elif arch_tag == "universal":
                     score = 20
+                else:
+                    score = 10
         elif plat == "win32":
             if low.endswith(".exe"):
                 if "setup" in low and "online" not in low:
@@ -132,6 +247,11 @@ def select_platform_asset(
                     score = 20
                 else:
                     score = 10
+        elif plat.startswith("linux"):
+            if low.endswith(".appimage"):
+                score = 30 if arch_tag == host_arch else 25
+            elif low.endswith(".tar.gz") and ("linux" in low or "subvision" in low):
+                score = 20 if arch_tag == host_arch else 15
 
         if score > best_score:
             best_score = score
@@ -140,7 +260,15 @@ def select_platform_asset(
     if not best_asset:
         return ("", "", 0, "")
 
-    checksum_url = (checksum_macos or checksum_generic) if plat == "darwin" else checksum_generic
+    if plat == "darwin":
+        checksum_url = checksum_macos or checksum_generic
+    elif plat.startswith("linux"):
+        checksum_url = checksum_linux or checksum_generic
+    elif plat == "win32":
+        checksum_url = checksum_windows or checksum_generic
+    else:
+        checksum_url = checksum_generic
+
     return (
         str(best_asset.get("name") or ""),
         str(best_asset.get("browser_download_url") or ""),
@@ -185,27 +313,31 @@ def check_for_updates(
     Queries GitHub Releases API for the latest release and compares with current_version.
     Never raises — returns an UpdateInfo with `error` populated on network failure.
     """
-    req = urllib.request.Request(
-        api_url,
-        headers={
-            "Accept": "application/vnd.github+json",
-            "User-Agent": f"SubVisionAI/{current_version}",
-        },
-    )
+    fallback_url = f"https://github.com/{__repo__}/releases/latest"
     try:
-        with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
-            raw = resp.read().decode("utf-8", errors="replace")
+        validated_api = validate_trusted_update_url(api_url)
+        req = urllib.request.Request(
+            validated_api,
+            headers={
+                "Accept": "application/vnd.github+json",
+                "User-Agent": f"SubVisionAI/{current_version}",
+            },
+        )
+        with _open_trusted_url(req, timeout=timeout_sec) as resp:
+            raw = resp.read(2 * 1024 * 1024).decode("utf-8", errors="replace")
         payload = json.loads(raw)
         tag_name = str(payload.get("tag_name") or "").strip()
         latest_ver = tag_name.lstrip("vV") or current_version
-        html_url = str(
-            payload.get("html_url")
-            or f"https://github.com/{__repo__}/releases/latest"
-        )
+        raw_html_url = str(payload.get("html_url") or fallback_url).strip()
+        html_url = raw_html_url if is_trusted_update_url(raw_html_url) else fallback_url
         notes = str(payload.get("body") or "").strip()[:800]
         asset_name, asset_url, asset_size, checksum_url = select_platform_asset(
             payload.get("assets") or []
         )
+        if asset_url and not is_trusted_update_url(asset_url):
+            asset_name, asset_url, asset_size = "", "", 0
+        if checksum_url and not is_trusted_update_url(checksum_url):
+            checksum_url = ""
         return UpdateInfo(
             current_version=current_version,
             latest_version=latest_ver,
@@ -222,7 +354,7 @@ def check_for_updates(
             current_version=current_version,
             latest_version=current_version,
             is_update_available=False,
-            release_url=f"https://github.com/{__repo__}/releases/latest",
+            release_url=fallback_url,
             error=str(exc),
         )
 
@@ -237,11 +369,18 @@ def download_update_asset(
 ) -> str:
     """
     Downloads the platform update installer from GitHub Releases into `dest_dir`,
-    verifies SHA-256 if a checksum file is published, and returns the final file path.
-    Raises RuntimeError on cancellation or integrity failure.
+    and strictly verifies SHA-256 integrity (fail-closed) before returning the path.
+    Raises RuntimeError on cancellation, untrusted URL, or missing/failed SHA-256 verification.
     """
     if not info.has_direct_installer:
         raise RuntimeError("Bu platform için doğrudan kurulum paketi bulunamadı.")
+    if not is_trusted_update_url(info.asset_url):
+        raise RuntimeError("Güvenilmeyen güncelleme indirme adresi reddedildi.")
+    if not info.checksum_url or not is_trusted_update_url(info.checksum_url):
+        raise RuntimeError(
+            "Bu sürüm için güvenilir SHA256SUMS doğrulama dosyası bulunamadı; "
+            "güvenlik gereği otomatik kurulum iptal edildi."
+        )
 
     os.makedirs(dest_dir, exist_ok=True)
     safe_name = os.path.basename(info.asset_name)
@@ -256,10 +395,10 @@ def download_update_asset(
     total = int(info.asset_size or 0)
 
     try:
-        with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+        with _open_trusted_url(req, timeout=timeout_sec) as resp:
             if total <= 0:
-                hdr_len = resp.headers.get("Content-Length")
-                if hdr_len and hdr_len.isdigit():
+                hdr_len = resp.headers.get("Content-Length") if hasattr(resp, "headers") and resp.headers else None
+                if hdr_len and str(hdr_len).isdigit():
                     total = int(hdr_len)
             with open(part_path, "wb") as out:
                 while True:
@@ -273,26 +412,29 @@ def download_update_asset(
                     if progress_cb:
                         progress_cb(downloaded, total)
 
-        if info.checksum_url:
-            if status_cb:
-                status_cb("SHA-256 bütünlüğü doğrulanıyor...")
-            try:
-                cs_req = urllib.request.Request(
-                    info.checksum_url,
-                    headers={"User-Agent": f"SubVisionAI/{info.current_version}"},
-                )
-                with urllib.request.urlopen(cs_req, timeout=10.0) as cs_resp:
-                    sums_text = cs_resp.read().decode("utf-8", errors="replace")
-                expected = parse_sha256sums(sums_text, safe_name)
-                if expected and not verify_file_sha256(part_path, expected):
-                    raise RuntimeError(
-                        "İndirilen güncelleme dosyasının SHA-256 doğrulaması başarısız oldu."
-                    )
-            except RuntimeError:
-                raise
-            except Exception:
-                # Checksum dosyası geçici olarak erişilemezse indirmeyi bozma
-                pass
+        if status_cb:
+            status_cb("SHA-256 bütünlüğü doğrulanıyor...")
+        try:
+            cs_req = urllib.request.Request(
+                info.checksum_url,
+                headers={"User-Agent": f"SubVisionAI/{info.current_version}"},
+            )
+            with _open_trusted_url(cs_req, timeout=10.0) as cs_resp:
+                sums_text = cs_resp.read(512 * 1024).decode("utf-8", errors="replace")
+        except Exception as exc:
+            raise RuntimeError(
+                f"SHA-256 doğrulama dosyası indirilemediği için güncelleme iptal edildi: {exc}"
+            ) from exc
+
+        expected = parse_sha256sums(sums_text, safe_name)
+        if not expected:
+            raise RuntimeError(
+                f"SHA256SUMS dosyasında '{safe_name}' için beklenen özet bulunamadı."
+            )
+        if not verify_file_sha256(part_path, expected):
+            raise RuntimeError(
+                "İndirilen güncelleme dosyasının SHA-256 doğrulaması başarısız oldu."
+            )
 
         os.replace(part_path, final_path)
         return final_path
@@ -359,11 +501,22 @@ def apply_downloaded_update(installer_path: str) -> Tuple[bool, str]:
             script_body = f"""#!/bin/bash
 set -e
 OLD_PID={pid}
+WAIT_TICKS=0
 while kill -0 "$OLD_PID" 2>/dev/null; do
     sleep 0.3
+    WAIT_TICKS=$((WAIT_TICKS + 1))
+    if [ "$WAIT_TICKS" -ge 100 ]; then
+        exit 1
+    fi
 done
 
+SWAPPED=0
 cleanup() {{
+    local rc=$?
+    if [ "$rc" -ne 0 ] && [ "$SWAPPED" -eq 1 ] && [ ! -d {q_app} ] && [ -d {q_app_old} ]; then
+        mv {q_app_old} {q_app} 2>/dev/null || true
+    fi
+    rm -rf {q_app_new} 2>/dev/null || true
     hdiutil detach {q_mnt} -quiet 2>/dev/null || true
     rmdir {q_mnt} 2>/dev/null || true
     rm -f {q_script} 2>/dev/null || true
@@ -383,8 +536,10 @@ xattr -dr com.apple.quarantine {q_app_new} 2>/dev/null || true
 
 if [ -d {q_app} ]; then
     mv {q_app} {q_app_old}
+    SWAPPED=1
 fi
 mv {q_app_new} {q_app}
+SWAPPED=0
 rm -rf {q_app_old}
 rm -f {q_dmg} 2>/dev/null || true
 

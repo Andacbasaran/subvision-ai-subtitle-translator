@@ -139,6 +139,10 @@ class TestTranslatorMultiLangAndMPS(unittest.TestCase):
 
         with (
             patch("subvision.translator.detect_mps_available", return_value=True),
+            patch(
+                "subvision.translator.ctranslate2.get_supported_compute_types",
+                return_value={"float16"},
+            ),
             patch("subvision.translator.ctranslate2.Translator", side_effect=_FakeTranslator),
         ):
             engine, active_type = tr._create_ct2_translator("/fake/model")
@@ -166,6 +170,10 @@ class TestTranslatorMultiLangAndMPS(unittest.TestCase):
 
         with (
             patch("subvision.translator.detect_mps_available", return_value=True),
+            patch(
+                "subvision.translator.ctranslate2.get_supported_compute_types",
+                return_value={"float16", "float32"},
+            ),
             patch("subvision.translator.ctranslate2.Translator", side_effect=_FakeTranslator),
         ):
             engine, active_type = tr._create_ct2_translator("/fake/model")
@@ -174,6 +182,22 @@ class TestTranslatorMultiLangAndMPS(unittest.TestCase):
         self.assertEqual(tr.active_device, "mps")
         self.assertEqual(active_type, "float16")
         self.assertEqual(attempts, [("mps", "float16")])
+
+        # Also verify CT2 4.9+ macOS ARM64 where MPS only advertises float32
+        attempts.clear()
+        with (
+            patch("subvision.translator.detect_mps_available", return_value=True),
+            patch(
+                "subvision.translator.ctranslate2.get_supported_compute_types",
+                return_value={"float32"},
+            ),
+            patch("subvision.translator.ctranslate2.Translator", side_effect=_FakeTranslator),
+        ):
+            engine32, active_type32 = tr._create_ct2_translator("/fake/model")
+        self.assertIsNotNone(engine32)
+        self.assertEqual(tr.active_device, "mps")
+        self.assertEqual(active_type32, "float32")
+        self.assertEqual(attempts, [("mps", "float32")])
 
     def test_05_detect_mps_available_guards(self) -> None:
         with patch("subvision.translator.sys.platform", "win32"):
@@ -188,6 +212,18 @@ class TestTranslatorMultiLangAndMPS(unittest.TestCase):
         with (
             patch("subvision.translator.sys.platform", "darwin"),
             patch("subvision.translator.platform.machine", return_value="arm64"),
+            patch("subvision.translator.ctranslate2.get_mps_device_count", return_value=0, create=True),
+            patch(
+                "subvision.translator.ctranslate2.get_supported_compute_types",
+                return_value={"float32"},
+            ),
+        ):
+            self.assertFalse(detect_mps_available())
+
+        with (
+            patch("subvision.translator.sys.platform", "darwin"),
+            patch("subvision.translator.platform.machine", return_value="arm64"),
+            patch("subvision.translator.ctranslate2.get_mps_device_count", return_value=1, create=True),
             patch(
                 "subvision.translator.ctranslate2.get_supported_compute_types",
                 side_effect=RuntimeError("no mps"),
@@ -198,6 +234,7 @@ class TestTranslatorMultiLangAndMPS(unittest.TestCase):
         with (
             patch("subvision.translator.sys.platform", "darwin"),
             patch("subvision.translator.platform.machine", return_value="arm64"),
+            patch("subvision.translator.ctranslate2.get_mps_device_count", return_value=1, create=True),
             patch(
                 "subvision.translator.ctranslate2.get_supported_compute_types",
                 return_value={"float16", "float32"},

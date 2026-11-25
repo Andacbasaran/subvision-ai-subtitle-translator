@@ -13,7 +13,7 @@ SubVision AI — macOS (Apple Silicon arm64) .app & .dmg Kurulum Paketi Derleme 
 
 Kullanım:
     python scripts/build_macos.py
-    python scripts/build_macos.py --version 1.5.0
+    python scripts/build_macos.py --version 1.6.0
     python scripts/build_macos.py --skip-dmg
 """
 
@@ -31,7 +31,7 @@ from typing import Optional
 
 APP_NAME = "SubVision AI"
 BUNDLE_ID = "com.andacbasaran.subvisionai"
-DEFAULT_VERSION = "1.5.0"
+DEFAULT_VERSION = "1.6.0"
 
 FIRST_LAUNCH_GUIDE = """\
 ========================================================================
@@ -162,6 +162,8 @@ def build_app_bundle(base_dir: str, icns_path: Optional[str], arch: str) -> str:
         "onnxruntime",
         "--collect-all",
         "sentencepiece",
+        "--collect-submodules",
+        "subvision",
     ]
 
     if icns_path and os.path.exists(icns_path):

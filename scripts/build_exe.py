@@ -27,7 +27,7 @@ SubVision AI — Windows Dijital İmzalı Kurulum Yardımcısı, Uninstaller & S
 import os
 import subprocess
 import sys
-from typing import List
+from typing import List, Optional, Sequence, Tuple
 
 for _stream in (sys.stdout, sys.stderr):
     if hasattr(_stream, "reconfigure"):
@@ -36,40 +36,89 @@ for _stream in (sys.stdout, sys.stderr):
         except Exception:
             pass
 
-APP_VERSION = "1.5.0.0"
+APP_VERSION = "1.6.0.0"
+APP_DISPLAY_VERSION = "1.6.0"
 
-EMBEDDED_FILES = [
-    ("main.py", "main.py"),
-    ("requirements.txt", "requirements.txt"),
-    ("subvision/__init__.py", "subvision/__init__.py"),
-    ("subvision/hardware.py", "subvision/hardware.py"),
-    ("subvision/ocr_engine.py", "subvision/ocr_engine.py"),
-    ("subvision/translator.py", "subvision/translator.py"),
-    ("subvision/overlay_ui.py", "subvision/overlay_ui.py"),
-    ("subvision/glossary.py", "subvision/glossary.py"),
-    ("subvision/i18n.py", "subvision/i18n.py"),
-    ("subvision/updater.py", "subvision/updater.py"),
-    ("subvision/context_translator.py", "subvision/context_translator.py"),
-    ("subvision/audio_whisper.py", "subvision/audio_whisper.py"),
-    ("subvision/ui_widgets.py", "subvision/ui_widgets.py"),
-    ("subvision/workers.py", "subvision/workers.py"),
-    ("subvision/custom_glossary.py", "subvision/custom_glossary.py"),
-    ("subvision/profiles.py", "subvision/profiles.py"),
-    ("subvision/window_tracker.py", "subvision/window_tracker.py"),
-    ("subvision/exporters.py", "subvision/exporters.py"),
-    ("scripts/benchmark.py", "scripts/benchmark.py"),
-    ("tests/test_pipeline.py", "tests/test_pipeline.py"),
-    ("glossaries/spiderman2.json", "glossaries/spiderman2.json"),
-    ("glossaries/cyberpunk2077.json", "glossaries/cyberpunk2077.json"),
-    ("glossaries/baldurs_gate3.json", "glossaries/baldurs_gate3.json"),
-    ("assets/app_icon.ico", "assets/app_icon.ico"),
-    ("assets/app_icon.png", "assets/app_icon.png"),
-]
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def discover_embedded_files(base_dir: Optional[str] = None) -> List[Tuple[str, str]]:
+    """
+    Dynamically discovers all files to embed in the Windows Online Setup launcher,
+    guaranteeing every `subvision/*.py` module and `glossaries/*.json` pack is included.
+    """
+    root = os.path.abspath(base_dir or _REPO_ROOT)
+    items: List[Tuple[str, str]] = [
+        ("main.py", "main.py"),
+        ("requirements.txt", "requirements.txt"),
+    ]
+
+    subvision_dir = os.path.join(root, "subvision")
+    if os.path.isdir(subvision_dir):
+        py_files = sorted(
+            f
+            for f in os.listdir(subvision_dir)
+            if f.endswith(".py") and os.path.isfile(os.path.join(subvision_dir, f))
+        )
+        if "__init__.py" in py_files:
+            py_files.remove("__init__.py")
+            py_files.insert(0, "__init__.py")
+        for fname in py_files:
+            rel = f"subvision/{fname}"
+            items.append((rel, rel))
+
+    items.extend(
+        [
+            ("scripts/benchmark.py", "scripts/benchmark.py"),
+            ("tests/test_pipeline.py", "tests/test_pipeline.py"),
+        ]
+    )
+
+    glossaries_dir = os.path.join(root, "glossaries")
+    if os.path.isdir(glossaries_dir):
+        json_files = sorted(
+            f
+            for f in os.listdir(glossaries_dir)
+            if f.lower().endswith(".json") and os.path.isfile(os.path.join(glossaries_dir, f))
+        )
+        for fname in json_files:
+            rel = f"glossaries/{fname}"
+            items.append((rel, rel))
+
+    items.extend(
+        [
+            ("assets/app_icon.ico", "assets/app_icon.ico"),
+            ("assets/app_icon.png", "assets/app_icon.png"),
+        ]
+    )
+    return items
+
+
+def build_csharp_embedded_map(embedded_files: Sequence[Tuple[str, str]]) -> str:
+    """Builds C# EmbeddedMap array literal entries from EMBEDDED_FILES."""
+    entries: List[Tuple[str, str]] = list(embedded_files)
+    cert_entry = ("assets/SubVisionAI-Publisher.cer", "assets/SubVisionAI-Publisher.cer")
+    if cert_entry not in entries:
+        entries.append(cert_entry)
+
+    lines: List[str] = []
+    seen_res_ids = set()
+    for rel_src, rel_dst in entries:
+        res_id = "res_" + os.path.basename(rel_src)
+        if res_id in seen_res_ids:
+            raise ValueError(f"Duplicate embedded resource id detected: {res_id} ({rel_src})")
+        seen_res_ids.add(res_id)
+        win_rel = rel_dst.replace("/", "\\\\")
+        lines.append(f'            {{ "{res_id}", "{win_rel}" }}')
+    return ",\n".join(lines)
+
+
+EMBEDDED_FILES: List[Tuple[str, str]] = discover_embedded_files(_REPO_ROOT)
 
 AppManifestXml = r"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
   <assemblyIdentity
-    version="1.5.0.0"
+    version="1.6.0.0"
     processorArchitecture="amd64"
     name="SubVisionAI.Studio"
     type="win32"
@@ -105,7 +154,7 @@ AppManifestXml = r"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 
 # Windows .NET Framework 4.x csc.exe (C# 5.0 uyumlu)
 # Hem Kurulum Yardımcısını (SetupWizardForm) hem de Opsiyonel Kaldırma Yardımcısını (UninstallWizardForm) içerir.
-LauncherCSharpSource = r"""
+_LAUNCHER_CSHARP_TEMPLATE = r"""
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -130,8 +179,8 @@ using Microsoft.Win32;
 [assembly: AssemblyCopyright("Copyright (c) 2026 Andac Basaran & SubVision AI Contributors (MIT License)")]
 [assembly: AssemblyTrademark("SubVision AI")]
 [assembly: AssemblyCulture("")]
-[assembly: AssemblyVersion("1.5.0.0")]
-[assembly: AssemblyFileVersion("1.5.0.0")]
+[assembly: AssemblyVersion("1.6.0.0")]
+[assembly: AssemblyFileVersion("1.6.0.0")]
 
 namespace SubVisionAI
 {
@@ -216,32 +265,7 @@ namespace SubVisionAI
 
         private static readonly string[,] EmbeddedMap = new string[,]
         {
-            { "res_main.py", "main.py" },
-            { "res_requirements.txt", "requirements.txt" },
-            { "res___init__.py", "subvision\\__init__.py" },
-            { "res_hardware.py", "subvision\\hardware.py" },
-            { "res_ocr_engine.py", "subvision\\ocr_engine.py" },
-            { "res_translator.py", "subvision\\translator.py" },
-            { "res_overlay_ui.py", "subvision\\overlay_ui.py" },
-            { "res_glossary.py", "subvision\\glossary.py" },
-            { "res_i18n.py", "subvision\\i18n.py" },
-            { "res_updater.py", "subvision\\updater.py" },
-            { "res_context_translator.py", "subvision\\context_translator.py" },
-            { "res_audio_whisper.py", "subvision\\audio_whisper.py" },
-            { "res_ui_widgets.py", "subvision\\ui_widgets.py" },
-            { "res_workers.py", "subvision\\workers.py" },
-            { "res_custom_glossary.py", "subvision\\custom_glossary.py" },
-            { "res_profiles.py", "subvision\\profiles.py" },
-            { "res_window_tracker.py", "subvision\\window_tracker.py" },
-            { "res_exporters.py", "subvision\\exporters.py" },
-            { "res_benchmark.py", "scripts\\benchmark.py" },
-            { "res_test_pipeline.py", "tests\\test_pipeline.py" },
-            { "res_spiderman2.json", "glossaries\\spiderman2.json" },
-            { "res_cyberpunk2077.json", "glossaries\\cyberpunk2077.json" },
-            { "res_baldurs_gate3.json", "glossaries\\baldurs_gate3.json" },
-            { "res_app_icon.ico", "assets\\app_icon.ico" },
-            { "res_app_icon.png", "assets\\app_icon.png" },
-            { "res_SubVisionAI-Publisher.cer", "assets\\SubVisionAI-Publisher.cer" }
+__EMBEDDED_MAP_ENTRIES__
         };
 
         public static void ExtractEmbeddedFiles(string appDir, Action<string> logCallback)
@@ -456,7 +480,7 @@ namespace SubVisionAI
                         if (key != null)
                         {
                             key.SetValue("DisplayName", "SubVision AI — Real-Time Subtitle Studio");
-                            key.SetValue("DisplayVersion", "1.5.0");
+                            key.SetValue("DisplayVersion", "1.6.0");
                             key.SetValue("Publisher", "SubVision AI Open Source");
                             key.SetValue("DisplayIcon", File.Exists(iconPath) ? iconPath : mainExe);
                             key.SetValue("InstallLocation", appDir);
@@ -1188,7 +1212,7 @@ namespace SubVisionAI
                     throw new Exception("Paket kurulumu sırasında hata oluştu (Çıkış kodu: " + rcDeps + ").");
                 }
 
-                File.WriteAllText(markerFile, "1.5.0", Encoding.UTF8);
+                File.WriteAllText(markerFile, "1.6.0", Encoding.UTF8);
 
                 // ADIM 4: Kısayolları ve Uninstaller Kaydını Oluştur
                 UpdateProgress("Kısayollar ve Kaldırma Yardımcısı kaydediliyor...", 97, "Sistem entegrasyonu tamamlanıyor...");
@@ -1515,6 +1539,9 @@ namespace SubVisionAI
                 Application.DoEvents();
                 SafeDeleteFile(Path.Combine(_appDir, "user_settings.json"));
                 SafeDeleteFile(Path.Combine(_localAppDataDir, "user_settings.json"));
+                SafeDeleteFile(Path.Combine(_appDir, "vocab_notebook.json"));
+                SafeDeleteFile(Path.Combine(_localAppDataDir, "vocab_notebook.json"));
+                SafeDeleteDir(Path.Combine(_localAppDataDir, "glossaries"));
                 SafeDeleteFile(Path.Combine(_appDir, "benchmark_results.json"));
             }
             _progressBar.Value = 80;
@@ -1726,6 +1753,17 @@ namespace SubVisionAI
 """
 
 
+def render_launcher_csharp_source(embedded_files: Optional[Sequence[Tuple[str, str]]] = None) -> str:
+    files = list(embedded_files) if embedded_files is not None else EMBEDDED_FILES
+    return _LAUNCHER_CSHARP_TEMPLATE.replace(
+        "__EMBEDDED_MAP_ENTRIES__",
+        build_csharp_embedded_map(files),
+    )
+
+
+LauncherCSharpSource = render_launcher_csharp_source(EMBEDDED_FILES)
+
+
 def ensure_publisher_certificate_and_sign(base_dir: str, exe_paths: List[str]) -> bool:
     """
     Windows üzerinde üretilen tüm .exe dosyalarını Authenticode SHA-256 + RFC 3161 Timestamp ile imzalar.
@@ -1854,8 +1892,10 @@ def build_native_exe(base_dir: str) -> bool:
     exe_file = os.path.join(base_dir, "SubVisionAI.exe")
     ico_file = os.path.join(base_dir, "assets", "app_icon.ico")
 
+    embedded_list = discover_embedded_files(base_dir)
+    cs_source = render_launcher_csharp_source(embedded_list)
     with open(cs_file, "w", encoding="utf-8-sig") as f:
-        f.write(LauncherCSharpSource.strip())
+        f.write(cs_source.strip())
     with open(manifest_file, "w", encoding="utf-8") as f:
         f.write(AppManifestXml.strip())
 
@@ -1875,7 +1915,6 @@ def build_native_exe(base_dir: str) -> bool:
     if os.path.exists(ico_file):
         cmd.append(f"/win32icon:{ico_file}")
 
-    embedded_list = list(EMBEDDED_FILES)
     if os.path.exists(cer_file):
         embedded_list.append(("assets/SubVisionAI-Publisher.cer", "assets/SubVisionAI-Publisher.cer"))
 
@@ -1944,6 +1983,8 @@ def build_pyinstaller_bundle(base_dir: str) -> None:
         "onnxruntime",
         "--collect-all",
         "sentencepiece",
+        "--collect-submodules",
+        "subvision",
     ]
     if os.path.exists(ico_file):
         cmd.extend(["--icon", ico_file, "--add-data", f"{ico_file}{data_sep}assets"])
